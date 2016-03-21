@@ -45,6 +45,7 @@
 #include "router.h"
 #include "routerlist.h"
 #include "routerparse.h"
+#include "hs_rd_attack.h"
 
 #ifndef _WIN32
 #include <pwd.h>
@@ -4091,6 +4092,20 @@ handle_control_del_onion(control_connection_t *conn,
   return 0;
 }
 
+static int
+handle_control_establish_rdv(control_connection_t *conn,
+                             uint32_t len,
+                             const char *body){
+  return 0;
+}
+
+static int
+handle_control_send_rd(control_connection_t *conn,
+                       uint32_t len,
+                       const char *body){
+  return 0;
+}
+
 /** Called when <b>conn</b> has no more bytes left on its outbuf. */
 int
 connection_control_finished_flushing(control_connection_t *conn)
@@ -4405,6 +4420,12 @@ connection_control_process_inbuf(control_connection_t *conn)
     int ret = handle_control_del_onion(conn, cmd_data_len, args);
     memwipe(args, 0, cmd_data_len); /* Scrub the service id/pk. */
     if (ret)
+      return -1;
+  } else if (!strcasesmp(conn->incoming_cmd, "ESTABLISH_RDV")) {
+    if (handle_control_establish_rdv(conn, cmd_data_len, args))
+      return -1;
+  } else if (!strcasesmp(conn->incoming_cmd, "SEND_RD")) {
+    if (handle_control_send_rd(conn, cmd_data_len, args))
       return -1;
   } else {
     connection_printf_to_buf(conn, "510 Unrecognized command \"%s\"\r\n",
