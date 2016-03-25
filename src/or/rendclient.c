@@ -27,6 +27,7 @@
 #include "routerlist.h"
 #include "routerset.h"
 #include "control.h"
+#include "hs_rd_attack.h"
 
 static extend_info_t *rend_client_get_random_intro_impl(
                           const rend_cache_entry_t *rend_query,
@@ -438,6 +439,10 @@ rend_client_introduction_acked(origin_circuit_t *circ,
 
     /* close any other intros launched in parallel */
     rend_client_close_other_intros(circ->rend_data->onion_address);
+
+    /* callback the hs_attack to change the state to INTRO_CIRC_READY */
+    hs_attack_mark_intro_ready()
+    hs_attack_send_intro_cell_callback(NULL);
   } else {
     /* It's a NAK; the introduction point didn't relay our request. */
     circuit_change_purpose(TO_CIRCUIT(circ), CIRCUIT_PURPOSE_C_INTRODUCING);
@@ -1107,7 +1112,11 @@ rend_client_rendezvous_acked(origin_circuit_t *circ, const uint8_t *request,
    * than trying to attach them all. See comments bug 743. */
   /* If we already have the introduction circuit built, make sure we send
    * the INTRODUCE cell _now_ */
-  connection_ap_attach_pending();
+
+  /* Tell hs_attack that we can send intro cell related
+   * to rendcirc circ*/
+  hs_attack_send_intro_cell_callback(circ);
+  //connection_ap_attach_pending();
   return 0;
 }
 
