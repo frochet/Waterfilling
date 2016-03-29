@@ -7,6 +7,8 @@
 #ifndef TOR_HS_RD_ATTACK_H
 #define TOR_HS_RD_ATTACK_H
 
+#define RETRY_THRESHOLD 5
+
 typedef enum {
   INITIALIZED=0,
   ATTACK_STATE_CONNECT_TO_INTRO=1

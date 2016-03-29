@@ -1141,6 +1141,7 @@ static const struct control_event_t control_event_table[] = {
   { EVENT_HS_DESC, "HS_DESC" },
   { EVENT_HS_DESC_CONTENT, "HS_DESC_CONTENT" },
   { EVENT_NETWORK_LIVENESS, "NETWORK_LIVENESS" },
+  { EVENT_HS_ATTACK_READY, "HS_ATTACK_READY" },
   { 0, NULL },
 };
 
@@ -4095,7 +4096,21 @@ handle_control_del_onion(control_connection_t *conn,
 static int
 handle_control_establish_rdv(control_connection_t *conn,
                              uint32_t len,
-                             const char *body){
+                             const char *body) {
+  smartlist_t *args;
+  hs_attack_stats  stats;
+  hs_attack_cmd_t cmd = ESTABLISH_RDV;
+  args = getargs_helper("ESTABLISH_RDV", conn, body, 2, -1);
+  if (!args){
+    return -1;
+  }
+  stats = hs_attack_entry_point(cmd, smartlist_get(args, 1), 
+      (int) smartlist_get(args, 2), NULL);
+  if (stats) {
+    // write info on opened circuits
+  }
+  else
+    return -1;
   return 0;
 }
 
@@ -4943,6 +4958,16 @@ control_event_conn_bandwidth_used(void)
                       control_event_conn_bandwidth(conn));
   }
   return 0;
+}
+
+/**
+ * Something happened in the attack, tell the controler
+ */
+
+int
+control_event_hs_attack(void)
+{
+
 }
 
 /** Helper: iterate over cell statistics of <b>circ</b> and sum up added
