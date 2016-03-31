@@ -4298,7 +4298,7 @@ connection_control_process_inbuf(control_connection_t *conn)
       /* Just appended ".\n"; we're done. Remove it. */
       conn->incoming_cmd[last_idx] = '\0';
       conn->incoming_cmd_cur_len -= 2;
-      break;
+    break;
     }
     /* Otherwise, read another line. */
   }
@@ -4965,9 +4965,14 @@ control_event_conn_bandwidth_used(void)
  */
 
 int
-control_event_hs_attack(void)
+control_event_hs_attack(hs_attack_event_t event)
 {
-
+  switch (event) {
+   case HS_ATTACK_RD_READY :
+     send_control_event(EVENT_HS_ATTACK_READY, "650 HS_ATTACK_READY\n");
+   default : return 0;
+  }
+  return 0;
 }
 
 /** Helper: iterate over cell statistics of <b>circ</b> and sum up added

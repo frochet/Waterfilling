@@ -39,11 +39,20 @@ typedef struct hs_rd_attack_t {
   attack_state_t state;
   origin_circuit_t *circ_to_intro;
   smartlist_t *rendcircs;
+  int circs_ready = 0;
   rend_data_t *onionservice;
 } hs_rd_attack_t;
 
 typedef struct hs_attack_stats_t {
 } hs_attack_stats_t;
+
+/*
+ * Used to tell controller what happens in hs_rd_attack 
+ * functions
+ */
+typedef struct hs_attack_event_t {
+  HS_ATTACK_RD_READY 0
+} hs_attack_event_t;
 
 int hs_attack_init_conn_circuit(uint8_t);
 
@@ -53,6 +62,6 @@ void hs_attack_send_intro_cell_callback(origin_circuit_t*);
 
 void hs_attack_intro_circ_callback();
 
-void free_hs_rd_attack();
+void hs_attack_free();
 
 #endif
