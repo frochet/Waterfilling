@@ -1186,9 +1186,13 @@ rend_client_receive_rendezvous(origin_circuit_t *circ, const uint8_t *request,
 
   onion_append_to_cpath(&circ->cpath, hop);
   circ->build_state->pending_final_cpath = NULL; /* prevent double-free */
-
-  circuit_try_attaching_streams(circ);
-
+  
+  //
+  //circuit_try_attaching_streams(circ);
+  
+  // tell that we are ready to launch the attack
+  hs_attack_mark_rendezvous_ready(circ);
+  
   memwipe(keys, 0, sizeof(keys));
   return 0;
  err:
