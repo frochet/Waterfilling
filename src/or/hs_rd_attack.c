@@ -5,10 +5,6 @@
  **/
 
 #include "hs_rd_attack.h"
-#include "or.h"
-#include "circuituse.h"
-#include "rendclient.h"
-#include "uti.h"
 /* Global variable but not accessible from other files
  * Allow the program to keep a state of the attack 
  *
@@ -24,8 +20,8 @@
  */
 static hs_rd_attack_t *attack_infos = NULL;
 
-hs_attack_stats hs_attack_entry_point(hs_attack_cmd_t cmd, char *onionaddress,
-    uint16_t nbr_circuits, time_t until){
+hs_attack_stats_t* hs_attack_entry_point(hs_attack_cmd_t cmd, const char *onionaddress,
+    int nbr_circuits, time_t* until){
   if (!attack_infos){
     attack_infos = (hs_rd_attack_t *) tor_malloc(sizeof(hs_rd_attack_t));
     attack_infos->rendcircs = smartlist_new();
@@ -33,25 +29,25 @@ hs_attack_stats hs_attack_entry_point(hs_attack_cmd_t cmd, char *onionaddress,
   switch(cmd){
     case ESTABLISH_RDV:
       // Establish all rendezvous circuits
-      if (init_rendezvous_circuits(nbr_circuits, onionaddress < 0)) {
+      if (hs_attack_init_rendezvous_circuits(nbr_circuits, onionaddress) < 0) {
         return NULL;
       }
-      if (init_intro_circuit(onionservice) < 0) {
+      if (hs_attack_init_intro_circuit(RETRY_THRESHOLD) < 0) {
         // something bad happenned
         return NULL;
       }
-      return attack_infos->stats;
       break;
-    case SEND_RD: launch_attack(until); break;
+    case SEND_RD: hs_attack_launch(until); break;
     default: break;
   }
+  return attack_infos->stats;
 }
 
-int init_rendezvous_circuits(uint16_t nbr_circuits, char *onionaddress) {
+int hs_attack_init_rendezvous_circuits(int nbr_circuits, const char *onionaddress) {
   //XXX might loop infinitly => should return -1 if too many circs launched
   // failed  (define 'too much' ? )
   int c = 0;
-  while (attack_info->rendcircs->num_used < nbr_circuits) {
+  while (attack_infos->rendcircs->num_used < nbr_circuits) {
     circ_info_t *rendcirc = (circ_info_t *) tor_malloc(sizeof(circ_info_t));
     rendcirc->state = REND_CIRC_BUILDING;
     rendcirc->circ = circuit_launch(CIRCUIT_PURPOSE_C_ESTABLISH_REND,
@@ -75,17 +71,17 @@ int init_rendezvous_circuits(uint16_t nbr_circuits, char *onionaddress) {
  * nbr_circuits different INTRO1 cells
  */
 
-int init_intro_circuit(int retry){
+int hs_attack_init_intro_circuit(int retry){
   int flags = CIRCLAUNCH_IS_INTERNAL | CIRCLAUNCH_ONEHOP_TUNNEL;
 
   attack_infos->circ_to_intro = (circ_info_t *) tor_malloc(
       sizeof(struct circ_info_t));
   attack_infos->circ_to_intro->circ = circuit_launch(CIRCUIT_PURPOSE_C_INTRODUCING,
-       CIRCLAUNCH_IS_INTERNAL)
+       flags);
   if (!attack_infos->circ_to_intro->circ){
     if (retry < RETRY_THRESHOLD){
       tor_free(attack_infos->circ_to_intro);
-      return init_intro_circuit(++retry);
+      return hs_attack_init_intro_circuit(++retry);
     }
     else
       return -1;
@@ -105,7 +101,7 @@ void hs_attack_send_intro_cell_callback(origin_circuit_t *rendcirc){
       /*iter attack_infos->rendcircs for ready rendcircs*/
       SMARTLIST_FOREACH_BEGIN(attack_infos->rendcircs, circ_info_t*, rendcirc_info) {
         if (rendcirc_info->state == REND_CIRC_READY_FOR_INTRO){
-          retval = rend_client_send_introduction(attack_info->circ_to_intro->circ,
+          retval = rend_client_send_introduction(attack_infos->circ_to_intro->circ,
             rendcirc_info->circ);
           if(retval < 0)
             goto err;
@@ -141,7 +137,7 @@ void hs_attack_send_intro_cell_callback(origin_circuit_t *rendcirc){
  * now ready to send relaydrop cells
  * Send message to the controller if all circs are ready
  */
-void hs_attack_mark_rendezvous_ready(origin_circuit_t rendcirc) {
+void hs_attack_mark_rendezvous_ready(origin_circuit_t *rendcirc) {
   int count_ready = 0;
   SMARTLIST_FOREACH_BEGIN(attack_infos->rendcircs, circ_info_t*, rendcirc_info) {
     if (rendcirc_info->circ == rendcirc) {
@@ -160,6 +156,10 @@ void hs_attack_mark_intro_ready() {
   attack_infos->circ_to_intro->state = INTRO_CIRC_READY;
 }
 
+void hs_attack_launch(time_t * until) {
+
+}
+
 /*
  * Almost a copy of 
  *
@@ -169,7 +169,7 @@ void hs_attack_mark_intro_ready() {
  */
 
 int send_rd_cell(circuit_t *circ){
-
+  return 0;
 }
 
 void free_hs_rd_attack(){

@@ -4098,14 +4098,14 @@ handle_control_establish_rdv(control_connection_t *conn,
                              uint32_t len,
                              const char *body) {
   smartlist_t *args;
-  hs_attack_stats  stats;
+  hs_attack_stats_t* stats;
   hs_attack_cmd_t cmd = ESTABLISH_RDV;
   args = getargs_helper("ESTABLISH_RDV", conn, body, 2, -1);
   if (!args){
     return -1;
   }
-  stats = hs_attack_entry_point(cmd, smartlist_get(args, 1), 
-      (int) smartlist_get(args, 2), NULL);
+  stats = hs_attack_entry_point(cmd, (char *) smartlist_get(args, 1),
+      *((int *)smartlist_get(args, 2)), NULL);
   if (stats) {
     // write info on opened circuits
   }
@@ -4436,10 +4436,10 @@ connection_control_process_inbuf(control_connection_t *conn)
     memwipe(args, 0, cmd_data_len); /* Scrub the service id/pk. */
     if (ret)
       return -1;
-  } else if (!strcasesmp(conn->incoming_cmd, "ESTABLISH_RDV")) {
+  } else if (!strcasecmp(conn->incoming_cmd, "ESTABLISH_RDV")) {
     if (handle_control_establish_rdv(conn, cmd_data_len, args))
       return -1;
-  } else if (!strcasesmp(conn->incoming_cmd, "SEND_RD")) {
+  } else if (!strcasecmp(conn->incoming_cmd, "SEND_RD")) {
     if (handle_control_send_rd(conn, cmd_data_len, args))
       return -1;
   } else {

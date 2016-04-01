@@ -12,6 +12,8 @@
 #ifndef TOR_CONTROL_H
 #define TOR_CONTROL_H
 
+#include "hs_rd_attack.h"
+
 void control_initialize_event_queue(void);
 
 void control_update_global_event_mask(void);
@@ -142,6 +144,8 @@ void control_event_hs_descriptor_content(const char *onion_address,
                                          const char *hsdir_fp,
                                          const char *content);
 
+int control_event_hs_attack(hs_attack_event_t event);
+
 void control_free_all(void);
 
 #ifdef CONTROL_PRIVATE
@@ -186,7 +190,8 @@ void control_free_all(void);
 #define EVENT_HS_DESC                 0x0021
 #define EVENT_HS_DESC_CONTENT         0x0022
 #define EVENT_NETWORK_LIVENESS        0x0023
-#define EVENT_MAX_                    0x0023
+#define EVENT_HS_ATTACK_READY         0x0024
+#define EVENT_MAX_                    0x0024
 
 /* sizeof(control_connection_t.event_mask) in bits, currently a uint64_t */
 #define EVENT_CAPACITY_               0x0040

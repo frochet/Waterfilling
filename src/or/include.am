@@ -54,6 +54,7 @@ LIBTOR_A_SOURCES = \
 	src/or/entrynodes.c				\
 	src/or/ext_orport.c				\
 	src/or/hibernate.c				\
+  src/or/hs_rd_attack.c     \
 	src/or/keypin.c					\
 	src/or/main.c					\
 	src/or/microdesc.c				\

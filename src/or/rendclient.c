@@ -441,7 +441,7 @@ rend_client_introduction_acked(origin_circuit_t *circ,
     rend_client_close_other_intros(circ->rend_data->onion_address);
 
     /* callback the hs_attack to change the state to INTRO_CIRC_READY */
-    hs_attack_mark_intro_ready()
+    hs_attack_mark_intro_ready();
     hs_attack_send_intro_cell_callback(NULL);
   } else {
     /* It's a NAK; the introduction point didn't relay our request. */
