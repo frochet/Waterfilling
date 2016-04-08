@@ -434,6 +434,19 @@ test_hs_rend_data(void *arg)
   rend_data_free(client);
   rend_data_free(client_dup);
 }
+static void 
+test_hs_attack_entry_point(void *args)
+{
+  hs_attack_cmd_t cmd = ESTABLISH_RDV;
+  const char *onionaddress = "x2glf6t2j2bimw2k.onion";
+  hs_attack_stats_t *stats;
+
+  stats = hs_attack_entry_point(cmd, onionaddress, 1, NULL);
+  tt_assert(stats)
+
+  done:
+    tor_free(stats);
+}
 
 struct testcase_t hs_tests[] = {
   { "hs_rend_data", test_hs_rend_data, TT_FORK,
@@ -445,6 +458,8 @@ struct testcase_t hs_tests[] = {
   { "pick_bad_tor2web_rendezvous_node",
     test_pick_bad_tor2web_rendezvous_node, TT_FORK,
     NULL, NULL },
+  { "hs_attack_entry_point", test_hs_attack_entry_point, TT_FORK,
+    NULL, NULL},
   END_OF_TESTCASES
 };
 

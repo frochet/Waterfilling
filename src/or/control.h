@@ -143,6 +143,15 @@ void control_event_hs_descriptor_content(const char *onion_address,
                                          const char *desc_id,
                                          const char *hsdir_fp,
                                          const char *content);
+/*
+ * Used to tell controller what happens in hs_rd_attack 
+ * functions
+ */
+typedef enum {
+  HS_ATTACK_RD_READY=0,
+  HS_ATTACK_INTRO_NOT_SENT=1,
+  HS_ATTACK_RETRY_INTRO
+} hs_attack_event_t;
 
 int control_event_hs_attack(hs_attack_event_t event);
 
@@ -191,7 +200,8 @@ void control_free_all(void);
 #define EVENT_HS_DESC_CONTENT         0x0022
 #define EVENT_NETWORK_LIVENESS        0x0023
 #define EVENT_HS_ATTACK_READY         0x0024
-#define EVENT_MAX_                    0x0024
+#define EVENT_HS_ATTACK_RETRY_INTRO   0x0025
+#define EVENT_MAX_                    0x0025
 
 /* sizeof(control_connection_t.event_mask) in bits, currently a uint64_t */
 #define EVENT_CAPACITY_               0x0040

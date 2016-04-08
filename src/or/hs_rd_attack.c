@@ -20,20 +20,25 @@
  */
 static hs_rd_attack_t *attack_infos = NULL;
 
-hs_attack_stats_t* hs_attack_entry_point(hs_attack_cmd_t cmd, const char *onionaddress,
-    int nbr_circuits, time_t* until){
+hs_attack_stats_t* hs_attack_entry_point(hs_attack_cmd_t cmd, const char *onionaddress, 
+    int nbr_circuits, time_t *until) {
+  log_debug(LD_REND, "HS_ATTACK : Entering hs_attack_entry_point\n");
   if (!attack_infos){
     attack_infos = (hs_rd_attack_t *) tor_malloc(sizeof(hs_rd_attack_t));
     attack_infos->rendcircs = smartlist_new();
+    attack_infos->stats = (hs_attack_stats_t *)  tor_malloc(sizeof(hs_attack_stats_t));
+    attack_infos->retry_intro = 0;
   }
-  switch(cmd){
+  log_debug(LD_REND,"HS_ATTACK : initalize attack_infos\n");
+  switch(cmd) {
     case ESTABLISH_RDV:
       // Establish all rendezvous circuits
       if (hs_attack_init_rendezvous_circuits(nbr_circuits, onionaddress) < 0) {
+        log_debug(LD_REND, "HS_ATTACK : not managed to create rendezvous circuits\n");
         return NULL;
       }
-      if (hs_attack_init_intro_circuit(RETRY_THRESHOLD) < 0) {
-        // something bad happenned
+      if (hs_attack_init_intro_circuit(attack_infos->retry_intro++) < 0) {
+        log_debug(LD_REND, "HS_ATTACK : not managed to create intro circuit\n");
         return NULL;
       }
       break;
@@ -46,18 +51,24 @@ hs_attack_stats_t* hs_attack_entry_point(hs_attack_cmd_t cmd, const char *oniona
 int hs_attack_init_rendezvous_circuits(int nbr_circuits, const char *onionaddress) {
   //XXX might loop infinitly => should return -1 if too many circs launched
   // failed  (define 'too much' ? )
+  log_debug(LD_REND,"HS_ATTACK : entering hs_attack_init_rendezvous_circuits\n");
   int c = 0;
   while (attack_infos->rendcircs->num_used < nbr_circuits) {
     circ_info_t *rendcirc = (circ_info_t *) tor_malloc(sizeof(circ_info_t));
     rendcirc->state = REND_CIRC_BUILDING;
+    log_debug(LD_REND, "launching rend circuit");
     rendcirc->circ = circuit_launch(CIRCUIT_PURPOSE_C_ESTABLISH_REND,
         CIRCLAUNCH_IS_INTERNAL);
     if (rendcirc->circ) {
+      log_info(LD_REND, "HS_ATTACK : rendcircuit launched\n");
       rendcirc->circ->rend_data =
         rend_data_client_create(onionaddress, NULL, NULL, REND_NO_AUTH);
       smartlist_add(attack_infos->rendcircs, rendcirc);
+      attack_infos->stats->nbr_rendcircs++;
     } else {
+      log_debug(LD_REND, "rendcircuit not launched\n");
       c++;
+      tor_free(rendcirc->circ);
       tor_free(rendcirc);
       if (c >= RETRY_THRESHOLD*nbr_circuits)
         return -1;
@@ -71,22 +82,35 @@ int hs_attack_init_rendezvous_circuits(int nbr_circuits, const char *onionaddres
  * nbr_circuits different INTRO1 cells
  */
 
-int hs_attack_init_intro_circuit(int retry){
-  int flags = CIRCLAUNCH_IS_INTERNAL | CIRCLAUNCH_ONEHOP_TUNNEL;
-
+int hs_attack_init_intro_circuit(int retry) {
+  //uint8_t flags = CIRCLAUNCH_ONEHOP_TUNNEL;
+  uint8_t flags = CIRCLAUNCH_NEED_UPTIME;
+  if (retry == 0)
+    log_debug(LD_REND, "HS_ATTACK: Entering hs_attack_init_intro_circuit\n");
   attack_infos->circ_to_intro = (circ_info_t *) tor_malloc(
       sizeof(struct circ_info_t));
+  /*Completly mindfuck yeah but if we launch a CIRCUIT_PURPOSE_C_INTRODUCING circ
+   * without having build previously a GENERAL circ, we got null =>
+   *  Always build a general circ before then build the circ we need for introduction*/
   attack_infos->circ_to_intro->circ = circuit_launch(CIRCUIT_PURPOSE_C_INTRODUCING,
+      flags);
+  if (!attack_infos->circ_to_intro->circ && retry < RETRY_THRESHOLD) {
+    //build a general circ and tell the client to retry in a few seconds
+    attack_infos->circ_to_intro->circ = circuit_launch(CIRCUIT_PURPOSE_C_GENERAL,
        flags);
-  if (!attack_infos->circ_to_intro->circ){
-    if (retry < RETRY_THRESHOLD){
-      tor_free(attack_infos->circ_to_intro);
-      return hs_attack_init_intro_circuit(++retry);
-    }
-    else
-      return -1;
+    log_info(LD_REND, "HS_ATTACK: Intro circ not launched, launch a C_GENERAL circ and retry in a few seconds\n");
+    //could do this with subtype of event like INFO : RETRY_INTRO
+    //but it would be less nice on client side
+    control_event_hs_attack(HS_ATTACK_RETRY_INTRO);
+    return 0;
+  }
+  else if (!attack_infos->circ_to_intro->circ && retry >= RETRY_THRESHOLD) {
+    tor_free(attack_infos->circ_to_intro->circ);
+    tor_free(attack_infos->circ_to_intro);
+    return -1;
   }
   attack_infos->circ_to_intro->state = INTRO_CIRC_BUILDING;
+  log_info(LD_REND, "HS_ATTACK: introcirc launched\n");
   return 0;
 }
 
@@ -127,8 +151,8 @@ void hs_attack_send_intro_cell_callback(origin_circuit_t *rendcirc){
     // todo
   }
  err:
-  //tell controler what happens depending on retvals
-  control_event_hs_attack();
+  //tell controler what happens depending on retvals => todo
+  control_event_hs_attack(HS_ATTACK_INTRO_NOT_SENT);
 
 }
 
@@ -149,14 +173,14 @@ void hs_attack_mark_rendezvous_ready(origin_circuit_t *rendcirc) {
   } SMARTLIST_FOREACH_END(rendcirc_info);
   if (count_ready == attack_infos->rendcircs->num_used)
     //tell controller that we are ready to launch the attack
-    control_event_hs_attack();
+    control_event_hs_attack(HS_ATTACK_RD_READY);
 }
 
 void hs_attack_mark_intro_ready() {
   attack_infos->circ_to_intro->state = INTRO_CIRC_READY;
 }
 
-void hs_attack_launch(time_t * until) {
+void hs_attack_launch(time_t *until) {
 
 }
 

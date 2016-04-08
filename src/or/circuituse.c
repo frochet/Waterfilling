@@ -1795,6 +1795,7 @@ circuit_launch_by_extend_info(uint8_t purpose,
       n_circuit_failures > MAX_CIRCUIT_FAILURES) {
     /* too many failed circs in a row. don't try. */
 //    log_fn(LOG_INFO,"%d failures so far, not trying.",n_circuit_failures);
+    log_debug(LD_CIRC, "Too many failed circs :'(\n");
     return NULL;
   }
 

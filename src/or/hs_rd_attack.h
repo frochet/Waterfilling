@@ -13,6 +13,7 @@
 #include "circuituse.h"
 #include "rendclient.h"
 #include "util.h"
+#include "control.h"
 
 typedef enum {
   INITIALIZED=0,
@@ -39,6 +40,8 @@ typedef struct circ_info_t {
 } circ_info_t;
 
 typedef struct hs_attack_stats_t {
+  int tot_cells;
+  int nbr_rendcircs;
 } hs_attack_stats_t;
 
 typedef struct hs_rd_attack_t {
@@ -49,16 +52,10 @@ typedef struct hs_rd_attack_t {
   smartlist_t *rendcircs;
   rend_data_t *onionservice;
   hs_attack_stats_t *stats;
+  int retry_intro;
 } hs_rd_attack_t;
 
 
-/*
- * Used to tell controller what happens in hs_rd_attack 
- * functions
- */
-typedef enum {
-  HS_ATTACK_RD_READY=0
-} hs_attack_event_t;
 
 hs_attack_stats_t*  hs_attack_entry_point(hs_attack_cmd_t, const char*, int, time_t*);
 

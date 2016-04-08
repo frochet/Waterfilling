@@ -463,8 +463,8 @@ circuit_establish_circuit(uint8_t purpose, extend_info_t *exit, int flags)
 {
   origin_circuit_t *circ;
   int err_reason = 0;
-
   circ = origin_circuit_init(purpose, flags);
+  log_debug(LD_CIRC, "Trying to build new circuit ... purpose %d\n", purpose);
 
   if (onion_pick_cpath_exit(circ, exit) < 0 ||
       onion_populate_cpath(circ) < 0) {
@@ -473,11 +473,12 @@ circuit_establish_circuit(uint8_t purpose, extend_info_t *exit, int flags)
   }
 
   control_event_circuit_status(circ, CIRC_EVENT_LAUNCHED, 0);
-
+  log_debug(LD_CIRC, "chose a circuit, handling now first hop ...\n");
   if ((err_reason = circuit_handle_first_hop(circ)) < 0) {
     circuit_mark_for_close(TO_CIRCUIT(circ), -err_reason);
     return NULL;
   }
+  log_debug(LD_CIRC, "Builded new circuit ... purpose %d\n", purpose);
   return circ;
 }
 
@@ -1863,7 +1864,7 @@ choose_good_exit_server(uint8_t purpose,
         return rendezvous_node;
       }
   }
-  log_warn(LD_BUG,"Unhandled purpose %d", purpose);
+  log_debug(LD_BUG,"Unhandled purpose %d", purpose);
   tor_fragile_assert();
   return NULL;
 }
@@ -1971,7 +1972,7 @@ onion_pick_cpath_exit(origin_circuit_t *circ, extend_info_t *exit)
       choose_good_exit_server(circ->base_.purpose, state->need_uptime,
                               state->need_capacity, state->is_internal);
     if (!node) {
-      log_warn(LD_CIRC,"Failed to choose an exit server");
+      log_debug(LD_CIRC,"Failed to choose an exit server");
       return -1;
     }
     exit = extend_info_from_node(node, 0);

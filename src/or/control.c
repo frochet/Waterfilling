@@ -1142,6 +1142,7 @@ static const struct control_event_t control_event_table[] = {
   { EVENT_HS_DESC_CONTENT, "HS_DESC_CONTENT" },
   { EVENT_NETWORK_LIVENESS, "NETWORK_LIVENESS" },
   { EVENT_HS_ATTACK_READY, "HS_ATTACK_READY" },
+  { EVENT_HS_ATTACK_RETRY_INTRO, "HS_ATTACK_RETRY_INTRO"},
   { 0, NULL },
 };
 
@@ -4097,20 +4098,27 @@ static int
 handle_control_establish_rdv(control_connection_t *conn,
                              uint32_t len,
                              const char *body) {
+  log_debug(LD_CONTROL, "HS_ATTACK : Entering handle_control_establish_rdv");
   smartlist_t *args;
-  hs_attack_stats_t* stats;
+  hs_attack_stats_t *stats;
   hs_attack_cmd_t cmd = ESTABLISH_RDV;
   args = getargs_helper("ESTABLISH_RDV", conn, body, 2, -1);
   if (!args){
     return -1;
   }
-  stats = hs_attack_entry_point(cmd, (char *) smartlist_get(args, 1),
-      *((int *)smartlist_get(args, 2)), NULL);
+  const char *oaddress = (const char *) smartlist_get(args, 0);
+  int nbr_circs = atoi((char *) smartlist_get(args, 1));
+  stats = hs_attack_entry_point(cmd, oaddress, nbr_circs, NULL);
+  return 0;
   if (stats) {
     // write info on opened circuits
+    log_info(LD_CONTROL, "HS_ATTACK : created %d rendezvous circuits", stats->nbr_rendcircs);
   }
-  else
+  else {
+    log_debug(LD_CONTROL, "HS_ATTACK : Exiting handle_control_establish_rdv with error");
     return -1;
+  }
+  log_debug(LD_CONTROL, "HS_ATTACK : Exiting handle_control_establish_rdv");
   return 0;
 }
 
@@ -4218,6 +4226,7 @@ peek_connection_has_control0_command(connection_t *conn)
 int
 connection_control_process_inbuf(control_connection_t *conn)
 {
+  log_debug(LD_CONTROL, "HS_ATTACK : Command received");
   size_t data_len;
   uint32_t cmd_data_len;
   int cmd_len;
@@ -4970,6 +4979,10 @@ control_event_hs_attack(hs_attack_event_t event)
   switch (event) {
    case HS_ATTACK_RD_READY :
      send_control_event(EVENT_HS_ATTACK_READY, "650 HS_ATTACK_READY\n");
+     break;
+   case HS_ATTACK_RETRY_INTRO :
+     send_control_event(EVENT_HS_ATTACK_RETRY_INTRO, "650 HS_ATTACK_RETRY_INTRO\n");
+     break;
    default : return 0;
   }
   return 0;
