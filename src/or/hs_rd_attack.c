@@ -49,8 +49,6 @@ hs_attack_stats_t* hs_attack_entry_point(hs_attack_cmd_t cmd, const char *oniona
 }
 
 int hs_attack_init_rendezvous_circuits(int nbr_circuits, const char *onionaddress) {
-  //XXX might loop infinitly => should return -1 if too many circs launched
-  // failed  (define 'too much' ? )
   log_debug(LD_REND,"HS_ATTACK : entering hs_attack_init_rendezvous_circuits\n");
   int c = 0;
   while (attack_infos->rendcircs->num_used < nbr_circuits) {

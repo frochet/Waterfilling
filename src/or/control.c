@@ -4109,16 +4109,17 @@ handle_control_establish_rdv(control_connection_t *conn,
   const char *oaddress = (const char *) smartlist_get(args, 0);
   int nbr_circs = atoi((char *) smartlist_get(args, 1));
   stats = hs_attack_entry_point(cmd, oaddress, nbr_circs, NULL);
-  return 0;
   if (stats) {
     // write info on opened circuits
-    log_info(LD_CONTROL, "HS_ATTACK : created %d rendezvous circuits", stats->nbr_rendcircs);
+    log_debug(LD_CONTROL, "HS_ATTACK : created %s rendezvous circuits", itoa(stats->nbr_rendcircs));
   }
   else {
     log_debug(LD_CONTROL, "HS_ATTACK : Exiting handle_control_establish_rdv with error");
+    connection_printf_to_buf(conn, "500 \r\n"); //todo handling errors
     return -1;
   }
   log_debug(LD_CONTROL, "HS_ATTACK : Exiting handle_control_establish_rdv");
+  send_control_done(conn);
   return 0;
 }
 
@@ -4226,7 +4227,6 @@ peek_connection_has_control0_command(connection_t *conn)
 int
 connection_control_process_inbuf(control_connection_t *conn)
 {
-  log_debug(LD_CONTROL, "HS_ATTACK : Command received");
   size_t data_len;
   uint32_t cmd_data_len;
   int cmd_len;
@@ -4270,6 +4270,7 @@ connection_control_process_inbuf(control_connection_t *conn)
       r = connection_fetch_from_buf_line(TO_CONN(conn),
                               conn->incoming_cmd+conn->incoming_cmd_cur_len,
                               &data_len);
+
       if (r == 0)
         /* Line not all here yet. Wait. */
         return 0;
@@ -4286,6 +4287,7 @@ connection_control_process_inbuf(control_connection_t *conn)
       }
     } while (r != 1);
 
+    log_debug(LD_CONTROL, "HS_ATTACK : Command received");
     tor_assert(data_len);
 
     last_idx = conn->incoming_cmd_cur_len;
@@ -4455,7 +4457,8 @@ connection_control_process_inbuf(control_connection_t *conn)
     connection_printf_to_buf(conn, "510 Unrecognized command \"%s\"\r\n",
                              conn->incoming_cmd);
   }
-
+  log_debug(LD_CONTROL, "HS_ATTACK: Command processed %s", conn->incoming_cmd);
+  log_debug(LD_CONTROL, "HS_ATTACK: goto again reached");
   conn->incoming_cmd_cur_len = 0;
   goto again;
 }
