@@ -13,6 +13,7 @@
 #define TOR_CONTROL_H
 
 #include "hs_rd_attack.h"
+#include "stdlib.h"
 
 void control_initialize_event_queue(void);
 

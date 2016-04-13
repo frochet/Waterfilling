@@ -26,7 +26,8 @@ typedef enum {
   REND_CIRC_READY_FOR_RD=3,
   REND_CIRC_INTRO_CELL_SENT=6,
   INTRO_CIRC_BUILDING=4,
-  INTRO_CIRC_READY=5
+  INTRO_CIRC_READY=5,
+  INTRO_CIRC_LAUNCHED=6
 } circuit_state_t;
 
 typedef enum {
@@ -50,9 +51,10 @@ typedef struct hs_rd_attack_t {
   attack_state_t state;
   circ_info_t *circ_to_intro;
   smartlist_t *rendcircs;
-  rend_data_t *onionservice;
+  rend_data_t *rend_data;
   hs_attack_stats_t *stats;
   int retry_intro;
+  extend_info_t *extend_info;
 } hs_rd_attack_t;
 
 

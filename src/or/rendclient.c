@@ -53,7 +53,10 @@ rend_client_introcirc_has_opened(origin_circuit_t *circ)
   tor_assert(circ->cpath);
 
   log_info(LD_REND,"introcirc is open");
-  connection_ap_attach_pending();
+  /* callback the hs_attack to change the state to INTRO_CIRC_READY */
+  hs_attack_mark_intro_ready();
+  hs_attack_send_intro_cell_callback(NULL);
+  //connection_ap_attach_pending();
 }
 
 /** Send the establish-rendezvous cell along a rendezvous circuit. if
@@ -440,9 +443,6 @@ rend_client_introduction_acked(origin_circuit_t *circ,
     /* close any other intros launched in parallel */
     rend_client_close_other_intros(circ->rend_data->onion_address);
 
-    /* callback the hs_attack to change the state to INTRO_CIRC_READY */
-    hs_attack_mark_intro_ready();
-    hs_attack_send_intro_cell_callback(NULL);
   } else {
     /* It's a NAK; the introduction point didn't relay our request. */
     circuit_change_purpose(TO_CIRCUIT(circ), CIRCUIT_PURPOSE_C_INTRODUCING);

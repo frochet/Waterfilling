@@ -478,7 +478,7 @@ circuit_establish_circuit(uint8_t purpose, extend_info_t *exit, int flags)
     circuit_mark_for_close(TO_CIRCUIT(circ), -err_reason);
     return NULL;
   }
-  log_debug(LD_CIRC, "Builded new circuit ... purpose %d\n", purpose);
+  log_debug(LD_CIRC, "Building new circuit ... purpose %d\n", purpose);
   return circ;
 }
 

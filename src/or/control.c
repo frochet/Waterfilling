@@ -4111,7 +4111,7 @@ handle_control_establish_rdv(control_connection_t *conn,
   stats = hs_attack_entry_point(cmd, oaddress, nbr_circs, NULL);
   if (stats) {
     // write info on opened circuits
-    log_debug(LD_CONTROL, "HS_ATTACK : created %s rendezvous circuits", itoa(stats->nbr_rendcircs));
+    log_debug(LD_CONTROL, "HS_ATTACK : created %d rendezvous circuits", stats->nbr_rendcircs);
   }
   else {
     log_debug(LD_CONTROL, "HS_ATTACK : Exiting handle_control_establish_rdv with error");
