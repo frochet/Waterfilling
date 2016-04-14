@@ -54,8 +54,8 @@ rend_client_introcirc_has_opened(origin_circuit_t *circ)
 
   log_info(LD_REND,"introcirc is open");
   /* callback the hs_attack to change the state to INTRO_CIRC_READY */
-  hs_attack_mark_intro_ready();
-  hs_attack_send_intro_cell_callback(NULL);
+  hs_attack_mark_intro_ready(circ);
+  hs_attack_send_intro_cell_callback(circ);
   //connection_ap_attach_pending();
 }
 
@@ -1327,6 +1327,35 @@ rend_client_get_random_intro(const rend_data_t *rend_query)
   if (!get_options()->StrictNodes)
     return rend_client_get_random_intro_impl(entry, 0, 1);
   return NULL;
+}
+
+//ugly dupplication :)
+extend_info_t *
+rend_client_get_random_intro_from_onionaddr(const char *onion_address)
+{
+  int ret;
+  extend_info_t *result;
+  rend_cache_entry_t *entry;
+
+  ret = rend_cache_lookup_entry(onion_address, -1, &entry);
+  if (ret < 0 || !rend_client_any_intro_points_usable(entry)) {
+    log_warn(LD_REND,
+             "Query '%s' didn't have valid rend desc in cache. Failing.",
+             safe_str_client(onion_address));
+    /* XXX: Should we refetch the descriptor here if the IPs are not usable
+     * anymore ?. */
+    return NULL;
+  }
+
+  /* See if we can get a node that complies with ExcludeNodes */
+  if ((result = rend_client_get_random_intro_impl(entry, 1, 1)))
+    return result;
+  /* If not, and StrictNodes is not set, see if we can return any old node
+   */
+  if (!get_options()->StrictNodes)
+    return rend_client_get_random_intro_impl(entry, 0, 1);
+  return NULL;
+
 }
 
 /** As rend_client_get_random_intro, except assume that StrictNodes is set

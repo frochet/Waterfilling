@@ -21,6 +21,7 @@ typedef enum {
 } attack_state_t;
 
 typedef enum {
+  CIRC_NO_STATE = 0,
   REND_CIRC_BUILDING = 1,
   REND_CIRC_READY_FOR_INTRO=2,
   REND_CIRC_READY_FOR_RD=3,
@@ -35,9 +36,16 @@ typedef enum {
   SEND_RD=1
 } hs_attack_cmd_t;
 
+/*
+ * Tor has a 1to1 mapping between intro and rend circ
+ * when receiving cells; we can't have 1tomany
+ * */
 typedef struct circ_info_t {
-  origin_circuit_t* circ;
-  circuit_state_t state;
+  origin_circuit_t *rendcirc;
+  origin_circuit_t *introcirc;
+  extend_info_t *extend_info;
+  circuit_state_t state_rend;
+  circuit_state_t state_intro;
 } circ_info_t;
 
 typedef struct hs_attack_stats_t {
@@ -49,12 +57,10 @@ typedef struct hs_rd_attack_t {
   /* contain information needed to carry out the attack*/
   connection_t *conns;
   attack_state_t state;
-  circ_info_t *circ_to_intro;
   smartlist_t *rendcircs;
-  rend_data_t *rend_data;
   hs_attack_stats_t *stats;
+  char *current_target;
   int retry_intro;
-  extend_info_t *extend_info;
 } hs_rd_attack_t;
 
 
@@ -71,7 +77,7 @@ void hs_attack_mark_rendezvous_ready(origin_circuit_t*);
 
 void hs_attack_mark_rendezvous_ready_for_intro(origin_circuit_t*);
 
-void hs_attack_mark_intro_ready();
+void hs_attack_mark_intro_ready(origin_circuit_t *);
 
 void hs_attack_send_intro_cell_callback(origin_circuit_t*);
 
