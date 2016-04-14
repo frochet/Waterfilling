@@ -14,7 +14,7 @@
 #include "rendclient.h"
 #include "util.h"
 #include "control.h"
-
+#include "router.h"
 typedef enum {
   INITIALIZED=0,
   ATTACK_STATE_CONNECT_TO_INTRO=1
@@ -68,6 +68,8 @@ int hs_attack_init_intro_circuit(int);
 int hs_attack_send_RD_cells(hs_rd_attack_t *);
 
 void hs_attack_mark_rendezvous_ready(origin_circuit_t*);
+
+void hs_attack_mark_rendezvous_ready_for_intro(origin_circuit_t*);
 
 void hs_attack_mark_intro_ready();
 

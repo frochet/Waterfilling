@@ -1724,7 +1724,10 @@ circuit_launch_by_extend_info(uint8_t purpose,
     /* see if there are appropriate circs available to cannibalize. */
     /* XXX if we're planning to add a hop, perhaps we want to look for
      * internal circs rather than exit circs? -RD */
+
+
     circ = circuit_find_to_cannibalize(purpose, extend_info, flags);
+    
     if (circ) {
       uint8_t old_purpose = circ->base_.purpose;
       struct timeval old_timestamp_began = circ->base_.timestamp_began;
@@ -1776,6 +1779,12 @@ circuit_launch_by_extend_info(uint8_t purpose,
         case CIRCUIT_PURPOSE_C_GENERAL:
         case CIRCUIT_PURPOSE_S_ESTABLISH_INTRO:
           /* need to add a new hop */
+
+          //if (purpose == CIRCUIT_PURPOSE_C_INTRODUCING) {
+            //log_debug(LD_CIRC, "HS_ATTACK: before extending to new exit\n");
+            //log_debug(LD_CIRC, "exit_info: %s", extend_info_describe(extend_info));
+            //return NULL;
+          //}
           tor_assert(extend_info);
           if (circuit_extend_to_new_exit(circ, extend_info) < 0)
             return NULL;
