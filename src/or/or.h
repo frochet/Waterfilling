@@ -3825,7 +3825,7 @@ typedef struct {
   int NumEntryGuards; /**< How many entry guards do we try to establish? */
   int UseEntryGuardsAsDirGuards; /** Boolean: Do we try to get directory info
                                   * from a smallish number of fixed nodes? */
-
+  int UseWaterfilling; /** <Boolean: Use watefillin bandwidth-weights or not */
   /** If 1, we use any guardfraction information we see in the
    * consensus.  If 0, we don't.  If -1, let the consensus parameter
    * decide. */
