@@ -989,11 +989,22 @@ networkstatus_compute_bw_weights_v10(smartlist_t *chunks, int64_t G,
       }
     }
   }
+  log_notice(LD_CIRC, "Computed bandwidth weights for %s with v10: "
+             "G="I64_FORMAT" M="I64_FORMAT" E="I64_FORMAT" D="I64_FORMAT
+             " T="I64_FORMAT,
+             casename,
+             I64_PRINTF_ARG(G), I64_PRINTF_ARG(M), I64_PRINTF_ARG(E),
+             I64_PRINTF_ARG(D), I64_PRINTF_ARG(T));
+}
+
+static void
+write_classical_bw_weights(smartlist_t *chunk, bandwidth_weights_t *bwweights,
+    int64_t G, int64_t M, int64_t D, int64_t E, int64_t T) {
 
   /* We cast down the weights to 32 bit ints on the assumption that
    * weight_scale is ~= 10000. We need to ensure a rogue authority
    * doesn't break this assumption to rig our weights */
-  tor_assert(0 < weight_scale && weight_scale <= INT32_MAX);
+  tor_assert(0 < bwweights->weight_scale && bwweights->weight_scale <= INT32_MAX);
 
   /*
    * Provide Wgm=Wgg, Wmm=1, Wem=Wee, Weg=Wed. May later determine
@@ -1004,24 +1015,25 @@ networkstatus_compute_bw_weights_v10(smartlist_t *chunks, int64_t G,
    * NOTE: This list is sorted.
    */
   smartlist_add_asprintf(chunks,
-     "bandwidth-weights Wbd=%d Wbe=%d Wbg=%d Wbm=%d "
+     "bandwidth-weights Wbd=%d Wbe=%d Wbg=%d "
+     "Wbm=%d "
      "Wdb=%d "
-     "Web=%d Wed=%d Wee=%d Weg=%d Wem=%d "
-     "Wgb=%d Wgd=%d Wgg=%d Wgm=%d "
-     "Wmb=%d Wmd=%d Wme=%d Wmg=%d Wmm=%d\n",
-     (int)Wmd, (int)Wme, (int)Wmg, (int)weight_scale,
-     (int)weight_scale,
-     (int)weight_scale, (int)Wed, (int)Wee, (int)Wed, (int)Wee,
-     (int)weight_scale, (int)Wgd, (int)Wgg, (int)Wgg,
-     (int)weight_scale, (int)Wmd, (int)Wme, (int)Wmg, (int)weight_scale);
+     "Web=%d Wed=%d Wee=%d "
+     "Weg=%d Wem=%d "
+     "Wgb=%d Wgd=%d Wgg=%d "
+     "Wgm=%d "
+     "Wmb=%d Wmd=%d Wme=%d "
+     "Wmg=%d Wmm=%d\n",
+     (int)bwweights->wmd, (int)bwweights->wme, (int)bwweights->wmg, 
+     (int)bwweights->weight_scale,
+     (int)bwweights->weight_scale,
+     (int)bwweights->weight_scale, (int)bwweights->wed, (int)bwweights->wee,
+     (int)bwweights->wed, (int)bwweights->wee,
+     (int)bwweights->weight_scale, (int)bwweights->wgd, (int)bwweights->wgg,
+     (int)bwweights->wgg,
+     (int)bwweights->weight_scale, (int)bwweights->wmd,
+     (int)bwweights->wme, (int)bwweights->wmg, (int)bwweights->weight_scale);
 
-  log_notice(LD_CIRC, "Computed bandwidth weights for %s with v10: "
-             "G="I64_FORMAT" M="I64_FORMAT" E="I64_FORMAT" D="I64_FORMAT
-             " T="I64_FORMAT,
-             casename,
-             I64_PRINTF_ARG(G), I64_PRINTF_ARG(M), I64_PRINTF_ARG(E),
-             I64_PRINTF_ARG(D), I64_PRINTF_ARG(T));
-  return 1;
 }
 
 /** Update total bandwidth weights (G/M/E/D/T) with the bandwidth of
@@ -1835,6 +1847,20 @@ networkstatus_compute_consensus(smartlist_t *votes,
         smartlist_add_asprintf(chunks, "p %s\n", rs_out.exitsummary);
       }
 
+      /* Now the Waterfilling bandwidth-weights if the option is set */
+      if (get_options()->UseWaterfilling) {
+        
+        smartlist_add_asprintf(chunks,"wfbw %s%s%s%s%s%s\n",
+                               wgg_str ? wgg_str : "",
+                               wmg_str ? wmg_star : "",
+                               wgd_str ? wgd_str : "",
+                               wmd_str ? wmd_str : "",
+                               wee_str ? wee_str : "",
+                               wed_str ? wed_str : "",
+                               wme_str ? wme_str : "");
+
+
+      }
       /* And the loop is over and we move on to the next router */
     }
 
@@ -1894,8 +1920,13 @@ networkstatus_compute_consensus(smartlist_t *votes,
       }
     }
 
-    added_weights = networkstatus_compute_bw_weights_v10(chunks, G, M, E, D,
-                                                         T, weight_scale);
+    if (get_options()->UseWaterfilling) {
+    }
+    else {
+      write_classical_bw_weights(chunks, bwweights, G, M, D, E, T);
+      //added_weights = networkstatus_compute_bw_weights_v10(chunks, G, M, E, D,
+      //                                                   T, weight_scale);
+    }
   }
 
   /* Add a signature. */
