@@ -102,6 +102,19 @@ typedef struct bandwidth_weights_t {
   int64_t weight_scale;
 } bandwidth_weights_t;
 
+/*
+ * Used to retain information when computing
+ * our consensus -> intended primarily for
+ * function networkstatus_compute_wfbw_weights
+ */
+typedef struct r_consensus_info_t {
+  char digest[DIGEST_LEN];
+  unsigned int is_exit:1;
+  unsigned int is_guard:1;
+  uint32_t bandwidth_kb;
+  bandwidth_weights_t *wfbwweights;
+} r_consensus_info_t;
+
 void dirvote_free_all(void);
 
 /* vote manipulation */

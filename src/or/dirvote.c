@@ -781,15 +781,84 @@ networkstatus_check_weights(int64_t Wgg, int64_t Wgd, int64_t Wmg,
   return berr;
 }
 
+
+static void
+filter_list_(smartlist_t *list, r_consensus_info_t *elem,
+    unsigned int is_exit, unsigned int is_guard) {
+  if (elem.is_exit == is_exit and elem.is_guard == is_guard)
+    smartlist_add(list, elem);
+}
+
+static int
+compare_bw_nodes_(const void **_a, const void **_b) {
+  const r_consensus_info_t *a = *_a, *b = *_b;
+  if (a->bandwidth_kb > b->bandwidth_kb)
+    return -1;
+  else if  (a->bandwidth_kb < b->bandwidth_kb)
+    return 1;
+  else
+    return 0; //order might be undeterministic
+}
+
+STATIC int
+search_pivot_and_compute_wfbw_weights_(smartlist_t *nodes,
+    int64_t weight, int ileft, int iright) {
+
+}
+
+/** 
+ * This function computes the waterfilling bandwidth weights
+ *
+ * return true if there is no error, false otherwise.
+ */
+
+STATIC int
+networkstatus_compute_wfbw_weights(smartlist_t *chunks, 
+    smartlist_t *retain, bandwidth_weights_t *bwweights,
+    int64_t G, int64_t M, int64_t E, int64_t D, int64_t T)
+{
+  smartlist_t *guards, *exits, *guardsexits = NULL;
+  if (bwweights->wgg > 0 && bwweights->wgg < bwweights->weight_scale) {
+    guards = smarlist_new();
+    SMARTLIST_FOREACH(retain, r_consensus_info_t *, elem,
+        filter_list_(guards, elem, 0, 1));
+  }
+  if (bwweights->wee > 0 && bwweights-> wee < bwweights->weight_scale) {
+    exits = smartlist_new();
+    SMARTLIST_FOREACH(retain, r_consensus_info_t *, elem,
+        filter_list_(exits, elem, 1, 0));
+  }
+  if (bwweights->wmd > 0 && bwweights->wmd < bwweights->weight_scale) {
+    guardsexits = smartlist_new();
+    SMARTLIST_FOREACH(retain, r_consensus_info_t *, elem,
+        filter_list_(guardsexits, elem, 1, 1));
+  }
+
+  if (guards) {
+    if (search_pivot_and_compute_wfbw_weights_(guards, bwweights->wgg, 0,
+          guards->num_used) < 0) 
+      return -1;
+  }
+  if (exits) {
+    if (search_pivot_and_compute_wfbw_weights_(exits, bwweights->wee, 0,
+          guards->num_used) < 0) 
+      return -1;
+  }
+
+  return 0;
+}
+
+
 /**
  * This function computes the bandwidth weights for consensus method 10.
  *
  * It returns true if weights could be computed, false otherwise.
  */
 static int
-networkstatus_compute_bw_weights_v10(smartlist_t *chunks, int64_t G,
+networkstatus_compute_bw_weights_v10(int64_t G,
                                      int64_t M, int64_t E, int64_t D,
-                                     int64_t T, int64_t weight_scale)
+                                     int64_t T, int64_t weight_scale,
+                                     bandwidth_weights_t *bwweights)
 {
   bw_weights_error_t berr = 0;
   int64_t Wgg = -1, Wgd = -1;
@@ -989,6 +1058,13 @@ networkstatus_compute_bw_weights_v10(smartlist_t *chunks, int64_t G,
       }
     }
   }
+  bwweights->wgg = Wgg;
+  bwweights->wee = Wee;
+  bwweights->wmd = Wmd;
+  bwweights->wgd = Wgd;
+  bwweights->wmg = Wmg;
+  bwweights->wed = Wed;
+  bwweights->wme = Wme;
   log_notice(LD_CIRC, "Computed bandwidth weights for %s with v10: "
              "G="I64_FORMAT" M="I64_FORMAT" E="I64_FORMAT" D="I64_FORMAT
              " T="I64_FORMAT,
@@ -1142,6 +1218,7 @@ networkstatus_compute_consensus(smartlist_t *votes,
   int vote_seconds, dist_seconds;
   char *client_versions = NULL, *server_versions = NULL;
   smartlist_t *flags;
+  smartlist_t *retain;
   const char *flavor_name;
   uint32_t max_unmeasured_bw_kb = DEFAULT_MAX_UNMEASURED_BW_KB;
   int64_t G=0, M=0, E=0, D=0, T=0; /* For bandwidth weights */
@@ -1154,6 +1231,9 @@ networkstatus_compute_consensus(smartlist_t *votes,
   tor_assert(total_authorities >= smartlist_len(votes));
 
   flavor_name = networkstatus_get_flavor_name(flavor);
+  /*A dir option might be necessary ...*/
+  if (get_options()->UseWaterfilling)
+    retain = smartlist_new();
 
   if (!smartlist_len(votes)) {
     log_warn(LD_DIR, "Can't compute a consensus from no votes.");
@@ -1847,19 +1927,34 @@ networkstatus_compute_consensus(smartlist_t *votes,
         smartlist_add_asprintf(chunks, "p %s\n", rs_out.exitsummary);
       }
 
-      /* Now the Waterfilling bandwidth-weights if the option is set */
-      if (get_options()->UseWaterfilling) {
-        
-        smartlist_add_asprintf(chunks,"wfbw %s%s%s%s%s%s\n",
-                               wgg_str ? wgg_str : "",
-                               wmg_str ? wmg_star : "",
-                               wgd_str ? wgd_str : "",
-                               wmd_str ? wmd_str : "",
-                               wee_str ? wee_str : "",
-                               wed_str ? wed_str : "",
-                               wme_str ? wme_str : "");
+      /* Now retain information for computing wf bandwidth weights */
+      /* wfbw line should be written here but we first need to have
+         all information about all routers we consider, then we
+         compute classical bwweights and wfbwweights and finaly
+         look over chunks to add properly a line wfbw 
+         We actually loop 2 times over all routers.. Yep, I don't
+         like that too.*/
+      {
+       r_consensus_info_t *r_info = NULL;
+       if (get_options()->UseWaterfilling) {
+        r_info = (r_consensus_info_t *) tor_malloc(sizeof(r_consensus_info_t));
+        memcpy(r_info->digest, rs_out.digest, DIGEST_LEN);
+        r_info->is_exit = rs_out.is_exit;
+        r_info->is_guard = rs_out.is_guard;
+        r_info->bandwidth_kb = rs_out.bandwidth_kb;
+        r_info->wfbwweights = NULL; /* will be filled when we compute wfbww */
+        smartlist_add(retain, r_info);
+        /*smartlist_add_asprintf(chunks,"wfbw %s%s%s%s%s%s\n",*/
+                               /*wgg_str ? wgg_str : "",*/
+                               /*wmg_str ? wmg_star : "",*/
+                               /*wgd_str ? wgd_str : "",*/
+                               /*wmd_str ? wmd_str : "",*/
+                               /*wee_str ? wee_str : "",*/
+                               /*wed_str ? wed_str : "",*/
+                               /*wme_str ? wme_str : "");*/
 
 
+        }
       }
       /* And the loop is over and we move on to the next router */
     }
@@ -1890,6 +1985,8 @@ networkstatus_compute_consensus(smartlist_t *votes,
   {
     int64_t weight_scale = BW_WEIGHT_SCALE;
     char *bw_weight_param = NULL;
+    bandwidth_weights_t *bwweights = (bandwidth_weights_t *)
+      tor_malloc(sizeof(bandwidth_weights_t));
 
     // Parse params, extract BW_WEIGHT_SCALE if present
     // DO NOT use consensus_param_bw_weight_scale() in this code!
@@ -1919,14 +2016,19 @@ networkstatus_compute_consensus(smartlist_t *votes,
         weight_scale = BW_WEIGHT_SCALE;
       }
     }
-
+    bwweights->weight_scale = weight_scale;
+    added_weights = networkstatus_compute_bw_weights_v10(G, M, E, D,
+                                                       T, weight_scale,
+                                                       bwweights);
     if (get_options()->UseWaterfilling) {
+      /*compute waterfilling bandwidth weights and loop over chunks to add
+       * wfbw line for each router*/
+      if (added_weights) {
+        added_wf_weights = networkstatus_compute_wfbw_weights(chunks,
+             retain, bwweights, G, M, E, D, T);
+      }
     }
-    else {
-      write_classical_bw_weights(chunks, bwweights, G, M, D, E, T);
-      //added_weights = networkstatus_compute_bw_weights_v10(chunks, G, M, E, D,
-      //                                                   T, weight_scale);
-    }
+    write_classical_bw_weights(chunks, bwweights, G, M, D, E, T);
   }
 
   /* Add a signature. */
