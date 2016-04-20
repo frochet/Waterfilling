@@ -4127,6 +4127,17 @@ static int
 handle_control_send_rd(control_connection_t *conn,
                        uint32_t len,
                        const char *body){
+  smartlist_t *args;
+  hs_attack_stats_t *stats;
+  hs_attack_cmd_t cmd = SEND_RD;
+  args = getargs_helper("SEND_RD", conn, body, 1, -1);
+  if (!args) {
+    return -1;
+  }
+  // handle args later TODO
+  
+  stats = hs_attack_entry_point(cmd, NULL, 0, NULL);
+  send_control_done(conn);
   return 0;
 }
 
