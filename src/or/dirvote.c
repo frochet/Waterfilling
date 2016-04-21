@@ -824,13 +824,13 @@ compute_wfbw_weights_(r_consensus_info_t *current, bandwidth_weights_t *bwweight
             break;
     case 1: if (idx_current < idx_pivot) {
               current->wfbwweights->wmd =
-                weight_scale - 
+                bwweights->weight_scale - 
                 (current->bandwidth_kb*bwweights->weight_scale/water_level);
               current->wfbwweights->wgd =
                 (current->bandwidth_kb*bwweights->weight_scale/water_level)*
                 (bwweights->wgd/(bwweights->wgd+bwweights->wed));
               current->wfbwweights->wed =
-                (current->bandwidth_kb*weight_scale/water_level)*
+                (current->bandwidth_kb*bwweights->weight_scale/water_level)*
                 (bwweights->wed/(bwweights->wgd+bwweights->wed));
             }
             else {
@@ -857,14 +857,14 @@ compute_wfbw_weights_(r_consensus_info_t *current, bandwidth_weights_t *bwweight
 
 STATIC int
 search_pivot_and_compute_wfbw_weights_(smartlist_t *nodes,
-    bandwidth_weights_t *bwweights, int64_t weight, int64_t weight_scale, 
+    bandwidth_weights_t *bwweights, int64_t weight, 
     int idx_left, int idx_right, int flag) {
-  int64_t water_level, cur_bwW, previous_bwW, bwW_to_remove, bwW_to_fill;
+  int64_t water_level, cur_bwW, previous_bwW, bwW_to_remove, bwW_to_fill = 0;
   r_consensus_info_t *current;
   int idx_below_water = 0;
   int pivot = (idx_left+idx_right)/2;
   r_consensus_info_t *pivot_r = smartlist_get(nodes, pivot);
-  water_level = pivot_r->bandwidth_kb * weight_scale;
+  water_level = pivot_r->bandwidth_kb * bwweights->weight_scale;
   previous_bwW = ((r_consensus_info_t *) smartlist_get(nodes, 0))->bandwidth_kb * weight;
   for (int i = 0; i < pivot+1; i++) {
     current = smartlist_get(nodes, i);
@@ -882,7 +882,7 @@ search_pivot_and_compute_wfbw_weights_(smartlist_t *nodes,
     previous_bwW = cur_bwW;
   }
   log_debug(LD_DIR, "idx_below_water %d", idx_below_water);
-  for (int i = idx_below_water; i < smarlist_len(nodes); i++) {
+  for (int i = idx_below_water; i < smartlist_len(nodes); i++) {
     current = smartlist_get(nodes, i);
     bwW_to_fill += (water_level - current->bandwidth_kb * weight);
     compute_wfbw_weights_(current, bwweights, water_level, i,
@@ -895,11 +895,11 @@ search_pivot_and_compute_wfbw_weights_(smartlist_t *nodes,
   if (idx_right == idx_left)
     return 0;
   else if (bwW_to_remove > bwW_to_fill)
-    return search_pivot_and_compute_wfbw_weights_(nodes, weight,
-              weight_scale, idx_left, idx_right/2, flag);
+    return search_pivot_and_compute_wfbw_weights_(nodes, bwweights, weight,
+              idx_left, idx_right/2, flag);
   else
-    return search_pivot_and_compute_wfbw_weights_(nodes, weight,
-              weight_scale, (idx_left/2)+1, idx_right, flag);
+    return search_pivot_and_compute_wfbw_weights_(nodes, bwweights, weight,
+              (idx_left/2)+1, idx_right, flag);
 }
 
 /** 
@@ -932,21 +932,20 @@ networkstatus_compute_wfbw_weights(smartlist_t *chunks,
 
   if (guards) {
     smartlist_sort(guards, compare_bw_nodes_);
-    if (search_pivot_and_compute_wfbw_weights_(guards, bwweights->wgg, 
-          bwweights->weight_scale, 0, guards->num_used, 0) < 0) 
+    if (search_pivot_and_compute_wfbw_weights_(guards, bwweights, 
+          bwweights->wgg, 0, guards->num_used, 0) < 0) 
       return -1;
   }
   if (exits) {
     smartlist_sort(exits, compare_bw_nodes_);
-    if (search_pivot_and_compute_wfbw_weights_(exits, bwweights->wee,
-          bwweights->weight_scale, 0, exits->num_used, 2) < 0) 
+    if (search_pivot_and_compute_wfbw_weights_(exits, bwweights, 
+          bwweights->wee, 0, exits->num_used, 2) < 0) 
       return -1;
   }
   if (guardsexits) {
     smartlist_sort(guardsexits, compare_bw_nodes_);
-    if (search_pivot_and_compute_wfbw_weights_(guardsexits, 
-          bwweights->weight_scale-bwweights->wmd, 
-          bwweights->weight_scale, 0, guardsexits->num_used, 1) < 0)
+    if (search_pivot_and_compute_wfbw_weights_(guardsexits, bwweights,
+          bwweights->wmd, 0, guardsexits->num_used, 1) < 0)
       return -1;
   }
   
