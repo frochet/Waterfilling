@@ -859,7 +859,8 @@ STATIC int
 search_pivot_and_compute_wfbw_weights_(smartlist_t *nodes,
     bandwidth_weights_t *bwweights, int64_t weight, 
     int idx_left, int idx_right, int flag) {
-  int64_t water_level, cur_bwW, previous_bwW, bwW_to_remove, bwW_to_fill = 0;
+  int64_t water_level, cur_bwW, previous_bwW, bwW_to_remove, bwW_to_fill;
+  water_level = cur_bwW = previous_bwW = bwW_to_remove = bwW_to_fill = 0;
   r_consensus_info_t *current;
   int idx_below_water = 0;
   int pivot = (idx_left+idx_right)/2;
@@ -913,7 +914,8 @@ networkstatus_compute_wfbw_weights(smartlist_t *chunks,
     smartlist_t *retain, bandwidth_weights_t *bwweights,
     int64_t G, int64_t M, int64_t E, int64_t D, int64_t T)
 {
-  smartlist_t *guards, *exits, *guardsexits = NULL;
+  smartlist_t *guards, *exits, *guardsexits;
+  guards = exits = guardsexits = NULL;
   if (bwweights->wgg > 0 && bwweights->wgg < bwweights->weight_scale) {
     guards = smartlist_new();
     SMARTLIST_FOREACH(retain, r_consensus_info_t *, elem,
@@ -1175,6 +1177,7 @@ networkstatus_compute_bw_weights_v10(int64_t G,
              casename,
              I64_PRINTF_ARG(G), I64_PRINTF_ARG(M), I64_PRINTF_ARG(E),
              I64_PRINTF_ARG(D), I64_PRINTF_ARG(T));
+  return 0;
 }
 
 static void
@@ -1330,14 +1333,15 @@ networkstatus_compute_consensus(smartlist_t *votes,
     flavor == FLAV_NS ? NS_V3_CONSENSUS : NS_V3_CONSENSUS_MICRODESC;
   char *params = NULL;
   char *packages = NULL;
-  int added_weights, added_wf_weights = 0;
+  int added_weights, added_wf_weights;
+  added_wf_weights = added_weights = 0;
   tor_assert(flavor == FLAV_NS || flavor == FLAV_MICRODESC);
   tor_assert(total_authorities >= smartlist_len(votes));
 
   flavor_name = networkstatus_get_flavor_name(flavor);
   /*A dir option might be necessary ...*/
-  if (get_options()->UseWaterfilling)
-    retain = smartlist_new();
+  /*if (get_options()->UseWaterfilling)*/
+  retain = smartlist_new();
 
   if (!smartlist_len(votes)) {
     log_warn(LD_DIR, "Can't compute a consensus from no votes.");
@@ -2039,23 +2043,23 @@ networkstatus_compute_consensus(smartlist_t *votes,
          We actually loop 2 times over all routers.. Yep, I don't
          like that too.*/
       {
-       r_consensus_info_t *r_info = NULL;
-       if (get_options()->UseWaterfilling) {
-        r_info = (r_consensus_info_t *) tor_malloc(sizeof(r_consensus_info_t));
-        memcpy(r_info->digest, rs_out.identity_digest, DIGEST_LEN);
-        r_info->is_exit = is_exit;
-        r_info->is_guard = is_guard;
-        r_info->bandwidth_kb = rs_out.bandwidth_kb;
-        r_info->wfbwweights = NULL; /* will be filled when we compute wfbww */
-        smartlist_add(retain, r_info);
-        /*smartlist_add_asprintf(chunks,"wfbw %s%s%s%s%s%s\n",*/
-                               /*wgg_str ? wgg_str : "",*/
-                               /*wmg_str ? wmg_star : "",*/
-                               /*wgd_str ? wgd_str : "",*/
-                               /*wmd_str ? wmd_str : "",*/
-                               /*wee_str ? wee_str : "",*/
-                               /*wed_str ? wed_str : "",*/
-                               /*wme_str ? wme_str : "");*/
+        r_consensus_info_t *r_info = NULL;
+        if (get_options()->UseWaterfilling) {
+          r_info = (r_consensus_info_t *) tor_malloc(sizeof(r_consensus_info_t));
+          memcpy(r_info->digest, rs_out.identity_digest, DIGEST_LEN);
+          r_info->is_exit = is_exit;
+          r_info->is_guard = is_guard;
+          r_info->bandwidth_kb = rs_out.bandwidth_kb;
+          r_info->wfbwweights = NULL; /* will be filled when we compute wfbww */
+          smartlist_add(retain, r_info);
+          /*smartlist_add_asprintf(chunks,"wfbw %s%s%s%s%s%s\n",*/
+          /*wgg_str ? wgg_str : "",*/
+          /*wmg_str ? wmg_star : "",*/
+          /*wgd_str ? wgd_str : "",*/
+          /*wmd_str ? wmd_str : "",*/
+          /*wee_str ? wee_str : "",*/
+          /*wed_str ? wed_str : "",*/
+          /*wme_str ? wme_str : "");*/
 
 
         }
