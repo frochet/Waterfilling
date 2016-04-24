@@ -914,10 +914,10 @@ search_pivot_and_compute_wfbw_weights_(smartlist_t *nodes,
     return 0;
   else if (bwW_to_remove > bwW_to_fill)
     return search_pivot_and_compute_wfbw_weights_(nodes, bwweights, weight,
-              idx_left, idx_right/2, flag);
+              idx_left, pivot, flag);
   else
     return search_pivot_and_compute_wfbw_weights_(nodes, bwweights, weight,
-              (idx_left/2)+1, idx_right, flag);
+              pivot+1, idx_right, flag);
 }
 
 /** 
@@ -952,22 +952,30 @@ networkstatus_compute_wfbw_weights(smartlist_t *chunks,
   if (guards) {
     smartlist_sort(guards, compare_bw_nodes_);
     if (search_pivot_and_compute_wfbw_weights_(guards, bwweights, 
-          bwweights->wgg, 0, guards->num_used, 0) < 0) 
+          bwweights->wgg, 0, guards->num_used, 0) < 0) {
+      tor_free(guards); 
       return -1;
+    }
+    tor_free(guards);
   }
   if (exits) {
     smartlist_sort(exits, compare_bw_nodes_);
     if (search_pivot_and_compute_wfbw_weights_(exits, bwweights, 
-          bwweights->wee, 0, exits->num_used, 2) < 0) 
+          bwweights->wee, 0, exits->num_used, 2) < 0) {
+      tor_free(exits);
       return -1;
+    }
+    tor_free(exits);
   }
   if (guardsexits) {
     smartlist_sort(guardsexits, compare_bw_nodes_);
     if (search_pivot_and_compute_wfbw_weights_(guardsexits, bwweights,
-          bwweights->wmd, 0, guardsexits->num_used, 1) < 0)
+          bwweights->wmd, 0, guardsexits->num_used, 1) < 0) {
+      tor_free(guardsexits);
       return -1;
+    }
+    tor_free(guardsexits);
   }
-  
   return 0;
 }
 
@@ -1234,6 +1242,30 @@ write_classical_bw_weights(smartlist_t *chunks, bandwidth_weights_t *bwweights,
      (int)bwweights->weight_scale, (int)bwweights->wmd,
      (int)bwweights->wme, (int)bwweights->wmg, (int)bwweights->weight_scale);
 
+}
+
+/*
+ * This function loop on chunks and insert a new line in each
+ * router entry :
+ *  wfbw <weight>=<value>" "<...>=<...>
+ *  for each water filling weights. router entry in chunks
+ *  and router info in retain appear in the same order
+ **/
+
+static void 
+write_wfbw_weights(smartlist_t *chunks, smartlist_t *retain) {
+  /* loop on chunks until we found the first router entry */
+  char *line;
+  r_consensus_info_t *node;
+  /*reverse the list to use smartlist_pop_last directly*/
+  smartlist_reverse(retain);
+  for (int i = 0; i < smartlist_len(chunks); i++) {
+    line = smarlist_get(chunks, i);
+    if (!strcmpstart(line, "w Bandwidth")) {
+      node = smartlist_pop_last(retain);
+      /* insert our new line TODO*/
+    }
+  }
 }
 
 /** Update total bandwidth weights (G/M/E/D/T) with the bandwidth of
@@ -2151,6 +2183,9 @@ networkstatus_compute_consensus(smartlist_t *votes,
       if (added_weights) {
         added_wf_weights = networkstatus_compute_wfbw_weights(chunks,
              retain, bwweights, G, M, E, D, T);
+        if (added_wf_weights) {
+          write_wfbw_weights(chunks, retain);
+        }
       }
     }
     write_classical_bw_weights(chunks, bwweights, G, M, D, E, T);
