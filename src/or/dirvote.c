@@ -909,7 +909,8 @@ search_pivot_and_compute_wfbw_weights_(smartlist_t *nodes,
    * if idx_left and idx_right are equal, then both bwW
    * are close to each other .. we can exit
    * */
-  if (idx_right == idx_left)
+  if (idx_right == idx_left) 
+    /*we should have computed the more precise wf*/
     return 0;
   else if (bwW_to_remove > bwW_to_fill)
     return search_pivot_and_compute_wfbw_weights_(nodes, bwweights, weight,
