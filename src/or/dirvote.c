@@ -801,15 +801,11 @@ compare_bw_nodes_(const void **_a, const void **_b) {
 }
 
 /**
- * This function search for the pivot node for which the bandwidth
- * of this node is the water level.
+ * fill the appropriate wfbwweights 
  *
- * flag arg precises on which set we apply wf:
- *   0 : guards
- *   1 : guardexits
- *   2 : exits
- *
- * */
+ * Precision depends on weight_scale: higher is the weight_scale value, higher
+ * is the precision.
+ */
 static int
 compute_wfbw_weights_(r_consensus_info_t *current, bandwidth_weights_t *bwweights,
     int64_t water_level, int idx_current, int idx_pivot, int flag) {
@@ -855,10 +851,20 @@ compute_wfbw_weights_(r_consensus_info_t *current, bandwidth_weights_t *bwweight
   return 0;
 }
 
+/**
+ * This function search for the pivot node for which the bandwidth
+ * of this node is the water level.
+ *
+ * flag arg precises on which set we apply wf:
+ *   0 : guards
+ *   1 : guardexits
+ *   2 : exits
+ *
+ * */
 STATIC int
 search_pivot_and_compute_wfbw_weights_(smartlist_t *nodes,
-    bandwidth_weights_t *bwweights, int64_t weight, 
-    int idx_left, int idx_right, int flag) {
+    bandwidth_weights_t *bwweights, int64_t weight, int idx_left,
+    int idx_right, int flag) {
   int64_t water_level, cur_bwW, previous_bwW, bwW_to_remove, bwW_to_fill;
   water_level = cur_bwW = previous_bwW = bwW_to_remove = bwW_to_fill = 0;
   r_consensus_info_t *current;
@@ -866,7 +872,11 @@ search_pivot_and_compute_wfbw_weights_(smartlist_t *nodes,
   int pivot = (idx_left+idx_right)/2;
   r_consensus_info_t *pivot_r = smartlist_get(nodes, pivot);
   water_level = pivot_r->bandwidth_kb * bwweights->weight_scale;
-  previous_bwW = ((r_consensus_info_t *) smartlist_get(nodes, 0))->bandwidth_kb * weight;
+  previous_bwW = ((r_consensus_info_t *)
+      smartlist_get(nodes, 0))->bandwidth_kb * weight;
+  /* We cumulate the capacity to remove until we are under the
+   * water level. We retain the index of this node and exit the
+   * loop*/
   for (int i = 0; i < pivot+1; i++) {
     current = smartlist_get(nodes, i);
     cur_bwW = current->bandwidth_kb * weight;
@@ -883,9 +893,15 @@ search_pivot_and_compute_wfbw_weights_(smartlist_t *nodes,
     previous_bwW = cur_bwW;
   }
   log_debug(LD_DIR, "idx_below_water %d", idx_below_water);
+  /*We compute the bandwidth we could fill in smaller nodes*/
   for (int i = idx_below_water; i < smartlist_len(nodes); i++) {
     current = smartlist_get(nodes, i);
-    bwW_to_fill += (water_level - current->bandwidth_kb * weight);
+    if (i < pivot+1)
+      bwW_to_fill += (water_level - current->bandwidth_kb * weight);
+    /*We reach node which have capacity below the waterlevel*/
+    else
+      bwW_to_fill += (current->bandwidth_kb*bwweights->weight_scale-
+          current->bandwidth_kb*weight);
     compute_wfbw_weights_(current, bwweights, water_level, i,
         pivot, flag);
   }
