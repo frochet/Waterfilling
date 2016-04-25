@@ -927,9 +927,8 @@ search_pivot_and_compute_wfbw_weights_(smartlist_t *nodes,
  */
 
 STATIC int
-networkstatus_compute_wfbw_weights(smartlist_t *chunks, 
-    smartlist_t *retain, bandwidth_weights_t *bwweights,
-    int64_t G, int64_t M, int64_t E, int64_t D, int64_t T)
+networkstatus_compute_wfbw_weights(smartlist_t *retain, 
+    bandwidth_weights_t *bwweights)
 {
   smartlist_t *guards, *exits, *guardsexits;
   guards = exits = guardsexits = NULL;
@@ -948,9 +947,10 @@ networkstatus_compute_wfbw_weights(smartlist_t *chunks,
     SMARTLIST_FOREACH(retain, r_consensus_info_t *, elem,
         filter_list_(guardsexits, elem, 1, 1));
   }
-
   if (guards) {
+    /*sort in decreasing order*/
     smartlist_sort(guards, compare_bw_nodes_);
+    printf("%d\n", ((r_consensus_info_t*) smartlist_get(guards, 0))->bandwidth_kb);
     if (search_pivot_and_compute_wfbw_weights_(guards, bwweights, 
           bwweights->wgg, 0, guards->num_used, 0) < 0) {
       tor_free(guards); 
@@ -1259,9 +1259,10 @@ write_wfbw_weights(smartlist_t *chunks, smartlist_t *retain) {
   /*reverse the list to use smartlist_pop_last directly*/
   smartlist_reverse(retain);
   for (int i = 0; i < smartlist_len(chunks); i++) {
-    line = smarlist_get(chunks, i);
+    line = smartlist_get(chunks, i);
     if (!strcmpstart(line, "w Bandwidth")) {
       r_consensus_info_t *node = NULL;
+      /*At the end of the loop, retain should be empty*/
       node = smartlist_pop_last(retain);
       /* insert our new line TODO*/
       char *wgg_str = NULL;
@@ -1272,19 +1273,19 @@ write_wfbw_weights(smartlist_t *chunks, smartlist_t *retain) {
       char *wmg_str = NULL;
       char * wgd_str = NULL;
       if (node->wfbwweights->wgg) 
-        tor_asprintf(&wgg_str, "wgg=%d ", node->wfbwweights->wgg);
+        tor_asprintf(&wgg_str, "wgg=%d ", (int)node->wfbwweights->wgg);
       if (node->wfbwweights->wee)
-        tor_asprintf(&wee_str, "wee=%d ", node->wfbwweights->wee);
+        tor_asprintf(&wee_str, "wee=%d ", (int)node->wfbwweights->wee);
       if (node->wfbwweights->wed)
-        tor_asprintf(&wed_str, "wed=%d ", node->wfbwweights->wed);
+        tor_asprintf(&wed_str, "wed=%d ", (int)node->wfbwweights->wed);
       if (node->wfbwweights->wmd)
-        tor_asprintf(&wmd_str, "wmd=%d ", node->wfbwweights->wmd);
+        tor_asprintf(&wmd_str, "wmd=%d ", (int)node->wfbwweights->wmd);
       if (node->wfbwweights->wme)
-        tor_asprintf(&wme_str, "wme=%d ", node->wfbwweights->wme);
+        tor_asprintf(&wme_str, "wme=%d ", (int)node->wfbwweights->wme);
       if (node->wfbwweights->wmg)
-        tor_asprintf(&wmg_str, "wmg=%d ", node->wfbwweights->wmg);
+        tor_asprintf(&wmg_str, "wmg=%d ", (int)node->wfbwweights->wmg);
       if (node->wfbwweights->wgd)
-        tor_asprintf(&wgd_str, "wgd=%d ", node->wfbwweights->wgd);
+        tor_asprintf(&wgd_str, "wgd=%d ", (int)node->wfbwweights->wgd);
       
       smartlist_insert_asprintf(chunks, i+1,
           "wfbw %s%s%s%s%s%s%s\n",
@@ -1295,7 +1296,7 @@ write_wfbw_weights(smartlist_t *chunks, smartlist_t *retain) {
           wme_str ? wme_str : "",
           wmg_str ? wmg_str : "",
           wgd_str ? wgd_str : "");
-
+      tor_free(node->wfbwweights);
       tor_free(node);
       tor_free(wgg_str);
       tor_free(wee_str);
@@ -2140,6 +2141,8 @@ networkstatus_compute_consensus(smartlist_t *votes,
           r_info->is_guard = is_guard;
           r_info->bandwidth_kb = rs_out.bandwidth_kb;
           r_info->wfbwweights = NULL; /* will be filled when we compute wfbww */
+          r_info->wfbwweights = 
+            (bandwidth_weights_t*) tor_malloc(sizeof(bandwidth_weights_t));
           smartlist_add(retain, r_info);
           /*smartlist_add_asprintf(chunks,"wfbw %s%s%s%s%s%s\n",*/
           /*wgg_str ? wgg_str : "",*/
@@ -2221,14 +2224,14 @@ networkstatus_compute_consensus(smartlist_t *votes,
       /*compute waterfilling bandwidth weights and loop over chunks to add
        * wfbw line for each router*/
       if (added_weights) {
-        added_wf_weights = networkstatus_compute_wfbw_weights(chunks,
-             retain, bwweights, G, M, E, D, T);
+        added_wf_weights = networkstatus_compute_wfbw_weights(retain, bwweights);
         if (added_wf_weights) {
           write_wfbw_weights(chunks, retain);
         }
       }
     }
     write_classical_bw_weights(chunks, bwweights, G, M, D, E, T);
+    tor_free(bwweights);
   }
 
   /* Add a signature. */
@@ -2319,6 +2322,8 @@ networkstatus_compute_consensus(smartlist_t *votes,
   SMARTLIST_FOREACH(flags, char *, cp, tor_free(cp));
   smartlist_free(flags);
   SMARTLIST_FOREACH(chunks, char *, cp, tor_free(cp));
+  SMARTLIST_FOREACH(retain, r_consensus_info_t *, r, tor_free(r));
+  smartlist_free(retain);
   smartlist_free(chunks);
 
   return result;

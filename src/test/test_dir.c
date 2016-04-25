@@ -3105,6 +3105,47 @@ test_dir_packages(void *arg)
 #define DIR(name,flags)                              \
   { #name, test_dir_##name, (flags), NULL, NULL }
 
+#define WEIGHT_SCALE_TEST 10000
+#define WGG_TEST 5000
+#define WEE_TEST -1 /*deactivated*/
+#define WMD_TEST -1 /*deactivated*/
+#define IS_GUARD 1
+#define IS_EXIT 0
+static void
+test_dir_compute_wfbw_weights(void *args)
+{
+  int retval;
+  smartlist_t *nodes = smartlist_new();
+  /* Testing wf with 500 nodes */
+  int max_capacity = 100000; /* in kB/s */
+  bandwidth_weights_t *bwweights = 
+    (bandwidth_weights_t *) tor_malloc(sizeof(bandwidth_weights_t));
+  bwweights->wgg = WGG_TEST;
+  bwweights->weight_scale = WEIGHT_SCALE_TEST;
+  bwweights->wee = WEE_TEST; 
+  bwweights->wmd = WMD_TEST;
+  for (int i = 0; i < 500; i++) {
+    r_consensus_info_t *node = NULL;
+    node = (r_consensus_info_t *) tor_malloc(sizeof(r_consensus_info_t));
+    node->bandwidth_kb = max_capacity/(i+1);
+    node->is_guard = IS_GUARD;
+    node->is_exit = IS_EXIT;
+    node->wfbwweights = 
+         (bandwidth_weights_t*) tor_malloc(sizeof(bandwidth_weights_t));
+    smartlist_add(nodes, node);
+  }
+  retval = networkstatus_compute_wfbw_weights(nodes, bwweights);
+  tt_assert(!retval);
+  SMARTLIST_FOREACH(nodes, r_consensus_info_t *, node,
+      printf("wgg=%d\n", (int)node->wfbwweights->wgg));
+done:
+  /*should write a function r_consensus_info_free() but i'm damn lazy*/
+  SMARTLIST_FOREACH(nodes, r_consensus_info_t *, node, tor_free(node->wfbwweights));
+  SMARTLIST_FOREACH(nodes, r_consensus_info_t *, node, tor_free(node));
+  smartlist_free(nodes);
+  tor_free(bwweights);
+}
+
 struct testcase_t dir_tests[] = {
   DIR_LEGACY(nicknames),
   DIR_LEGACY(formats),
@@ -3129,6 +3170,7 @@ struct testcase_t dir_tests[] = {
   DIR(purpose_needs_anonymity, 0),
   DIR(fetch_type, 0),
   DIR(packages, 0),
+  DIR(compute_wfbw_weights, 0),
   END_OF_TESTCASES
 };
 
