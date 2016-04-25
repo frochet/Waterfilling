@@ -1256,14 +1256,54 @@ static void
 write_wfbw_weights(smartlist_t *chunks, smartlist_t *retain) {
   /* loop on chunks until we found the first router entry */
   char *line;
-  r_consensus_info_t *node;
   /*reverse the list to use smartlist_pop_last directly*/
   smartlist_reverse(retain);
   for (int i = 0; i < smartlist_len(chunks); i++) {
     line = smarlist_get(chunks, i);
     if (!strcmpstart(line, "w Bandwidth")) {
+      r_consensus_info_t *node = NULL;
       node = smartlist_pop_last(retain);
       /* insert our new line TODO*/
+      char *wgg_str = NULL;
+      char *wee_str = NULL;
+      char *wed_str = NULL;
+      char *wmd_str = NULL;
+      char *wme_str = NULL;
+      char *wmg_str = NULL;
+      char * wgd_str = NULL;
+      if (node->wfbwweights->wgg) 
+        tor_asprintf(&wgg_str, "wgg=%d ", node->wfbwweights->wgg);
+      if (node->wfbwweights->wee)
+        tor_asprintf(&wee_str, "wee=%d ", node->wfbwweights->wee);
+      if (node->wfbwweights->wed)
+        tor_asprintf(&wed_str, "wed=%d ", node->wfbwweights->wed);
+      if (node->wfbwweights->wmd)
+        tor_asprintf(&wmd_str, "wmd=%d ", node->wfbwweights->wmd);
+      if (node->wfbwweights->wme)
+        tor_asprintf(&wme_str, "wme=%d ", node->wfbwweights->wme);
+      if (node->wfbwweights->wmg)
+        tor_asprintf(&wmg_str, "wmg=%d ", node->wfbwweights->wmg);
+      if (node->wfbwweights->wgd)
+        tor_asprintf(&wgd_str, "wgd=%d ", node->wfbwweights->wgd);
+      
+      smartlist_insert_asprintf(chunks, i+1,
+          "wfbw %s%s%s%s%s%s%s\n",
+          wgg_str ? wgg_str : "",
+          wee_str ? wee_str : "",
+          wed_str ? wed_str : "",
+          wmd_str ? wmd_str : "",
+          wme_str ? wme_str : "",
+          wmg_str ? wmg_str : "",
+          wgd_str ? wgd_str : "");
+
+      tor_free(node);
+      tor_free(wgg_str);
+      tor_free(wee_str);
+      tor_free(wed_str);
+      tor_free(wmd_str);
+      tor_free(wme_str);
+      tor_free(wmg_str);
+      tor_free(wgd_str);
     }
   }
 }

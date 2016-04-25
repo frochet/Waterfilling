@@ -3322,6 +3322,37 @@ tor_sscanf(const char *buf, const char *pattern, ...)
   return r;
 }
 
+/**
+ * Insert the string produced by tor_asprintf(<b>pattern</b>, <b>...</b>)
+ * as the new idxth element of sl, moving all items previously at idx
+ * or later forward one space.
+ */
+
+void
+smartlist_insert_asprintf(struct smartlist_t *sl, int idx,
+    const char *pattern, ...)
+{
+  va_list ap;
+  va_start(ap, pattern);
+  smartlist_insert_vasprintf(sl, idx, pattern, ap);
+  va_end(ap);
+}
+/**
+ * va_list-based backend of smartlist_insert_asprintf
+ */
+
+void
+smartlist_insert_vasprintf(struct smartlist_t *sl, int idx,
+    const char *pattern, va_list args) 
+{
+  char *str = NULL;
+
+  tor_vasprintf(&str, pattern, args);
+  tor_assert(str != NULL);
+
+  smartlist_insert(sl, idx, str);
+}
+
 /** Append the string produced by tor_asprintf(<b>pattern</b>, <b>...</b>)
  * to <b>sl</b>. */
 void
