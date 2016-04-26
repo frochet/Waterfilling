@@ -1430,8 +1430,7 @@ networkstatus_compute_consensus(smartlist_t *votes,
     flavor == FLAV_NS ? NS_V3_CONSENSUS : NS_V3_CONSENSUS_MICRODESC;
   char *params = NULL;
   char *packages = NULL;
-  int added_weights, added_wf_weights;
-  added_wf_weights = added_weights = 0;
+  int added_weights=0, added_wf_weights=0;
   tor_assert(flavor == FLAV_NS || flavor == FLAV_MICRODESC);
   tor_assert(total_authorities >= smartlist_len(votes));
 
