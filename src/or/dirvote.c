@@ -1209,7 +1209,7 @@ networkstatus_compute_bw_weights_v10(int64_t G,
              casename,
              I64_PRINTF_ARG(G), I64_PRINTF_ARG(M), I64_PRINTF_ARG(E),
              I64_PRINTF_ARG(D), I64_PRINTF_ARG(T));
-  return 0;
+  return 1;
 }
 
 static void
