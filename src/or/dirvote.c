@@ -812,7 +812,7 @@ compute_wfbw_weights_(r_consensus_info_t *current, bandwidth_weights_t *bwweight
   switch (flag) {
     case 0: if (idx_current < idx_pivot) 
               current->wfbwweights->wgg = 
-                (current->bandwidth_kb*bwweights->weight_scale/water_level);
+                (water_level/current->bandwidth_kb);
             else
               current->wfbwweights->wgg = bwweights->weight_scale;
             current->wfbwweights->wmg = 
@@ -821,7 +821,7 @@ compute_wfbw_weights_(r_consensus_info_t *current, bandwidth_weights_t *bwweight
     case 1: if (idx_current < idx_pivot) {
               current->wfbwweights->wmd =
                 bwweights->weight_scale - 
-                (current->bandwidth_kb*bwweights->weight_scale/water_level);
+                (water_level/current->bandwidth_kb);
               current->wfbwweights->wgd =
                 (current->bandwidth_kb*bwweights->weight_scale/water_level)*
                 (bwweights->wgd/(bwweights->wgd+bwweights->wed));
@@ -839,7 +839,7 @@ compute_wfbw_weights_(r_consensus_info_t *current, bandwidth_weights_t *bwweight
             break;
     case 2: if (idx_current < idx_pivot)
               current->wfbwweights->wee =
-                (current->bandwidth_kb*bwweights->weight_scale/water_level);
+                (water_level/current->bandwidth_kb);
             else
               current->wfbwweights->wee = bwweights->weight_scale;
             current->wfbwweights->wme =
@@ -861,7 +861,7 @@ compute_wfbw_weights_(r_consensus_info_t *current, bandwidth_weights_t *bwweight
  *   2 : exits
  *
  * */
-STATIC int
+STATIC int64_t
 search_pivot_and_compute_wfbw_weights_(smartlist_t *nodes,
     bandwidth_weights_t *bwweights, int64_t weight, int idx_left,
     int idx_right, int flag) {
@@ -896,7 +896,7 @@ search_pivot_and_compute_wfbw_weights_(smartlist_t *nodes,
   /*We compute the bandwidth we could fill in smaller nodes*/
   for (int i = idx_below_water; i < smartlist_len(nodes); i++) {
     current = smartlist_get(nodes, i);
-    if (i < pivot+1)
+    if (i < pivot)
       bwW_to_fill += (water_level - current->bandwidth_kb * weight);
     /*We reach node which have capacity below the waterlevel*/
     else
@@ -909,9 +909,13 @@ search_pivot_and_compute_wfbw_weights_(smartlist_t *nodes,
    * if idx_left and idx_right are equal, then both bwW
    * are close to each other .. we can exit
    * */
+  printf("bww_to_remove - bww_to_fill: %" PRId64
+      "idx_left:%d, pivot:%d, idx_right:%d, wl=%" PRId64 "\n",
+      bwW_to_remove-bwW_to_fill, idx_left, pivot, idx_right, water_level);
   if (idx_right == idx_left) 
     /*we should have computed the more precise wf*/
-    return 0;
+    /*return the water level */
+    return water_level;
   else if (bwW_to_remove > bwW_to_fill)
     return search_pivot_and_compute_wfbw_weights_(nodes, bwweights, weight,
               idx_left, pivot, flag);
@@ -931,6 +935,7 @@ networkstatus_compute_wfbw_weights(smartlist_t *retain,
     bandwidth_weights_t *bwweights)
 {
   smartlist_t *guards, *exits, *guardsexits;
+  int64_t wl_guards, wl_exits, wl_guardsexits;
   guards = exits = guardsexits = NULL;
   if (bwweights->wgg > 0 && bwweights->wgg < bwweights->weight_scale) {
     guards = smartlist_new();
@@ -950,9 +955,8 @@ networkstatus_compute_wfbw_weights(smartlist_t *retain,
   if (guards) {
     /*sort in decreasing order*/
     smartlist_sort(guards, compare_bw_nodes_);
-    printf("%d\n", ((r_consensus_info_t*) smartlist_get(guards, 0))->bandwidth_kb);
-    if (search_pivot_and_compute_wfbw_weights_(guards, bwweights, 
-          bwweights->wgg, 0, guards->num_used, 0) < 0) {
+    if ((wl_guards=search_pivot_and_compute_wfbw_weights_(guards, bwweights, 
+          bwweights->wgg, 0, guards->num_used, 0)) < 0) {
       tor_free(guards); 
       return -1;
     }
@@ -960,8 +964,8 @@ networkstatus_compute_wfbw_weights(smartlist_t *retain,
   }
   if (exits) {
     smartlist_sort(exits, compare_bw_nodes_);
-    if (search_pivot_and_compute_wfbw_weights_(exits, bwweights, 
-          bwweights->wee, 0, exits->num_used, 2) < 0) {
+    if ((wl_exits=search_pivot_and_compute_wfbw_weights_(exits, bwweights, 
+          bwweights->wee, 0, exits->num_used, 2)) < 0) {
       tor_free(exits);
       return -1;
     }
@@ -969,13 +973,16 @@ networkstatus_compute_wfbw_weights(smartlist_t *retain,
   }
   if (guardsexits) {
     smartlist_sort(guardsexits, compare_bw_nodes_);
-    if (search_pivot_and_compute_wfbw_weights_(guardsexits, bwweights,
-          bwweights->wmd, 0, guardsexits->num_used, 1) < 0) {
+    if ((wl_guardsexits=search_pivot_and_compute_wfbw_weights_(guardsexits, bwweights,
+          bwweights->wmd, 0, guardsexits->num_used, 1)) < 0) {
       tor_free(guardsexits);
       return -1;
     }
     tor_free(guardsexits);
   }
+  if (wl_guards)
+    printf("Waterlevel guards=%" PRId64 "\n", wl_guards);
+
   return 0;
 }
 

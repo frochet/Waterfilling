@@ -3105,17 +3105,20 @@ test_dir_packages(void *arg)
 #define DIR(name,flags)                              \
   { #name, test_dir_##name, (flags), NULL, NULL }
 
-#define WEIGHT_SCALE_TEST 10000
-#define WGG_TEST 5000
+#define WEIGHT_SCALE_TEST 100000
+#define WGG_TEST 50000
 #define WEE_TEST -1 /*deactivated*/
 #define WMD_TEST -1 /*deactivated*/
 #define IS_GUARD 1
 #define IS_EXIT 0
+#define CHECK_EQ(a, b, margin) \
+     ((a)-(b) >= 0 ? (a)-(b) <= (margin) : (b)-(a) <= (margin))
 static void
 test_dir_compute_wfbw_weights(void *args)
 {
   int retval;
   smartlist_t *nodes = smartlist_new();
+  int margin = WEIGHT_SCALE_TEST*500;
   /* Testing wf with 500 nodes */
   int max_capacity = 100000; /* in kB/s */
   bandwidth_weights_t *bwweights = 
@@ -3135,9 +3138,23 @@ test_dir_compute_wfbw_weights(void *args)
     smartlist_add(nodes, node);
   }
   retval = networkstatus_compute_wfbw_weights(nodes, bwweights);
-  tt_assert(!retval);
+  int64_t check_sum = 0;
+  int64_t tot_capacity = 0;
+  printf("Waterlevel = %" PRId64 "\n", retval);
+  SMARTLIST_FOREACH_BEGIN(nodes, r_consensus_info_t *, node) {
+    if (WGG_TEST) {
+      printf("weight=%d and bw=%d wl=%" PRId64 "\n", 
+          (int)node->wfbwweights->wgg, node->bandwidth_kb,
+          node->wfbwweights->wgg*node->bandwidth_kb);
+      check_sum += node->bandwidth_kb * node->wfbwweights->wgg;
+      tot_capacity += node->bandwidth_kb * WGG_TEST;
+    }
+  }SMARTLIST_FOREACH_END(node);
+  /*tt_assert(retval);*/
+  printf("check values %" PRId64 "-%" PRId64 "\n", check_sum, tot_capacity);
+  tt_int_op(0, OP_EQ, !CHECK_EQ(check_sum, tot_capacity, margin));
   SMARTLIST_FOREACH(nodes, r_consensus_info_t *, node,
-      printf("wgg=%d\n", (int)node->wfbwweights->wgg));
+      printf("wgg=%d bw=%d\n", (int)node->wfbwweights->wgg, node->bandwidth_kb));
 done:
   /*should write a function r_consensus_info_free() but i'm damn lazy*/
   SMARTLIST_FOREACH(nodes, r_consensus_info_t *, node, tor_free(node->wfbwweights));
