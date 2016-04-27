@@ -115,6 +115,12 @@ typedef struct r_consensus_info_t {
   bandwidth_weights_t *wfbwweights;
 } r_consensus_info_t;
 
+typedef struct remainder_wfbw_t {
+  int64_t r_guards;
+  int64_t r_exits;
+  int64_t r_guardsexits;
+} remainder_wfbw_t;
+
 void dirvote_free_all(void);
 
 /* vote manipulation */

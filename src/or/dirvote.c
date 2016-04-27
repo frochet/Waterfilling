@@ -880,6 +880,15 @@ search_pivot_and_compute_wfbw_weights_(smartlist_t *nodes,
   water_level = pivot_r->bandwidth_kb * bwweights->weight_scale;
   previous_bwW = ((r_consensus_info_t *)
       smartlist_get(nodes, 0))->bandwidth_kb * weight;
+  int64_t remainder = 0;
+  /*
+   * We have a special case: when the the capacity of the biggest
+   * node is below the water-level ... This is never likely to
+   * happen but anyway, exit without any waterfilling 
+   */
+  if (previous_bwW <= water_level)
+    return -1;
+
   /* We cumulate the capacity to remove until we are under the
    * water level. We retain the index of this node and exit the
    * loop*/
@@ -915,14 +924,17 @@ search_pivot_and_compute_wfbw_weights_(smartlist_t *nodes,
    * if idx_left and idx_right are equal, then both bwW
    * are close to each other .. we can exit
    * */
+  remainder = bwW_to_remove-bwW_to_fill;
   printf("bww_to_remove - bww_to_fill: %" PRId64
       "idx_left:%d, pivot:%d, idx_right:%d, wl=%" PRId64 "\n",
-      bwW_to_remove-bwW_to_fill, idx_left, pivot, idx_right, water_level);
+      remainder, idx_left, pivot, idx_right, water_level);
   if (idx_right == idx_left) 
     /*we should have computed the more precise wf -- but it might not be
      *the best choice.*/
-    /*return the water level */
-    return water_level;
+    /*return the rest. > 0 if we could not fill enough in the smallest node
+     * < 0 if we have removed too much from the top nodes */
+    /* Ideally, it should be 0 but such situation needs a lot of nodes... */
+    return remainder;
   else if (bwW_to_remove > bwW_to_fill)
     return search_pivot_and_compute_wfbw_weights_(nodes, bwweights, weight,
               idx_left, pivot, flag);
@@ -937,13 +949,13 @@ search_pivot_and_compute_wfbw_weights_(smartlist_t *nodes,
  * return true if there is no error, false otherwise.
  */
 
-STATIC int
+STATIC remainder_wfbw_t*
 networkstatus_compute_wfbw_weights(smartlist_t *retain, 
     bandwidth_weights_t *bwweights)
 {
-  smartlist_t *guards, *exits, *guardsexits;
-  int64_t wl_guards, wl_exits, wl_guardsexits;
-  guards = exits = guardsexits = NULL;
+  smartlist_t *guards=NULL, *exits=NULL, *guardsexits=NULL;
+  int64_t remainder_guards=0, remainder_exits=0, remainder_guardsexits=0;
+  remainder_wfbw_t *remainder = NULL;
   if (bwweights->wgg > 0 && bwweights->wgg < bwweights->weight_scale) {
     guards = smartlist_new();
     SMARTLIST_FOREACH(retain, r_consensus_info_t *, elem,
@@ -962,35 +974,38 @@ networkstatus_compute_wfbw_weights(smartlist_t *retain,
   if (guards) {
     /*sort in decreasing order*/
     smartlist_sort(guards, compare_bw_nodes_);
-    if ((wl_guards=search_pivot_and_compute_wfbw_weights_(guards, bwweights, 
-          bwweights->wgg, 0, guards->num_used, 0)) < 0) {
+    if ((remainder_guards=search_pivot_and_compute_wfbw_weights_(guards, bwweights, 
+          bwweights->wgg, 0, guards->num_used-1, 0)) < 0) {
       tor_free(guards); 
-      return -1;
+      return NULL;
     }
     tor_free(guards);
   }
   if (exits) {
     smartlist_sort(exits, compare_bw_nodes_);
-    if ((wl_exits=search_pivot_and_compute_wfbw_weights_(exits, bwweights, 
-          bwweights->wee, 0, exits->num_used, 2)) < 0) {
+    if ((remainder_exits=search_pivot_and_compute_wfbw_weights_(exits, bwweights, 
+          bwweights->wee, 0, exits->num_used-1, 2)) < 0) {
       tor_free(exits);
-      return -1;
+      return NULL;
     }
     tor_free(exits);
   }
   if (guardsexits) {
     smartlist_sort(guardsexits, compare_bw_nodes_);
-    if ((wl_guardsexits=search_pivot_and_compute_wfbw_weights_(guardsexits, bwweights,
-          bwweights->wmd, 0, guardsexits->num_used, 1)) < 0) {
+    if ((remainder_guardsexits=search_pivot_and_compute_wfbw_weights_(guardsexits, bwweights,
+          bwweights->wmd, 0, guardsexits->num_used-1, 1)) < 0) {
       tor_free(guardsexits);
-      return -1;
+      return NULL;
     }
     tor_free(guardsexits);
   }
-  if (wl_guards)
-    printf("Waterlevel guards=%" PRId64 "\n", wl_guards);
-
-  return 0;
+  if (remainder_guards)
+    printf("remainder_guards guards=%" PRId64 "\n", remainder_guards);
+  remainder = tor_malloc_zero(sizeof(remainder_wfbw_t));
+  remainder->r_guards = remainder_guards;
+  remainder->r_exits = remainder_exits;
+  remainder->r_guardsexits = remainder_guardsexits;
+  return remainder;
 }
 
 
@@ -1437,7 +1452,8 @@ networkstatus_compute_consensus(smartlist_t *votes,
     flavor == FLAV_NS ? NS_V3_CONSENSUS : NS_V3_CONSENSUS_MICRODESC;
   char *params = NULL;
   char *packages = NULL;
-  int added_weights=0, added_wf_weights=0;
+  int added_weights=0;
+  remainder_wfbw_t *remainder = NULL;
   tor_assert(flavor == FLAV_NS || flavor == FLAV_MICRODESC);
   tor_assert(total_authorities >= smartlist_len(votes));
 
@@ -2237,8 +2253,8 @@ networkstatus_compute_consensus(smartlist_t *votes,
       /*compute waterfilling bandwidth weights and loop over chunks to add
        * wfbw line for each router*/
       if (added_weights) {
-        added_wf_weights = networkstatus_compute_wfbw_weights(retain, bwweights);
-        if (added_wf_weights) {
+        remainder = networkstatus_compute_wfbw_weights(retain, bwweights);
+        if (remainder) {
           write_wfbw_weights(chunks, retain);
         }
       }
@@ -2332,6 +2348,7 @@ networkstatus_compute_consensus(smartlist_t *votes,
   tor_free(client_versions);
   tor_free(server_versions);
   tor_free(packages);
+  tor_free(remainder);
   SMARTLIST_FOREACH(flags, char *, cp, tor_free(cp));
   smartlist_free(flags);
   SMARTLIST_FOREACH(chunks, char *, cp, tor_free(cp));
