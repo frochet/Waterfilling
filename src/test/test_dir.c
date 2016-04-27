@@ -3106,7 +3106,7 @@ test_dir_packages(void *arg)
   { #name, test_dir_##name, (flags), NULL, NULL }
 
 #define WEIGHT_SCALE_TEST 100000
-#define WGG_TEST 50000
+#define WGG_TEST 5000
 #define WEE_TEST -1 /*deactivated*/
 #define WMD_TEST -1 /*deactivated*/
 #define IS_GUARD 1

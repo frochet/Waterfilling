@@ -860,6 +860,12 @@ compute_wfbw_weights_(r_consensus_info_t *current, bandwidth_weights_t *bwweight
  *   1 : guardexits
  *   2 : exits
  *
+ *TODO handle when the pivot is the smallest node
+ *     it currently crashes. In practice this sh*t
+ *     should never happen because it means that
+ *     there is way too much bandwidth in a end-position
+ *
+ *
  * */
 STATIC int64_t
 search_pivot_and_compute_wfbw_weights_(smartlist_t *nodes,
@@ -877,7 +883,7 @@ search_pivot_and_compute_wfbw_weights_(smartlist_t *nodes,
   /* We cumulate the capacity to remove until we are under the
    * water level. We retain the index of this node and exit the
    * loop*/
-  for (int i = 0; i < pivot+1; i++) {
+  for (int i = 0; i < pivot; i++) {
     current = smartlist_get(nodes, i);
     cur_bwW = current->bandwidth_kb * weight;
     if (cur_bwW <= water_level && previous_bwW >= water_level) {
@@ -913,7 +919,8 @@ search_pivot_and_compute_wfbw_weights_(smartlist_t *nodes,
       "idx_left:%d, pivot:%d, idx_right:%d, wl=%" PRId64 "\n",
       bwW_to_remove-bwW_to_fill, idx_left, pivot, idx_right, water_level);
   if (idx_right == idx_left) 
-    /*we should have computed the more precise wf*/
+    /*we should have computed the more precise wf -- but it might not be
+     *the best choice.*/
     /*return the water level */
     return water_level;
   else if (bwW_to_remove > bwW_to_fill)
