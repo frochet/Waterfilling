@@ -1997,6 +1997,20 @@ typedef struct signed_descriptor_t {
   unsigned int send_unencrypted : 1;
 } signed_descriptor_t;
 
+/* hold bandwidth weight for each router when Waterfilling
+ * is used*/
+typedef struct bandwidth_weights_t {
+  int64_t wgg;
+  int64_t wmg;
+  int64_t wee;
+  int64_t wme;
+  int64_t wmd;
+  int64_t wgd;
+  int64_t wed;
+  int64_t weight_scale;
+} bandwidth_weights_t;
+
+
 /** A signed integer representing a country code. */
 typedef int16_t country_t;
 
@@ -2160,7 +2174,8 @@ typedef struct routerstatus_t {
   time_t last_dir_503_at; /**< When did this router last tell us that it
                            * was too busy to serve directory info? */
   download_status_t dl_status;
-
+  
+  bandwidth_weights_t *wfbwweights;
 } routerstatus_t;
 
 /** A single entry in a parsed policy summary, describing a range of ports. */

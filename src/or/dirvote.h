@@ -123,6 +123,10 @@ typedef struct remainder_wfbw_t {
 
 void dirvote_free_all(void);
 
+
+remainder_wfbw_t* networkstatus_compute_wfbw_weights(smartlist_t *retain,
+    bandwidth_weights_t *bwweights);
+
 /* vote manipulation */
 char *networkstatus_compute_consensus(smartlist_t *votes,
                                       int total_authorities,

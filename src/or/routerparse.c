@@ -76,6 +76,7 @@ typedef enum {
   K_S,
   K_V,
   K_W,
+  K_WFBW,
   K_M,
   K_EXTRA_INFO,
   K_EXTRA_INFO_DIGEST,
@@ -352,6 +353,7 @@ static token_rule_t rtrstatus_token_table[] = {
   T1( "s",                   K_S,                   ARGS,    NO_OBJ ),
   T01("v",                   K_V,               CONCAT_ARGS, NO_OBJ ),
   T01("w",                   K_W,                   ARGS,    NO_OBJ ),
+  T0N("wfbw",                K_WFBW,                ARGS,    NO_OBJ ),
   T0N("m",                   K_M,               CONCAT_ARGS, NO_OBJ ),
   T0N("opt",                 K_OPT,             CONCAT_ARGS, OBJ_OK ),
   END_OF_TABLE
@@ -1915,6 +1917,9 @@ routerstatus_parse_entry_from_string(memarea_t *area,
   } else {
     rs = tor_malloc_zero(sizeof(routerstatus_t));
   }
+  if (get_options()->UseWaterfilling)
+    rs->wfbwweights = 
+      (bandwidth_weights_t *) tor_malloc_zero(sizeof(bandwidth_weights_t));
 
   if (!is_legal_nickname(tok->args[0])) {
     log_warn(LD_DIR,
@@ -2059,6 +2064,54 @@ routerstatus_parse_entry_from_string(memarea_t *area,
       } else if (!strcmpstart(tok->args[i], "GuardFraction=")) {
         if (routerstatus_parse_guardfraction(tok->args[i],
                                              vote, vote_rs, rs) < 0) {
+          goto err;
+        }
+      }
+    }
+  }
+  /* handle waterfilling weights option set */
+  if (get_options()->UseWaterfilling) {
+    if ((tok = find_opt_by_keyword(tokens, K_WFBW))) {
+      for (int i=0; i < tok->n_args; ++i) { // first arg wfbw ?
+        int ok;
+        if (!strcmpstart(tok->args[i], "wgg=")) {
+          rs->wfbwweights->wgg = 
+            (int64_t) tor_parse_uint64(strchr(tok->args[i], '=')+1,
+                10, 0, UINT32_MAX, &ok NULL);
+        }
+        else if (!strcmpstart(tok->args[i], "wee=")) {
+          rs->wfbwweights->wee = 
+            (int64_t) tor_parse_uint64(strchr(tok->args[i], '=')+1,
+                10, 0, UINT32_MAX, &ok NULL);
+        }
+        else if (!strcmpstart(tok->args[i], "wgd=")) {
+          rs->wfbwweights->wgd = 
+            (int64_t) tor_parse_uint64(strchr(tok->args[i], '=')+1,
+                10, 0, UINT32_MAX, &ok NULL);
+        }
+        else if (!strcmpstart(tok->args[i], "wed")) {
+          rs->wfbwweights->wed = 
+            (int64_t) tor_parse_uint64(strchr(tok->args[i], '=')+1,
+                10, 0, UINT32_MAX, &ok NULL);
+
+        }
+        else if (!strcmpstart(tok->args[i], "wmd")) {
+          rs->wfbwweights->wmd = 
+            (int64_t) tor_parse_uint64(strchr(tok->args[i], '=')+1,
+                10, 0, UINT32_MAX, &ok NULL);
+        }
+        else if (!strcmpstart(tok->args[i], "wmg")) {
+          rs->wfbwweights->wmg = 
+            (int64_t) tor_parse_uint64(strchr(tok->args[i], '=')+1,
+                10, 0, UINT32_MAX, &ok NULL);
+        }
+        else if (!strcmpstart(tok->args[i], "wme")) {
+          rs->wfbwweights->wme = 
+            (int64_t) tor_parse_uint64(strchr(tok->args[i], '=')+1,
+                10, 0, UINT32_MAX, &ok NULL);
+        }
+        if (!ok) {
+          log_warn(LD_DIR, "Invalid weight %s", escaped(tok->args[i]));
           goto err;
         }
       }

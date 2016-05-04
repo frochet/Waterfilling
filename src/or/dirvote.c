@@ -949,7 +949,7 @@ search_pivot_and_compute_wfbw_weights_(smartlist_t *nodes,
  * return true if there is no error, false otherwise.
  */
 
-STATIC remainder_wfbw_t*
+remainder_wfbw_t*
 networkstatus_compute_wfbw_weights(smartlist_t *retain, 
     bandwidth_weights_t *bwweights)
 {
@@ -2164,6 +2164,7 @@ networkstatus_compute_consensus(smartlist_t *votes,
       {
         r_consensus_info_t *r_info = NULL;
         if (get_options()->UseWaterfilling) {
+          printf("Using Waterfilling\n");
           r_info = (r_consensus_info_t *) tor_malloc(sizeof(r_consensus_info_t));
           memcpy(r_info->digest, rs_out.identity_digest, DIGEST_LEN);
           r_info->is_exit = is_exit;

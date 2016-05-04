@@ -3099,11 +3099,6 @@ test_dir_packages(void *arg)
   tor_free(res);
 }
 
-#define DIR_LEGACY(name)                                                   \
-  { #name, test_dir_ ## name , TT_FORK, NULL, NULL }
-
-#define DIR(name,flags)                              \
-  { #name, test_dir_##name, (flags), NULL, NULL }
 
 #define WEIGHT_SCALE_TEST 100000
 #define WGG_TEST 60000
@@ -3153,20 +3148,44 @@ test_dir_compute_wfbw_weights(void *args)
     int64_t margin = 0;
     if (WGG_TEST) {
       margin = WEIGHT_SCALE_TEST*rem->r_guards;
-      /*printf("margin %" PRId64 "\n", margin);*/
+      printf("margin %" PRId64 "\n", margin);
     }
     printf("check values %" PRId64 "-%" PRId64 "\n", check_sum, tot_capacity);
-    //tt_int_op(0, OP_EQ, !CHECK_EQ(check_sum, tot_capacity, margin));
+    tt_int_op(0, OP_EQ, !CHECK_EQ(check_sum, tot_capacity, margin));
   }
-done:
+ done:
   /*should write a function r_consensus_info_free() but i'm damn lazy*/
   SMARTLIST_FOREACH(nodes, r_consensus_info_t *, node, tor_free(node->wfbwweights));
   SMARTLIST_FOREACH(nodes, r_consensus_info_t *, node, tor_free(node));
   smartlist_free(nodes);
   tor_free(bwweights);
-  /*tor_free(remainder);*/
   return;
 }
+
+/*void test_dir_write_waterfilling_consensus(void *args) {*/
+  /*// activate watefilling*/
+  /*char *errmsg;*/
+  /*or_options_t *options = options_new();*/
+  /*options->UseWaterfilling = 1;*/
+  /*options_init(options);*/
+  /*if (set_options(options, &errmsg) < 0)*/
+    /*printf("Nervous breakdown Cath !\n");*/
+  /*[>test_a_networkstatus(gen_routerstatus_for_v3ns,<]*/
+                       /*[>vote_tweaks_for_v3ns,<]*/
+                       /*[>test_vrs_for_v3ns,<]*/
+                       /*[>test_consensus_for_v3ns,<]*/
+                       /*[>test_routerstatus_for_v3ns);<]*/
+  /*options->UseWaterfilling = 0;*/
+  /*if (set_options(options, &errmsg)<0)*/
+    /*printf("Nervous breakdown \n");*/
+/*done:;*/
+/*}*/
+
+#define DIR_LEGACY(name)                                                   \
+  { #name, test_dir_ ## name , TT_FORK, NULL, NULL }
+
+#define DIR(name,flags)                              \
+  { #name, test_dir_##name, (flags), NULL, NULL }
 
 struct testcase_t dir_tests[] = {
   DIR_LEGACY(nicknames),
@@ -3193,6 +3212,7 @@ struct testcase_t dir_tests[] = {
   DIR(fetch_type, 0),
   DIR(packages, 0),
   DIR(compute_wfbw_weights, 0),
+  //DIR_LEGACY(write_waterfilling_consensus),
   END_OF_TESTCASES
 };
 
