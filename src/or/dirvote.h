@@ -91,16 +91,6 @@
  * get confused with the above macros.) */
 #define DEFAULT_MAX_UNMEASURED_BW_KB 20
 
-typedef struct bandwidth_weights_t {
-  int64_t wgg;
-  int64_t wmg;
-  int64_t wee;
-  int64_t wme;
-  int64_t wmd;
-  int64_t wgd;
-  int64_t wed;
-  int64_t weight_scale;
-} bandwidth_weights_t;
 
 /*
  * Used to retain information when computing

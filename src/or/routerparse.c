@@ -2077,38 +2077,38 @@ routerstatus_parse_entry_from_string(memarea_t *area,
         if (!strcmpstart(tok->args[i], "wgg=")) {
           rs->wfbwweights->wgg = 
             (int64_t) tor_parse_uint64(strchr(tok->args[i], '=')+1,
-                10, 0, UINT32_MAX, &ok NULL);
+                10, 0, UINT32_MAX, &ok, NULL);
         }
         else if (!strcmpstart(tok->args[i], "wee=")) {
           rs->wfbwweights->wee = 
             (int64_t) tor_parse_uint64(strchr(tok->args[i], '=')+1,
-                10, 0, UINT32_MAX, &ok NULL);
+                10, 0, UINT32_MAX, &ok, NULL);
         }
         else if (!strcmpstart(tok->args[i], "wgd=")) {
           rs->wfbwweights->wgd = 
             (int64_t) tor_parse_uint64(strchr(tok->args[i], '=')+1,
-                10, 0, UINT32_MAX, &ok NULL);
+                10, 0, UINT32_MAX, &ok, NULL);
         }
         else if (!strcmpstart(tok->args[i], "wed")) {
           rs->wfbwweights->wed = 
             (int64_t) tor_parse_uint64(strchr(tok->args[i], '=')+1,
-                10, 0, UINT32_MAX, &ok NULL);
+                10, 0, UINT32_MAX, &ok, NULL);
 
         }
         else if (!strcmpstart(tok->args[i], "wmd")) {
           rs->wfbwweights->wmd = 
             (int64_t) tor_parse_uint64(strchr(tok->args[i], '=')+1,
-                10, 0, UINT32_MAX, &ok NULL);
+                10, 0, UINT32_MAX, &ok, NULL);
         }
         else if (!strcmpstart(tok->args[i], "wmg")) {
           rs->wfbwweights->wmg = 
             (int64_t) tor_parse_uint64(strchr(tok->args[i], '=')+1,
-                10, 0, UINT32_MAX, &ok NULL);
+                10, 0, UINT32_MAX, &ok, NULL);
         }
         else if (!strcmpstart(tok->args[i], "wme")) {
           rs->wfbwweights->wme = 
             (int64_t) tor_parse_uint64(strchr(tok->args[i], '=')+1,
-                10, 0, UINT32_MAX, &ok NULL);
+                10, 0, UINT32_MAX, &ok, NULL);
         }
         if (!ok) {
           log_warn(LD_DIR, "Invalid weight %s", escaped(tok->args[i]));

@@ -2099,7 +2099,9 @@ compute_weighted_bandwidths(const smartlist_t *sl,
   Wm /= weight_scale;
   We /= weight_scale;
   Wd /= weight_scale;
-
+  //XXX these weird weights are probably not compatible
+  //with wf weights... But currently, they are set to
+  //weight_scale in dirvote.c ... ok to not care right now
   Wgb /= weight_scale;
   Wmb /= weight_scale;
   Web /= weight_scale;
@@ -2140,11 +2142,44 @@ compute_weighted_bandwidths(const smartlist_t *sl,
     }
 
     if (is_guard && is_exit) {
-      weight = (is_dir ? Wdb*Wd : Wd);
-      weight_without_guard_flag = (is_dir ? Web*We : We);
+      if (get_options()->UseWaterfilling) {
+         // check if we have waterfilling weights on d nodes ?
+         if (node_check_wfbw_disponibility(node, 'd')) {
+           if (rule == WEIGHT_FOR_GUARD)
+             weight = (is_dir ? Wdb*node->rs->wfbwweights->wgd : 
+                 node->rs->wfbwweights->wgd);
+           else if (rule == WEIGHT_FOR_EXIT)
+             weight = (is_dir ? Wdb*node->rs->wfbwweights->wed :
+                 node->rs->wfbwweights->wed);
+           else if (rule == WEIGHT_FOR_MID)
+             weight = (is_dir ? Wdb*node->rs->wfbwweights->wmd :
+                 node->rs->wfbwweights->wmd)
+         }
+         else {
+           // code dup. erk.
+           weight = (is_dir ? Wdb*Wd : Wd);
+           weight_without_guard_flag = (is_dir ? Web*We : We);
+         }
+      }
+      else {
+        weight = (is_dir ? Wdb*Wd : Wd);
+        weight_without_guard_flag = (is_dir ? Web*We : We);
+      }
     } else if (is_guard) {
-      weight = (is_dir ? Wgb*Wg : Wg);
-      weight_without_guard_flag = (is_dir ? Wmb*Wm : Wm);
+      if (get_options()->UseWaterfilling) {
+        if (node_check_wfbw_disponibility(node, 'g')) {
+          if (rule == WEIGHT_FOR_GUARD)
+            weight = (is_dir ? Wgb*node->rs->wfbwweights->wgg :
+                node->rs->wfbwweights->wgg);
+          else if (rule == WEIGHT_FOR_MID)
+            weight = (is_dir ? Wgb*node->rs->wfbwweights->wmg :
+                node->rs->wfbwweights->wmg);
+        }
+      }
+      else {
+        weight = (is_dir ? Wgb*Wg : Wg);
+        weight_without_guard_flag = (is_dir ? Wmb*Wm : Wm);
+      }
     } else if (is_exit) {
       weight = (is_dir ? Web*We : We);
     } else { // middle

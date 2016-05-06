@@ -651,6 +651,26 @@ node_is_dir(const node_t *node)
   else
     return 0;
 }
+/** Return true iff <b>node</b> appears to have usable waterfilling weights
+ * for set d, g or e */
+int
+node_check_wfbw_disponibility(const node_t *node, char set) {
+  if (node->rs) {
+    if (set == 'g') {
+      if (node->rs->wfbwweights->wgg)
+        return 1;
+    }
+    else if(set == 'd') {
+      if (node->rs->wfbwweights->wmd)
+        return 1;
+    }
+    else if (set == 'e') {
+      if (node->rs->wfbwweights->wee)
+        return 1;
+    }
+  }
+  return 0;
+}
 
 /** Return true iff <b>node</b> has either kind of usable descriptor -- that
  * is, a routerdescriptor or a microdescriptor. */

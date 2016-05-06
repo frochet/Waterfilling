@@ -41,6 +41,7 @@ int node_is_named(const node_t *node);
 int node_is_dir(const node_t *node);
 int node_has_descriptor(const node_t *node);
 int node_get_purpose(const node_t *node);
+int node_check_wfbw_disponibility(const node_t *node, char set);
 #define node_is_bridge(node) \
   (node_get_purpose((node)) == ROUTER_PURPOSE_BRIDGE)
 int node_is_me(const node_t *node);
