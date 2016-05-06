@@ -2142,9 +2142,8 @@ compute_weighted_bandwidths(const smartlist_t *sl,
     }
 
     if (is_guard && is_exit) {
-      if (get_options()->UseWaterfilling) {
-         // check if we have waterfilling weights on d nodes ?
-         if (node_check_wfbw_disponibility(node, 'd')) {
+      if (get_options()->UseWaterfilling &&
+          node_check_wfbw_disponibility(node, 'd')) {
            if (rule == WEIGHT_FOR_GUARD)
              weight = (is_dir ? Wdb*node->rs->wfbwweights->wgd : 
                  node->rs->wfbwweights->wgd);
@@ -2153,21 +2152,15 @@ compute_weighted_bandwidths(const smartlist_t *sl,
                  node->rs->wfbwweights->wed);
            else if (rule == WEIGHT_FOR_MID)
              weight = (is_dir ? Wdb*node->rs->wfbwweights->wmd :
-                 node->rs->wfbwweights->wmd)
-         }
-         else {
-           // code dup. erk.
-           weight = (is_dir ? Wdb*Wd : Wd);
-           weight_without_guard_flag = (is_dir ? Web*We : We);
-         }
+                 node->rs->wfbwweights->wmd);
       }
       else {
         weight = (is_dir ? Wdb*Wd : Wd);
         weight_without_guard_flag = (is_dir ? Web*We : We);
       }
     } else if (is_guard) {
-      if (get_options()->UseWaterfilling) {
-        if (node_check_wfbw_disponibility(node, 'g')) {
+      if (get_options()->UseWaterfilling &&
+          node_check_wfbw_disponibility(node, 'g')) {
           if (rule == WEIGHT_FOR_GUARD)
             weight = (is_dir ? Wgb*node->rs->wfbwweights->wgg :
                 node->rs->wfbwweights->wgg);
@@ -2175,13 +2168,23 @@ compute_weighted_bandwidths(const smartlist_t *sl,
             weight = (is_dir ? Wgb*node->rs->wfbwweights->wmg :
                 node->rs->wfbwweights->wmg);
         }
-      }
       else {
         weight = (is_dir ? Wgb*Wg : Wg);
         weight_without_guard_flag = (is_dir ? Wmb*Wm : Wm);
       }
     } else if (is_exit) {
-      weight = (is_dir ? Web*We : We);
+      if (get_options()->UseWaterfilling &&
+          node_check_wfbw_disponibility(node, 'e')) {
+        if (rule == WEIGHT_FOR_EXIT)
+          weight = (is_dir ? Web*node->rs->wfbwweights->wee :
+              node->rs->wfbwweights->wee);
+        else if (rule == WEIGHT_FOR_MID)
+          weight = (is_dir ? Web*node->rs->wfbwweights->wme :
+              node->rs->wfbwweights->wme);
+      }
+      else {
+        weight = (is_dir ? Web*We : We);
+      }
     } else { // middle
       weight = (is_dir ? Wmb*Wm : Wm);
     }

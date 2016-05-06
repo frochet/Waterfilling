@@ -867,7 +867,7 @@ compute_wfbw_weights_(r_consensus_info_t *current, bandwidth_weights_t *bwweight
  *
  *
  * */
-STATIC int64_t
+static int64_t
 search_pivot_and_compute_wfbw_weights_(smartlist_t *nodes,
     bandwidth_weights_t *bwweights, int64_t weight, int idx_left,
     int idx_right, int flag) {
