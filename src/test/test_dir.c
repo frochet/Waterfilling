@@ -23,6 +23,7 @@
 #include "routerlist.h"
 #include "routerparse.h"
 #include "test.h"
+#include "nodelist.h"
 
 static void
 test_dir_nicknames(void *arg)
@@ -1530,6 +1531,56 @@ gen_routerstatus_for_v3ns(int idx, time_t now)
   return vrs;
 }
 
+/**
+ * gererate a routerstatus for v3ns with waterfilling
+ * should have bandwdith that increase with idx
+ * has guard flag if idx%2 == 0
+ * has exit flag if idx%3 == 0
+ */
+#define  NBR_ROUTERSTATUS 20
+static vote_routerstatus_t *
+gen_routerstatus_for_v3ns_with_wf(int idx, time_t now) 
+{
+  if (idx > NBR_ROUTERSTATUS)
+    return NULL;
+  else {
+    vote_routerstatus_t *vrs=NULL;
+    routerstatus_t *rs;
+    char *nickname;
+    /* Generate the first routerstatus. */
+    vrs = tor_malloc_zero(sizeof(vote_routerstatus_t));
+    rs = &vrs->status;
+    vrs->version = tor_strdup("0.1.2.14");
+    rs->published_on = now-1500;
+    tor_asprintf(&nickname, "router%d", idx);
+    strlcpy(rs->nickname, nickname, sizeof(rs->nickname));
+    memset(rs->identity_digest, idx, DIGEST_LEN);
+    memset(rs->descriptor_digest, idx*2, DIGEST_LEN);
+    rs->addr = 0x99008801;
+    rs->or_port = 443;
+    rs->dir_port = 8000;
+
+    rs->bandwidth_kb = (idx+1)*(idx+1)*5;
+    if (idx % 2 == 0)
+      rs->is_possible_guard = 1;
+    if (idx % 2 == 0 && idx % 3 == 0)
+      rs->is_exit = 1;
+    if (idx % 3 == 0)
+      rs->is_exit = 1;
+    rs->bw_is_unmeasured = 0;
+    rs->is_flagged_running = 1;
+    vrs->measured_bw_kb = rs->bandwidth_kb;
+    vrs->has_measured_bw = 1;
+    rs->has_bandwidth = 1;
+    vrs->microdesc = tor_malloc_zero(sizeof(vote_microdesc_hash_t));
+    tor_asprintf(&vrs->microdesc->microdesc_hash_line,
+                 "m 9,10,11,12,13,14,15,16,17 "
+                 "sha256=xyzajkldsdsajdadlsdjaslsdksdjlsdjsdaskdaaa%d\n",
+                 idx);
+    return vrs;
+  }
+}
+
 /** Apply tweaks to the vote list for each voter */
 static int
 vote_tweaks_for_v3ns(networkstatus_t *v, int voter, time_t now)
@@ -1567,6 +1618,11 @@ vote_tweaks_for_v3ns(networkstatus_t *v, int voter, time_t now)
 
  done:
   return 0;
+}
+static int
+vote_tweaks_for_v3ns_with_wf(networkstatus_t *v, int voter, time_t now)
+{
+  return 0; // no tweaks needed
 }
 
 /**
@@ -1652,6 +1708,12 @@ test_vrs_for_v3ns(vote_routerstatus_t *vrs, int voter, time_t now)
   return;
 }
 
+static void
+test_vrs_for_v3ns_with_wf(vote_routerstatus_t *vrs, int voter, time_t now) 
+{
+  return; //nothing to do
+}
+
 /**
  * Test a consensus for v3_networkstatus_test
  */
@@ -1666,6 +1728,17 @@ test_consensus_for_v3ns(networkstatus_t *con, time_t now)
   /* There should be two listed routers: one with identity 3, one with
    * identity 5. */
 
+ done:
+  return;
+}
+static void
+test_consensus_for_v3ns_with_wf(networkstatus_t *con, time_t now)
+{
+  (void) now;
+
+  tt_assert(con);
+  tt_assert(!con->cert);
+  tt_int_op(NBR_ROUTERSTATUS, OP_EQ, smartlist_len(con->routerstatus_list));
  done:
   return;
 }
@@ -1732,6 +1805,26 @@ test_routerstatus_for_v3ns(routerstatus_t *rs, time_t now)
     tt_assert(0);
   }
 
+ done:
+  return;
+}
+
+/** Test a router list entry when waterfilling is used
+ * Just check what has been added
+ */
+static void
+test_routerstatus_for_v3ns_with_wf(routerstatus_t *rs, time_t now)
+{
+  (void) now;
+  int check;
+  node_t *node = tor_malloc_zero(sizeof(node_t));
+  node->rs = rs;
+  tt_assert(rs);
+  tt_assert(rs->wfbwweights);
+  check = (node_check_wfbw_disponibility(node, 'g') || 
+      node_check_wfbw_disponibility(node, 'd') ||
+      node_check_wfbw_disponibility(node, 'e'));
+  tt_int_op(check, OP_EQ, 1);
  done:
   return;
 }
@@ -1964,7 +2057,6 @@ test_a_networkstatus(
 
   v3 = networkstatus_parse_vote_from_string(v3_text, NULL, NS_TYPE_VOTE);
   tt_assert(v3);
-
   if (vote_tweaks) params_tweaked += vote_tweaks(v3, 3, now);
 
   /* Compute a consensus as voter 3. */
@@ -1978,6 +2070,7 @@ test_a_networkstatus(
                                                    sign_skey_leg1,
                                                    FLAV_NS);
   tt_assert(consensus_text);
+  printf("%s\n", consensus_text);
   con = networkstatus_parse_vote_from_string(consensus_text, NULL,
                                              NS_TYPE_CONSENSUS);
   tt_assert(con);
@@ -3162,24 +3255,16 @@ test_dir_compute_wfbw_weights(void *args)
   return;
 }
 
-/*void test_dir_write_waterfilling_consensus(void *args) {*/
-  /*// activate watefilling*/
-  /*char *errmsg;*/
-  /*or_options_t *options = options_new();*/
-  /*options->UseWaterfilling = 1;*/
-  /*options_init(options);*/
-  /*if (set_options(options, &errmsg) < 0)*/
-    /*printf("Nervous breakdown Cath !\n");*/
-  /*[>test_a_networkstatus(gen_routerstatus_for_v3ns,<]*/
-                       /*[>vote_tweaks_for_v3ns,<]*/
-                       /*[>test_vrs_for_v3ns,<]*/
-                       /*[>test_consensus_for_v3ns,<]*/
-                       /*[>test_routerstatus_for_v3ns);<]*/
-  /*options->UseWaterfilling = 0;*/
-  /*if (set_options(options, &errmsg)<0)*/
-    /*printf("Nervous breakdown \n");*/
-/*done:;*/
-/*}*/
+void test_dir_write_waterfilling_consensus(void *args) {
+  // activate watefilling
+  get_options_mutable()->UseWaterfilling = 1;
+  test_a_networkstatus(gen_routerstatus_for_v3ns_with_wf,
+                         vote_tweaks_for_v3ns_with_wf,
+                         test_vrs_for_v3ns_with_wf,
+                         test_consensus_for_v3ns_with_wf,
+                         test_routerstatus_for_v3ns_with_wf);
+  get_options_mutable()->UseWaterfilling = 0;
+}
 
 #define DIR_LEGACY(name)                                                   \
   { #name, test_dir_ ## name , TT_FORK, NULL, NULL }
@@ -3212,7 +3297,7 @@ struct testcase_t dir_tests[] = {
   DIR(fetch_type, 0),
   DIR(packages, 0),
   DIR(compute_wfbw_weights, 0),
-  //DIR_LEGACY(write_waterfilling_consensus),
+  DIR_LEGACY(write_waterfilling_consensus),
   END_OF_TESTCASES
 };
 

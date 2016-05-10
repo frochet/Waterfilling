@@ -2164,7 +2164,6 @@ networkstatus_compute_consensus(smartlist_t *votes,
       {
         r_consensus_info_t *r_info = NULL;
         if (get_options()->UseWaterfilling) {
-          printf("Using Waterfilling\n");
           r_info = (r_consensus_info_t *) tor_malloc(sizeof(r_consensus_info_t));
           memcpy(r_info->digest, rs_out.identity_digest, DIGEST_LEN);
           r_info->is_exit = is_exit;
@@ -2172,7 +2171,7 @@ networkstatus_compute_consensus(smartlist_t *votes,
           r_info->bandwidth_kb = rs_out.bandwidth_kb;
           r_info->wfbwweights = NULL; /* will be filled when we compute wfbww */
           r_info->wfbwweights = 
-            (bandwidth_weights_t*) tor_malloc(sizeof(bandwidth_weights_t));
+            (bandwidth_weights_t*) tor_malloc_zero(sizeof(bandwidth_weights_t));
           smartlist_add(retain, r_info);
           /*smartlist_add_asprintf(chunks,"wfbw %s%s%s%s%s%s\n",*/
           /*wgg_str ? wgg_str : "",*/
@@ -2216,7 +2215,7 @@ networkstatus_compute_consensus(smartlist_t *votes,
     int64_t weight_scale = BW_WEIGHT_SCALE;
     char *bw_weight_param = NULL;
     bandwidth_weights_t *bwweights = (bandwidth_weights_t *)
-      tor_malloc(sizeof(bandwidth_weights_t));
+      tor_malloc_zero(sizeof(bandwidth_weights_t));
 
     // Parse params, extract BW_WEIGHT_SCALE if present
     // DO NOT use consensus_param_bw_weight_scale() in this code!

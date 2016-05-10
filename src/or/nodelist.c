@@ -652,7 +652,9 @@ node_is_dir(const node_t *node)
     return 0;
 }
 /** Return true iff <b>node</b> appears to have usable waterfilling weights
- * for set d, g or e */
+ * for set d, g or e 
+ * 
+ * waterfilling weights _must_ be equal to 0 when not used*/
 int
 node_check_wfbw_disponibility(const node_t *node, char set) {
   if (node->rs) {

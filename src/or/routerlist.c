@@ -2145,7 +2145,7 @@ compute_weighted_bandwidths(const smartlist_t *sl,
       if (get_options()->UseWaterfilling &&
           node_check_wfbw_disponibility(node, 'd')) {
            if (rule == WEIGHT_FOR_GUARD)
-             weight = (is_dir ? Wdb*node->rs->wfbwweights->wgd : 
+             weight = (is_dir ? Wdb*node->rs->wfbwweights->wgd :
                  node->rs->wfbwweights->wgd);
            else if (rule == WEIGHT_FOR_EXIT)
              weight = (is_dir ? Wdb*node->rs->wfbwweights->wed :
@@ -2196,7 +2196,9 @@ compute_weighted_bandwidths(const smartlist_t *sl,
       weight = 0.0;
     if (weight_without_guard_flag < 0.0)
       weight_without_guard_flag = 0.0;
-
+    
+    /*XXX compatibility between wf and guard fraction ? */
+    
     /* If guardfraction information is available in the consensus, we
      * want to calculate this router's bandwidth according to its
      * guardfraction. Quoting from proposal236:
