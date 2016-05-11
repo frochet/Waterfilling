@@ -1537,7 +1537,7 @@ gen_routerstatus_for_v3ns(int idx, time_t now)
  * has guard flag if idx%2 == 0
  * has exit flag if idx%3 == 0
  */
-#define  NBR_ROUTERSTATUS 20
+#define  NBR_ROUTERSTATUS 220
 static vote_routerstatus_t *
 gen_routerstatus_for_v3ns_with_wf(int idx, time_t now) 
 {
@@ -1555,7 +1555,7 @@ gen_routerstatus_for_v3ns_with_wf(int idx, time_t now)
     tor_asprintf(&nickname, "router%d", idx);
     strlcpy(rs->nickname, nickname, sizeof(rs->nickname));
     memset(rs->identity_digest, idx, DIGEST_LEN);
-    memset(rs->descriptor_digest, idx*2, DIGEST_LEN);
+    memset(rs->descriptor_digest, idx+NBR_ROUTERSTATUS, DIGEST_LEN);
     rs->addr = 0x99008801;
     rs->or_port = 443;
     rs->dir_port = 8000;
@@ -1563,10 +1563,14 @@ gen_routerstatus_for_v3ns_with_wf(int idx, time_t now)
     rs->bandwidth_kb = (idx+1)*(idx+1)*5;
     if (idx % 2 == 0)
       rs->is_possible_guard = 1;
+    else
+      rs->is_possible_guard = 0;
     if (idx % 2 == 0 && idx % 3 == 0)
       rs->is_exit = 1;
     if (idx % 3 == 0)
       rs->is_exit = 1;
+    else
+      rs->is_exit = 0;
     rs->bw_is_unmeasured = 0;
     rs->is_flagged_running = 1;
     vrs->measured_bw_kb = rs->bandwidth_kb;
@@ -1932,12 +1936,16 @@ test_a_networkstatus(
   vote->routerstatus_list = smartlist_new();
   /* add routerstatuses */
   idx = 0;
+  int ret = 0;
   do {
     vrs = vrs_gen(idx, now);
     if (vrs) {
       smartlist_add(vote->routerstatus_list, vrs);
-      tt_assert(router_add_to_routerlist(generate_ri_from_rs(vrs),
-                                           &msg,0,0)>=0);
+      ret = router_add_to_routerlist(generate_ri_from_rs(vrs),
+                                           &msg,0,0);
+      if (ret <= 0)
+        printf("%s\n", msg);
+      tt_assert(ret >= 0);
       ++idx;
     }
   } while (vrs);

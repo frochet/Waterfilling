@@ -17,7 +17,6 @@
 #include "routerlist.h"
 #include "routerparse.h"
 #include "entrynodes.h" /* needed for guardfraction methods */
-
 /**
  * \file dirvote.c
  * \brief Functions to compute directory consensus, and schedule voting.
@@ -851,6 +850,8 @@ compute_wfbw_weights_(r_consensus_info_t *current, bandwidth_weights_t *bwweight
   return 0;
 }
 
+#define ABS(a)\
+  (a > 0 ? a : -a)
 /**
  * This function search for the pivot node for which the bandwidth
  * of this node is the water level.
@@ -871,13 +872,20 @@ static int64_t
 search_pivot_and_compute_wfbw_weights_(smartlist_t *nodes,
     bandwidth_weights_t *bwweights, int64_t weight, int idx_left,
     int idx_right, int flag) {
+  printf("Entering search\n");
   int64_t water_level, cur_bwW, previous_bwW, bwW_to_remove, bwW_to_fill;
   water_level = cur_bwW = previous_bwW = bwW_to_remove = bwW_to_fill = 0;
   r_consensus_info_t *current;
   int idx_below_water = 0;
+  printf("computing pivot\n");
   int pivot = (idx_left+idx_right)/2;
   r_consensus_info_t *pivot_r = smartlist_get(nodes, pivot);
+  printf("computing waterlevel\n");
+  printf("weightscale %d\n", (int)bwweights->weight_scale);
+  printf("pivot: %d, idx_left:%d, idx_right:%d\n", pivot, idx_left, idx_right);
+  printf("bandwidth: %d\n", pivot_r->bandwidth_kb);
   water_level = pivot_r->bandwidth_kb * bwweights->weight_scale;
+  printf("computing previous\n");
   previous_bwW = ((r_consensus_info_t *)
       smartlist_get(nodes, 0))->bandwidth_kb * weight;
   int64_t remainder = 0;
@@ -886,12 +894,16 @@ search_pivot_and_compute_wfbw_weights_(smartlist_t *nodes,
    * node is below the water-level ... This is never likely to
    * happen but anyway, exit without any waterfilling 
    */
-  if (previous_bwW <= water_level)
+  if (previous_bwW <= water_level) {
+    printf("Biggest node * weight below waterlevel\n");
+    log_debug(LD_DIR, "Biggest node * weight below waterlevel\n");
     return -1;
+  }
 
   /* We cumulate the capacity to remove until we are under the
    * water level. We retain the index of this node and exit the
    * loop*/
+  printf("first loop\n");
   for (int i = 0; i < pivot; i++) {
     current = smartlist_get(nodes, i);
     cur_bwW = current->bandwidth_kb * weight;
@@ -903,12 +915,14 @@ search_pivot_and_compute_wfbw_weights_(smartlist_t *nodes,
     /*summing capacity to remove*/
     bwW_to_remove += (cur_bwW - water_level);
     /*compute tmp wf weight*/
+    printf("computing wfbw weights\n");
     compute_wfbw_weights_(current, bwweights, water_level, i,
         pivot, flag);
     previous_bwW = cur_bwW;
   }
   log_debug(LD_DIR, "idx_below_water %d", idx_below_water);
   /*We compute the bandwidth we could fill in smaller nodes*/
+  printf("second loop loop\n");
   for (int i = idx_below_water; i < smartlist_len(nodes); i++) {
     current = smartlist_get(nodes, i);
     if (i < pivot)
@@ -934,7 +948,7 @@ search_pivot_and_compute_wfbw_weights_(smartlist_t *nodes,
     /*return the rest. > 0 if we could not fill enough in the smallest node
      * < 0 if we have removed too much from the top nodes */
     /* Ideally, it should be 0 but such situation needs a lot of nodes... */
-    return remainder;
+    return ABS(remainder);
   else if (bwW_to_remove > bwW_to_fill)
     return search_pivot_and_compute_wfbw_weights_(nodes, bwweights, weight,
               idx_left, pivot, flag);
@@ -943,25 +957,28 @@ search_pivot_and_compute_wfbw_weights_(smartlist_t *nodes,
               pivot+1, idx_right, flag);
 }
 
+
 /** 
  * This function computes the waterfilling bandwidth weights
  *
  * return true if there is no error, false otherwise.
  */
-
 remainder_wfbw_t*
 networkstatus_compute_wfbw_weights(smartlist_t *retain, 
     bandwidth_weights_t *bwweights)
 {
+  tor_assert(smartlist_len(retain)>0);
   smartlist_t *guards=NULL, *exits=NULL, *guardsexits=NULL;
   int64_t remainder_guards=0, remainder_exits=0, remainder_guardsexits=0;
   remainder_wfbw_t *remainder = NULL;
   if (bwweights->wgg > 0 && bwweights->wgg < bwweights->weight_scale) {
     guards = smartlist_new();
     SMARTLIST_FOREACH(retain, r_consensus_info_t *, elem,
+        printf("Guard ? %d\n", elem->is_guard));
+    SMARTLIST_FOREACH(retain, r_consensus_info_t *, elem,
         filter_list_(guards, elem, 0, 1));
   }
-  if (bwweights->wee > 0 && bwweights-> wee < bwweights->weight_scale) {
+  if (bwweights->wee > 0 && bwweights->wee < bwweights->weight_scale) {
     exits = smartlist_new();
     SMARTLIST_FOREACH(retain, r_consensus_info_t *, elem,
         filter_list_(exits, elem, 1, 0));
@@ -973,28 +990,37 @@ networkstatus_compute_wfbw_weights(smartlist_t *retain,
   }
   if (guards) {
     /*sort in decreasing order*/
+    tor_assert(smartlist_len(guards) > 0);
     smartlist_sort(guards, compare_bw_nodes_);
     if ((remainder_guards=search_pivot_and_compute_wfbw_weights_(guards, bwweights, 
           bwweights->wgg, 0, guards->num_used-1, 0)) < 0) {
       tor_free(guards); 
+      printf("Error happened \n");
+      //XXX should not return null but wipeout computed wf weights for those nodes
       return NULL;
     }
     tor_free(guards);
   }
   if (exits) {
+    tor_assert(smartlist_len(exits) > 0);
     smartlist_sort(exits, compare_bw_nodes_);
     if ((remainder_exits=search_pivot_and_compute_wfbw_weights_(exits, bwweights, 
           bwweights->wee, 0, exits->num_used-1, 2)) < 0) {
       tor_free(exits);
+      printf("Error happened \n");
       return NULL;
     }
     tor_free(exits);
   }
   if (guardsexits) {
+    tor_assert(smartlist_len(guardsexits) > 0);
     smartlist_sort(guardsexits, compare_bw_nodes_);
+    SMARTLIST_FOREACH(guardsexits, r_consensus_info_t *, node,
+        printf("bandwidth : %d\n", node->bandwidth_kb));
     if ((remainder_guardsexits=search_pivot_and_compute_wfbw_weights_(guardsexits, bwweights,
-          bwweights->wmd, 0, guardsexits->num_used-1, 1)) < 0) {
+          bwweights->weight_scale-bwweights->wmd, 0, guardsexits->num_used-1, 1)) < 0) {
       tor_free(guardsexits);
+      printf("Error happened \n");
       return NULL;
     }
     tor_free(guardsexits);
@@ -1293,6 +1319,11 @@ write_wfbw_weights(smartlist_t *chunks, smartlist_t *retain) {
       r_consensus_info_t *node = NULL;
       /*At the end of the loop, retain should be empty*/
       node = smartlist_pop_last(retain);
+      /*if ther is no wf weights on this node, skip*/
+      if (!(node->wfbwweights->wgg ||
+          node->wfbwweights->wmd ||
+          node->wfbwweights->wee))
+        continue;
       /* insert our new line TODO*/
       char *wgg_str = NULL;
       char *wee_str = NULL;
@@ -2163,15 +2194,16 @@ networkstatus_compute_consensus(smartlist_t *votes,
          like that too.*/
       {
         r_consensus_info_t *r_info = NULL;
+        printf("wf ? %d\n", get_options()->UseWaterfilling);
         if (get_options()->UseWaterfilling) {
-          r_info = (r_consensus_info_t *) tor_malloc(sizeof(r_consensus_info_t));
+          r_info = (r_consensus_info_t *) tor_malloc_zero(sizeof(r_consensus_info_t));
           memcpy(r_info->digest, rs_out.identity_digest, DIGEST_LEN);
           r_info->is_exit = is_exit;
           r_info->is_guard = is_guard;
           r_info->bandwidth_kb = rs_out.bandwidth_kb;
-          r_info->wfbwweights = NULL; /* will be filled when we compute wfbww */
           r_info->wfbwweights = 
             (bandwidth_weights_t*) tor_malloc_zero(sizeof(bandwidth_weights_t));
+          printf("Adding r_info %s\n", r_info->digest);
           smartlist_add(retain, r_info);
           /*smartlist_add_asprintf(chunks,"wfbw %s%s%s%s%s%s\n",*/
           /*wgg_str ? wgg_str : "",*/
@@ -2252,9 +2284,11 @@ networkstatus_compute_consensus(smartlist_t *votes,
     if (get_options()->UseWaterfilling) {
       /*compute waterfilling bandwidth weights and loop over chunks to add
        * wfbw line for each router*/
+      printf("added weights \n");
       if (added_weights) {
         remainder = networkstatus_compute_wfbw_weights(retain, bwweights);
         if (remainder) {
+          printf("Trying to write wfbw weights\n");
           write_wfbw_weights(chunks, retain);
         }
       }
