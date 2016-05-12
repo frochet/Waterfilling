@@ -1328,11 +1328,11 @@ write_wfbw_weights(smartlist_t *chunks, smartlist_t *retain) {
         tor_asprintf(&wee_str, "wee=%d ", (int)node->wfbwweights->wee);
       if (node->wfbwweights->wed)
         tor_asprintf(&wed_str, "wed=%d ", (int)node->wfbwweights->wed);
-      if (node->wfbwweights->wmd)
+      if (node->wfbwweights->wmd || node->wfbwweights->wed || node->wfbwweights->wgd)
         tor_asprintf(&wmd_str, "wmd=%d ", (int)node->wfbwweights->wmd);
-      if (node->wfbwweights->wme)
+      if (node->wfbwweights->wme || node->wfbwweights->wee)
         tor_asprintf(&wme_str, "wme=%d ", (int)node->wfbwweights->wme);
-      if (node->wfbwweights->wmg)
+      if (node->wfbwweights->wmg || node->wfbwweights->wgg)
         tor_asprintf(&wmg_str, "wmg=%d ", (int)node->wfbwweights->wmg);
       if (node->wfbwweights->wgd)
         tor_asprintf(&wgd_str, "wgd=%d ", (int)node->wfbwweights->wgd);
