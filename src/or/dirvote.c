@@ -872,12 +872,10 @@ static int64_t
 search_pivot_and_compute_wfbw_weights_(smartlist_t *nodes,
     bandwidth_weights_t *bwweights, int64_t weight, int idx_left,
     int idx_right, int flag) {
-  printf("Entering search\n");
   int64_t water_level, cur_bwW, previous_bwW, bwW_to_remove, bwW_to_fill;
   water_level = cur_bwW = previous_bwW = bwW_to_remove = bwW_to_fill = 0;
   r_consensus_info_t *current;
   int idx_below_water = 0;
-  printf("computing pivot\n");
   int pivot = (idx_left+idx_right)/2;
   r_consensus_info_t *pivot_r = smartlist_get(nodes, pivot);
   printf("computing waterlevel\n");
@@ -885,7 +883,6 @@ search_pivot_and_compute_wfbw_weights_(smartlist_t *nodes,
   printf("pivot: %d, idx_left:%d, idx_right:%d\n", pivot, idx_left, idx_right);
   printf("bandwidth: %d\n", pivot_r->bandwidth_kb);
   water_level = pivot_r->bandwidth_kb * bwweights->weight_scale;
-  printf("computing previous\n");
   previous_bwW = ((r_consensus_info_t *)
       smartlist_get(nodes, 0))->bandwidth_kb * weight;
   int64_t remainder = 0;
@@ -903,7 +900,6 @@ search_pivot_and_compute_wfbw_weights_(smartlist_t *nodes,
   /* We cumulate the capacity to remove until we are under the
    * water level. We retain the index of this node and exit the
    * loop*/
-  printf("first loop\n");
   for (int i = 0; i < pivot; i++) {
     current = smartlist_get(nodes, i);
     cur_bwW = current->bandwidth_kb * weight;
@@ -915,14 +911,12 @@ search_pivot_and_compute_wfbw_weights_(smartlist_t *nodes,
     /*summing capacity to remove*/
     bwW_to_remove += (cur_bwW - water_level);
     /*compute tmp wf weight*/
-    printf("computing wfbw weights\n");
     compute_wfbw_weights_(current, bwweights, water_level, i,
         pivot, flag);
     previous_bwW = cur_bwW;
   }
   log_debug(LD_DIR, "idx_below_water %d", idx_below_water);
   /*We compute the bandwidth we could fill in smaller nodes*/
-  printf("second loop loop\n");
   for (int i = idx_below_water; i < smartlist_len(nodes); i++) {
     current = smartlist_get(nodes, i);
     if (i < pivot)
@@ -974,8 +968,6 @@ networkstatus_compute_wfbw_weights(smartlist_t *retain,
   if (bwweights->wgg > 0 && bwweights->wgg < bwweights->weight_scale) {
     guards = smartlist_new();
     SMARTLIST_FOREACH(retain, r_consensus_info_t *, elem,
-        printf("Guard ? %d\n", elem->is_guard));
-    SMARTLIST_FOREACH(retain, r_consensus_info_t *, elem,
         filter_list_(guards, elem, 0, 1));
   }
   if (bwweights->wee > 0 && bwweights->wee < bwweights->weight_scale) {
@@ -1015,8 +1007,6 @@ networkstatus_compute_wfbw_weights(smartlist_t *retain,
   if (guardsexits) {
     tor_assert(smartlist_len(guardsexits) > 0);
     smartlist_sort(guardsexits, compare_bw_nodes_);
-    SMARTLIST_FOREACH(guardsexits, r_consensus_info_t *, node,
-        printf("bandwidth : %d\n", node->bandwidth_kb));
     if ((remainder_guardsexits=search_pivot_and_compute_wfbw_weights_(guardsexits, bwweights,
           bwweights->weight_scale-bwweights->wmd, 0, guardsexits->num_used-1, 1)) < 0) {
       tor_free(guardsexits);
@@ -1935,6 +1925,7 @@ networkstatus_compute_consensus(smartlist_t *votes,
       /* Figure out the most popular opinion of what the most recent
        * routerinfo and its contents are. */
       memset(microdesc_digest, 0, sizeof(microdesc_digest));
+      /*printf("Consensus methdod: %d\n", consensus_method);*/
       rs = compute_routerstatus_consensus(matching_descs, consensus_method,
                                           microdesc_digest, &alt_orport);
       /* Copy bits of that into rs_out. */
@@ -2130,10 +2121,11 @@ networkstatus_compute_consensus(smartlist_t *votes,
           rs_out.exitsummary = (char *)chosen_exitsummary;
         }
       }
-
+      
       if (flavor == FLAV_MICRODESC &&
           tor_digest256_is_zero(microdesc_digest)) {
         /* With no microdescriptor digest, we omit the entry entirely. */
+        printf("Error microdesc\n");
         continue;
       }
 
@@ -2194,7 +2186,6 @@ networkstatus_compute_consensus(smartlist_t *votes,
          like that too.*/
       {
         r_consensus_info_t *r_info = NULL;
-        printf("wf ? %d\n", get_options()->UseWaterfilling);
         if (get_options()->UseWaterfilling) {
           r_info = (r_consensus_info_t *) tor_malloc_zero(sizeof(r_consensus_info_t));
           memcpy(r_info->digest, rs_out.identity_digest, DIGEST_LEN);
@@ -2203,7 +2194,6 @@ networkstatus_compute_consensus(smartlist_t *votes,
           r_info->bandwidth_kb = rs_out.bandwidth_kb;
           r_info->wfbwweights = 
             (bandwidth_weights_t*) tor_malloc_zero(sizeof(bandwidth_weights_t));
-          printf("Adding r_info %s\n", r_info->digest);
           smartlist_add(retain, r_info);
           /*smartlist_add_asprintf(chunks,"wfbw %s%s%s%s%s%s\n",*/
           /*wgg_str ? wgg_str : "",*/
