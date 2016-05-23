@@ -878,10 +878,10 @@ search_pivot_and_compute_wfbw_weights_(smartlist_t *nodes,
   int idx_below_water = 0;
   int pivot = (idx_left+idx_right)/2;
   r_consensus_info_t *pivot_r = smartlist_get(nodes, pivot);
-  printf("computing waterlevel\n");
-  printf("weightscale %d\n", (int)bwweights->weight_scale);
-  printf("pivot: %d, idx_left:%d, idx_right:%d\n", pivot, idx_left, idx_right);
-  printf("bandwidth: %d\n", pivot_r->bandwidth_kb);
+  /*printf("computing waterlevel\n");*/
+  /*printf("weightscale %d\n", (int)bwweights->weight_scale);*/
+  /*printf("pivot: %d, idx_left:%d, idx_right:%d\n", pivot, idx_left, idx_right);*/
+  /*printf("bandwidth: %d\n", pivot_r->bandwidth_kb);*/
   water_level = pivot_r->bandwidth_kb * bwweights->weight_scale;
   previous_bwW = ((r_consensus_info_t *)
       smartlist_get(nodes, 0))->bandwidth_kb * weight;
@@ -892,7 +892,7 @@ search_pivot_and_compute_wfbw_weights_(smartlist_t *nodes,
    * happen but anyway, exit without any waterfilling 
    */
   if (previous_bwW <= water_level) {
-    printf("Biggest node * weight below waterlevel\n");
+    /*printf("Biggest node * weight below waterlevel\n");*/
     log_debug(LD_DIR, "Biggest node * weight below waterlevel\n");
     return -1;
   }
@@ -933,7 +933,7 @@ search_pivot_and_compute_wfbw_weights_(smartlist_t *nodes,
    * are close to each other .. we can exit
    * */
   remainder = bwW_to_remove-bwW_to_fill;
-  printf("bww_to_remove - bww_to_fill: %" PRId64
+  /*printf("bww_to_remove - bww_to_fill: %" PRId64*/
       "idx_left:%d, pivot:%d, idx_right:%d, wl=%" PRId64 "\n",
       remainder, idx_left, pivot, idx_right, water_level);
   if (idx_right == idx_left) 
@@ -987,7 +987,7 @@ networkstatus_compute_wfbw_weights(smartlist_t *retain,
     if ((remainder_guards=search_pivot_and_compute_wfbw_weights_(guards, bwweights, 
           bwweights->wgg, 0, guards->num_used-1, 0)) < 0) {
       tor_free(guards); 
-      printf("Error happened \n");
+      /*printf("Error happened \n");*/
       //XXX should not return null but wipeout computed wf weights for those nodes
       return NULL;
     }
@@ -999,7 +999,7 @@ networkstatus_compute_wfbw_weights(smartlist_t *retain,
     if ((remainder_exits=search_pivot_and_compute_wfbw_weights_(exits, bwweights, 
           bwweights->wee, 0, exits->num_used-1, 2)) < 0) {
       tor_free(exits);
-      printf("Error happened \n");
+      /*printf("Error happened \n");*/
       return NULL;
     }
     tor_free(exits);
@@ -1010,13 +1010,13 @@ networkstatus_compute_wfbw_weights(smartlist_t *retain,
     if ((remainder_guardsexits=search_pivot_and_compute_wfbw_weights_(guardsexits, bwweights,
           bwweights->weight_scale-bwweights->wmd, 0, guardsexits->num_used-1, 1)) < 0) {
       tor_free(guardsexits);
-      printf("Error happened \n");
+      /*printf("Error happened \n");*/
       return NULL;
     }
     tor_free(guardsexits);
   }
   if (remainder_guards)
-    printf("remainder_guards guards=%" PRId64 "\n", remainder_guards);
+    /*printf("remainder_guards guards=%" PRId64 "\n", remainder_guards);*/
   remainder = tor_malloc_zero(sizeof(remainder_wfbw_t));
   remainder->r_guards = remainder_guards;
   remainder->r_exits = remainder_exits;
@@ -2125,7 +2125,7 @@ networkstatus_compute_consensus(smartlist_t *votes,
       if (flavor == FLAV_MICRODESC &&
           tor_digest256_is_zero(microdesc_digest)) {
         /* With no microdescriptor digest, we omit the entry entirely. */
-        printf("Error microdesc\n");
+        /*printf("Error microdesc\n");*/
         continue;
       }
 
@@ -2274,11 +2274,11 @@ networkstatus_compute_consensus(smartlist_t *votes,
     if (get_options()->UseWaterfilling) {
       /*compute waterfilling bandwidth weights and loop over chunks to add
        * wfbw line for each router*/
-      printf("added weights \n");
+      /*printf("added weights \n");*/
       if (added_weights) {
         remainder = networkstatus_compute_wfbw_weights(retain, bwweights);
         if (remainder) {
-          printf("Trying to write wfbw weights\n");
+          /*printf("Trying to write wfbw weights\n");*/
           write_wfbw_weights(chunks, retain);
         }
       }
