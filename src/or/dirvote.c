@@ -934,8 +934,8 @@ search_pivot_and_compute_wfbw_weights_(smartlist_t *nodes,
    * */
   remainder = bwW_to_remove-bwW_to_fill;
   /*printf("bww_to_remove - bww_to_fill: %" PRId64*/
-      "idx_left:%d, pivot:%d, idx_right:%d, wl=%" PRId64 "\n",
-      remainder, idx_left, pivot, idx_right, water_level);
+      /*"idx_left:%d, pivot:%d, idx_right:%d, wl=%" PRId64 "\n",*/
+      /*remainder, idx_left, pivot, idx_right, water_level);*/
   if (idx_right == idx_left) 
     /*we should have computed the more precise wf -- but it might not be
      *the best choice.*/
