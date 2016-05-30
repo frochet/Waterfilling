@@ -2283,12 +2283,12 @@ networkstatus_compute_consensus(smartlist_t *votes,
       /*printf("added weights \n");*/
       if (added_weights) {
         remainder = networkstatus_compute_wfbw_weights(retain, bwweights);
-        log_info(LD_DIR, "Fraction of remainder for guard: "I64_FORMAT
-            "\nFraction of remainder for guardexits: "I64_FORMAT
-            "\nFraction of remainder for exits: "I64_FORMAT"\n",
-            I64_PRINTF_ARG(remainder->r_guards/(G*bwweights->wgg)),
-            I64_PRINTF_ARG(remainder->r_guardsexits/(D*(bwweights->wed+bwweights->wgd))),
-            I64_PRINTF_ARG(remainder->r_exits/(E*bwweights->wee)));
+        log_info(LD_DIR, "\nFraction of remainder for guard: %f"
+            "\nFraction of remainder for guardexits: %f"
+            "\nFraction of remainder for exits: %f\n",
+            double(remainder->r_guards)/double(G*bwweights->wgg),
+            double(remainder->r_guardsexits)/double(D*(bwweights->wed+bwweights->wgd)),
+            double(remainder->r_exits)/double(E*bwweights->wee));
         if (remainder) {
           /*printf("Trying to write wfbw weights\n");*/
           write_wfbw_weights(chunks, retain);
