@@ -3841,6 +3841,10 @@ typedef struct {
   int UseEntryGuardsAsDirGuards; /** Boolean: Do we try to get directory info
                                   * from a smallish number of fixed nodes? */
   int UseWaterfilling; /** <Boolean: Use watefillin bandwidth-weights or not */
+  int OptWaterfilling; /**<Boolean: when UseWaterfilling is enabled, we can
+  enable OptWatefilling to change how bandwidth weights are computed --
+  This is a functionality test: either it works and it would be added by
+  default in waterfilling, or not*/
   /** If 1, we use any guardfraction information we see in the
    * consensus.  If 0, we don't.  If -1, let the consensus parameter
    * decide. */

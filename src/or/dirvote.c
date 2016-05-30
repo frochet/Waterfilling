@@ -1189,7 +1189,13 @@ networkstatus_compute_bw_weights_v10(int64_t G,
         // Minor subcase, if G is more scarce than M,
         // keep its bandwidth in place.
         if (G < M) Wmg = 0;
-        else Wmg = (weight_scale*(G-M))/(2*G);
+        else {
+          if (get_options()->UseWaterfilling &&
+              get_options()->OptWaterfilling)
+            Wmg =  (weight_scale*(G-E-D))/G;
+          else
+            Wmg = (weight_scale*(G-M))/(2*G);
+        }
         Wgg = weight_scale-Wmg;
       }
     } else { // Subcase b: S+D >= T/3
@@ -2277,6 +2283,12 @@ networkstatus_compute_consensus(smartlist_t *votes,
       /*printf("added weights \n");*/
       if (added_weights) {
         remainder = networkstatus_compute_wfbw_weights(retain, bwweights);
+        log_info(LD_DIR, "Fraction of remainder for guard: "I64_FORMAT
+            "\nFraction of remainder for guardexits: "I64_FORMAT
+            "\nFraction of remainder for exits: "I64_FORMAT"\n",
+            I64_PRINTF_ARG(remainder->r_guards/(G*bwweights->wgg)),
+            I64_PRINTF_ARG(remainder->r_guardsexits/(D*(bwweights->wed+bwweights->wgd))),
+            I64_PRINTF_ARG(remainder->r_exits/(E*bwweights->wee)));
         if (remainder) {
           /*printf("Trying to write wfbw weights\n");*/
           write_wfbw_weights(chunks, retain);

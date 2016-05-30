@@ -418,6 +418,7 @@ static config_var_t option_vars_[] = {
   V(UseEntryGuards,              BOOL,     "1"),
   V(UseEntryGuardsAsDirGuards,   BOOL,     "1"),
   V(UseWaterfilling,             BOOL,     "0"),
+  V(OptWaterfilling,              BOOL,     "0"),
   V(UseGuardFraction,            AUTOBOOL, "auto"),
   V(UseMicrodescriptors,         AUTOBOOL, "auto"),
   V(UseNTorHandshake,            AUTOBOOL, "1"),
