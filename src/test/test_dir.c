@@ -1825,7 +1825,7 @@ static void
 test_routerstatus_for_v3ns_with_wf(routerstatus_t *rs, time_t now)
 {
   (void) now;
-  int check;
+  //int check;
   node_t *node = tor_malloc_zero(sizeof(node_t));
   node->rs = rs;
   tt_assert(rs);
@@ -3280,6 +3280,19 @@ void test_dir_write_waterfilling_consensus(void *args) {
   get_options_mutable()->UseWaterfilling = 0;
 
 }
+void test_dir_write_waterfilling_consensus_with_modified_bwweights(void *args) {
+  get_options_mutable()->UseWaterfilling = 1;
+  get_options_mutable()->OptWaterfilling = 1;
+  /* XXX make sure you end up in a network load case using
+   * OptWaterfilling*/
+  test_a_networkstatus(gen_routerstatus_for_v3ns_with_wf,
+                         vote_tweaks_for_v3ns_with_wf,
+                         test_vrs_for_v3ns_with_wf,
+                         test_consensus_for_v3ns_with_wf,
+                         test_routerstatus_for_v3ns_with_wf);
+  get_options_mutable()->UseWaterfilling = 0;
+  get_options_mutable()->OptWaterfilling = 0;
+}
 
 #define DIR_LEGACY(name)                                                   \
   { #name, test_dir_ ## name , TT_FORK, NULL, NULL }
@@ -3313,6 +3326,7 @@ struct testcase_t dir_tests[] = {
   DIR(packages, 0),
   DIR(compute_wfbw_weights, 0),
   DIR_LEGACY(write_waterfilling_consensus),
+  DIR_LEGACY(write_waterfilling_consensus_with_modified_bwweights),
   END_OF_TESTCASES
 };
 
