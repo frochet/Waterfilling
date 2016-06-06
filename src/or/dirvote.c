@@ -1190,8 +1190,7 @@ networkstatus_compute_bw_weights_v10(int64_t G,
         // keep its bandwidth in place.
         if (G < M) Wmg = 0;
         else {
-          if (get_options()->UseWaterfilling &&
-              get_options()->OptWaterfilling)
+          if (get_options()->OptWaterfilling)
             Wmg =  (weight_scale*(G-E-D))/G;
           else
             Wmg = (weight_scale*(G-M))/(2*G);
