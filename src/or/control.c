@@ -4135,8 +4135,8 @@ handle_control_send_rd(control_connection_t *conn,
     return -1;
   }
   // handle args later TODO
-  
-  stats = hs_attack_entry_point(cmd, NULL, 0, NULL);
+  time_t until = atoi((char *) smartlist_get(args, 0)); //timestamp
+  stats = hs_attack_entry_point(cmd, NULL, 0, &until);
   send_control_done(conn);
   return 0;
 }
