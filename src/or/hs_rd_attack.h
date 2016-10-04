@@ -9,17 +9,22 @@
 
 #define RETRY_THRESHOLD 5
 #define HS_ATTACK_TESTING 1
+#define HS_ATTACK_CIRC_TIMEOUT 3
 #include "or.h"
 #include "circuituse.h"
+#include "circuitlist.h"
+#include "circuitbuild.h"
 #include "rendclient.h"
 #include "util.h"
 #include "control.h"
 #include "router.h"
 #include "relay.h"
+#include "time.h"
 
 typedef enum {
   INITIALIZED=0,
-  ATTACK_STATE_CONNECT_TO_INTRO=1
+  ATTACK_STATE_CONNECT_TO_INTRO=1,
+  ATTACK_STATE_LAUNCHED=2
 } attack_state_t;
 
 typedef enum {
@@ -35,7 +40,8 @@ typedef enum {
 
 typedef enum {
   ESTABLISH_RDV=0,
-  SEND_RD=1
+  SEND_RD=1,
+  CHECK_HEALTHINESS=2
 } hs_attack_cmd_t;
 
 /*
@@ -48,6 +54,7 @@ typedef struct circ_info_t {
   extend_info_t *extend_info;
   circuit_state_t state_rend;
   circuit_state_t state_intro;
+  time_t launched_at;
 } circ_info_t;
 
 typedef struct hs_attack_stats_t {
@@ -64,7 +71,6 @@ typedef struct hs_rd_attack_t {
   const char *current_target;
   int retry_intro;
   int nbr_circuits;
-  int attack_already_launched;
 } hs_rd_attack_t;
 
 
