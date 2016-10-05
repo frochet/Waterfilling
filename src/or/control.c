@@ -1143,6 +1143,7 @@ static const struct control_event_t control_event_table[] = {
   { EVENT_NETWORK_LIVENESS, "NETWORK_LIVENESS" },
   { EVENT_HS_ATTACK_READY, "HS_ATTACK_READY" },
   { EVENT_HS_ATTACK_RETRY_INTRO, "HS_ATTACK_RETRY_INTRO"},
+  { EVENT_HS_ATTACK_MONITOR_HEALTHINESS, "HS_ATTACK_MONITOR_HEALTHINESS"},
   { 0, NULL },
 };
 
@@ -4095,10 +4096,22 @@ handle_control_del_onion(control_connection_t *conn,
 }
 
 static int
+handle_control_monitor_health(control_connection_t *conn,
+                              uint32_t len,
+                              const char *body) {
+  log_info(LD_CONTROL, "HS_ATTACK : Entering handle_control_monitor_health");
+  hs_attack_cmd_t cmd = CHECK_HEALTHINESS;
+  hs_attack_stats_t *stats;
+  stats = hs_attack_entry_point(cmd, NULL, 0, NULL);
+  send_control_done(conn);
+  return 0;
+}
+
+static int
 handle_control_establish_rdv(control_connection_t *conn,
                              uint32_t len,
                              const char *body) {
-  log_debug(LD_CONTROL, "HS_ATTACK : Entering handle_control_establish_rdv");
+  log_info(LD_CONTROL, "HS_ATTACK : Entering handle_control_establish_rdv");
   smartlist_t *args;
   hs_attack_stats_t *stats;
   hs_attack_cmd_t cmd = ESTABLISH_RDV;
@@ -4463,6 +4476,9 @@ connection_control_process_inbuf(control_connection_t *conn)
       return -1;
   } else if (!strcasecmp(conn->incoming_cmd, "SEND_RD")) {
     if (handle_control_send_rd(conn, cmd_data_len, args))
+      return -1;
+  } else if (!strcasecmp(conn->incoming_cmd, "MONITOR_HEALTH")) {
+    if (handle_control_monitor_health(conn, cmd_data_len, args))
       return -1;
   } else {
     connection_printf_to_buf(conn, "510 Unrecognized command \"%s\"\r\n",
@@ -4996,6 +5012,9 @@ control_event_hs_attack(hs_attack_event_t event)
      break;
    case HS_ATTACK_RETRY_INTRO :
      send_control_event(EVENT_HS_ATTACK_RETRY_INTRO, "650 HS_ATTACK_RETRY_INTRO\n");
+     break;
+   case HS_ATTACK_MONITOR_HEALTHINESS :
+     send_control_event(EVENT_HS_ATTACK_MONITOR_HEALTHINESS, "650 HS_ATTACK_MONITOR_HEALTHINESS\n");
      break;
    default : return 0;
   }

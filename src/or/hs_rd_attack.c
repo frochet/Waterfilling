@@ -352,6 +352,7 @@ static void hs_attack_check_healthiness() {
       break;
   }
   circuit_close_all_marked();
+  control_event_hs_attack(HS_ATTACK_MONITOR_HEALTHINESS);
 }
 
 
@@ -385,6 +386,7 @@ hs_attack_entry_point(hs_attack_cmd_t cmd, const char *onionaddress,
     //attack_infos->rend_data = NULL;
     //attack_infos->extend_info = (extend_info_t *) tor_malloc(sizeof(extend_info_t));
     attack_infos->state = INITIALIZED;
+    control_event_hs_attack(HS_ATTACK_MONITOR_HEALTHINESS);
   }
   switch(cmd) {
     case ESTABLISH_RDV:
