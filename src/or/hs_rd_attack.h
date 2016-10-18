@@ -9,7 +9,7 @@
 
 #define RETRY_THRESHOLD 5
 #define HS_ATTACK_TESTING 1
-#define HS_ATTACK_CIRC_TIMEOUT 3
+#define HS_ATTACK_CIRC_TIMEOUT 6
 #include "or.h"
 #include "circuituse.h"
 #include "circuitlist.h"
@@ -28,14 +28,14 @@ typedef enum {
 } attack_state_t;
 
 typedef enum {
-  CIRC_NO_STATE = 0,
-  REND_CIRC_BUILDING = 1,
-  REND_CIRC_READY_FOR_INTRO=2,
-  REND_CIRC_READY_FOR_RD=3,
-  REND_CIRC_INTRO_CELL_SENT=6,
-  INTRO_CIRC_BUILDING=4,
-  INTRO_CIRC_READY=5,
-  INTRO_CIRC_LAUNCHED=6
+  CIRC_NO_STATE,
+  REND_CIRC_BUILDING,
+  REND_CIRC_READY_FOR_INTRO,
+  REND_CIRC_READY_FOR_RD,
+  REND_CIRC_INTRO_CELL_SENT,
+  INTRO_CIRC_BUILDING,
+  INTRO_CIRC_READY,
+  INTRO_CIRC_LAUNCHED
 } circuit_state_t;
 
 typedef enum {

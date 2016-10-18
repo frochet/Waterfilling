@@ -4124,14 +4124,14 @@ handle_control_establish_rdv(control_connection_t *conn,
   stats = hs_attack_entry_point(cmd, oaddress, nbr_circs, NULL);
   if (stats) {
     // write info on opened circuits
-    log_debug(LD_CONTROL, "HS_ATTACK : created %d rendezvous circuits", stats->nbr_rendcircs);
+    log_info(LD_CONTROL, "HS_ATTACK : created %d rendezvous circuits", stats->nbr_rendcircs);
   }
   else {
     log_debug(LD_CONTROL, "HS_ATTACK : Exiting handle_control_establish_rdv with error");
     connection_printf_to_buf(conn, "500 \r\n"); //todo handling errors
     return -1;
   }
-  log_debug(LD_CONTROL, "HS_ATTACK : Exiting handle_control_establish_rdv");
+  log_info(LD_CONTROL, "HS_ATTACK : Exiting handle_control_establish_rdv");
   send_control_done(conn);
   return 0;
 }
@@ -4484,8 +4484,7 @@ connection_control_process_inbuf(control_connection_t *conn)
     connection_printf_to_buf(conn, "510 Unrecognized command \"%s\"\r\n",
                              conn->incoming_cmd);
   }
-  log_debug(LD_CONTROL, "HS_ATTACK: Command processed %s", conn->incoming_cmd);
-  log_debug(LD_CONTROL, "HS_ATTACK: goto again reached");
+  log_info(LD_CONTROL, "HS_ATTACK: Command processed %s", conn->incoming_cmd);
   conn->incoming_cmd_cur_len = 0;
   goto again;
 }
