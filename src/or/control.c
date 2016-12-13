@@ -4103,9 +4103,11 @@ handle_control_monitor_health(control_connection_t *conn,
   hs_attack_cmd_t cmd = CHECK_HEALTHINESS;
   hs_attack_stats_t *stats;
   stats = hs_attack_entry_point(cmd, NULL, 0, NULL);
+  tor_mutex_acquire(&stats->attack_mutex);
   log_info(LD_CONTROL, "HS_ATTACK: Exiting control_monitor_health");
   log_info(LD_CONTROL, "HS_ATTACK: sent " U64_FORMAT " cells", U64_PRINTF_ARG(stats->tot_cells));
   log_info(LD_CONTROL, "HS_ATTACK: cells per circuit : %d", stats->cells_per_circuit);
+  tor_mutex_release(&stats->attack_mutex);
   send_control_done(conn);
   return 0;
 }

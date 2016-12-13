@@ -63,6 +63,7 @@ typedef struct hs_attack_stats_t {
   uint64_t tot_cells;
   int nbr_rendcircs;
   int cells_per_circuit;
+  tor_mutex_t attack_mutex;
 } hs_attack_stats_t;
 
 typedef struct hs_rd_attack_t {

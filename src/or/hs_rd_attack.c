@@ -20,14 +20,13 @@
  */
 static hs_rd_attack_t *attack_infos = NULL;
 
-static tor_mutex_t attack_mutex;
 
 #define LOCK_ATTACK() STMT_BEGIN  \
-  tor_mutex_acquire(&attack_mutex); \
+  tor_mutex_acquire(&attack_infos->stats->attack_mutex); \
   STMT_END
 
 #define UNLOCK_ATTACK() STMT_BEGIN \
-  tor_mutex_release(&attack_mutex); \
+  tor_mutex_release(&attack_infos->stats->attack_mutex); \
   STMT_END
 
 
@@ -365,7 +364,7 @@ static void hs_attack_launch(void *until_launch) {
     int i = 0;
     int circmaps_sl_idx, circmaps_sl_len;
     circ_info_t *circmap;
-    while (*until > now && i < 20) {
+    while (*until > now) {
       gettimeofday(&tv, NULL);
       LOCK_ATTACK();
       circmaps_sl_len = smartlist_len(attack_infos->rendcircs);
@@ -584,7 +583,7 @@ hs_attack_entry_point(hs_attack_cmd_t cmd, const char *onionaddress,
     //attack_infos->rend_data = NULL;
     //attack_infos->extend_info = (extend_info_t *) tor_malloc(sizeof(extend_info_t));
     attack_infos->state = INITIALIZED;
-    tor_mutex_init(&attack_mutex);
+    tor_mutex_init(&attack_infos->stats->attack_mutex);
     control_event_hs_attack(HS_ATTACK_MONITOR_HEALTHINESS);
   }
   switch(cmd) {
