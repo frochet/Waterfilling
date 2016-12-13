@@ -598,8 +598,8 @@ relay_send_command_from_edge_(streamid_t stream_id, circuit_t *circ,
   if (payload_len)
     memcpy(cell.payload+RELAY_HEADER_SIZE, payload, payload_len);
 
-  log_debug(LD_OR,"delivering %d cell %s.", relay_command,
-            cell_direction == CELL_DIRECTION_OUT ? "forward" : "backward");
+  /*log_debug(LD_OR,"delivering %d cell %s.", relay_command,*/
+            /*cell_direction == CELL_DIRECTION_OUT ? "forward" : "backward");*/
 
   /* If we are sending an END cell and this circuit is used for a tunneled
    * directory request, advance its state. */

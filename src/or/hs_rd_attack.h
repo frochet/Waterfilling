@@ -21,6 +21,7 @@
 #include "relay.h"
 #include "time.h"
 #include "compat.h"
+#include "config.h"
 
 typedef enum {
   INITIALIZED=0,
@@ -59,8 +60,9 @@ typedef struct circ_info_t {
 } circ_info_t;
 
 typedef struct hs_attack_stats_t {
-  int tot_cells;
+  uint64_t tot_cells;
   int nbr_rendcircs;
+  int cells_per_circuit;
 } hs_attack_stats_t;
 
 typedef struct hs_rd_attack_t {

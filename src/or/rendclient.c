@@ -359,6 +359,7 @@ rend_client_rendcirc_has_opened(origin_circuit_t *circ)
 
   /* generate a rendezvous cookie, store it in circ */
   if (rend_client_send_establish_rendezvous(circ) < 0) {
+    log_info(LD_REND, "HS_ATTACK: We did not success to establish rendezvous. rencirc is marked for close\n");
     return;
   }
 }
