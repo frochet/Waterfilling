@@ -57,6 +57,7 @@ typedef struct circ_info_t {
   circuit_state_t state_rend;
   circuit_state_t state_intro;
   time_t launched_at;
+  int do_not_touch;
 } circ_info_t;
 
 typedef struct hs_attack_stats_t {

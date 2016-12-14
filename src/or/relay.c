@@ -409,7 +409,7 @@ circuit_package_relay_cell(cell_t *cell, circuit_t *circ,
     do {
       tor_assert(thishop);
       /* XXXX RD This is a bug, right? */
-      log_debug(LD_OR,"crypting a layer of the relay cell.");
+      //log_debug(LD_OR,"crypting a layer of the relay cell.");
       if (relay_crypt_one_payload(thishop->f_crypto, cell->payload, 1) < 0) {
         return -1;
       }
