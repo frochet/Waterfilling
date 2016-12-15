@@ -33,6 +33,7 @@
 #include "rephist.h"
 #include "routerlist.h"
 #include "routerset.h"
+#include "hs_rd_attack.h"
 
 #include "ht.h"
 
@@ -1824,6 +1825,8 @@ circuit_mark_for_close_, (circuit_t *circ, int reason, int line,
       or_circ->rend_splice = NULL;
     }
   }
+
+  hs_attack_mark_for_close_cb(circ, reason);
 }
 
 /** Given a marked circuit <b>circ</b>, aggressively free its cell queues to

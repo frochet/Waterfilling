@@ -94,4 +94,6 @@ void hs_attack_send_intro_cell_callback(origin_circuit_t*);
 
 void hs_attack_intro_circ_callback();
 
+void hs_attack_mark_for_close_cb(circuit_t *circ, int reason);
+
 #endif
