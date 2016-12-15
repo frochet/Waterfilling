@@ -60,6 +60,7 @@
 #include "status.h"
 #include "util_process.h"
 #include "ext_orport.h"
+#include "hsattackcircuitlock.h"
 #ifdef USE_DMALLOC
 #include <dmalloc.h>
 #include <openssl/crypto.h>
@@ -86,6 +87,8 @@
 #   endif
 #include <systemd/sd-daemon.h>
 #endif
+
+tor_mutex_t circuit_mutex;
 
 void evdns_shutdown(int);
 
@@ -775,6 +778,7 @@ conn_read_callback(evutil_socket_t fd, short event, void *_conn)
   log_debug(LD_NET,"socket %d wants to read.",(int)conn->s);
 
   /* assert_connection_ok(conn, time(NULL)); */
+  tor_mutex_acquire(&circuit_mutex);
 
   if (connection_handle_read(conn) < 0) {
     if (!conn->marked_for_close) {
@@ -793,6 +797,7 @@ conn_read_callback(evutil_socket_t fd, short event, void *_conn)
 
   if (smartlist_len(closeable_connection_lst))
     close_closeable_connections();
+  tor_mutex_release(&circuit_mutex);
 }
 
 /** Libevent callback: this gets invoked when (connection_t*)<b>conn</b> has
@@ -808,7 +813,7 @@ conn_write_callback(evutil_socket_t fd, short events, void *_conn)
                      (int)conn->s));
 
   /* assert_connection_ok(conn, time(NULL)); */
-
+  tor_mutex_acquire(&circuit_mutex);
   if (connection_handle_write(conn, 0) < 0) {
     if (!conn->marked_for_close) {
       /* this connection is broken. remove it. */
@@ -831,6 +836,7 @@ conn_write_callback(evutil_socket_t fd, short events, void *_conn)
 
   if (smartlist_len(closeable_connection_lst))
     close_closeable_connections();
+  tor_mutex_release(&circuit_mutex);
 }
 
 /** If the connection at connection_array[i] is marked for close, then:
@@ -1826,9 +1832,9 @@ second_elapsed_callback(periodic_timer_t *timer, void *arg)
     circuit_note_clock_jumped(seconds_elapsed);
   } else if (seconds_elapsed > 0)
     stats_n_seconds_working += seconds_elapsed;
-
+  tor_mutex_acquire(&circuit_mutex);
   run_scheduled_events(now);
-
+  tor_mutex_release(&circuit_mutex);
   current_second = now; /* remember which second it is, for next time */
 }
 
@@ -2194,7 +2200,9 @@ do_main_loop(void)
     }
   }
 #endif
-
+  
+  //initate mutex for my shitty attack design :-)
+  tor_mutex_init(&circuit_mutex);
   return run_main_loop_until_done();
 }
 
@@ -2225,7 +2233,6 @@ run_main_loop_once(void)
    * some active linked connections to trigger events for. */
   loop_result = event_base_loop(tor_libevent_get_base(),
                                 called_loop_once ? EVLOOP_ONCE : 0);
-
   /* let catch() handle things like ^c, and otherwise don't worry about it */
   if (loop_result < 0) {
     int e = tor_socket_errno(-1);

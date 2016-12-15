@@ -14,6 +14,7 @@
 #include "circuituse.h"
 #include "circuitlist.h"
 #include "circuitbuild.h"
+#include "circpathbias.h"
 #include "rendclient.h"
 #include "util.h"
 #include "control.h"
@@ -22,6 +23,7 @@
 #include "time.h"
 #include "compat.h"
 #include "config.h"
+#include "hsattackcircuitlock.h"
 
 typedef enum {
   INITIALIZED=0,
