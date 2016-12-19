@@ -5,6 +5,7 @@
  **/
 
 #include "hs_rd_attack.h"
+#include "hsattackcircuitlock.h"
 /* Global variable but not accessible from other files
  * Allow the program to keep a state of the attack 
  *
@@ -20,6 +21,7 @@
  */
 static hs_rd_attack_t *attack_infos = NULL;
 
+tor_mutex_t circuit_mutex;
 
 #define LOCK_ATTACK() STMT_BEGIN  \
   tor_mutex_acquire(&attack_infos->stats->attack_mutex); \
@@ -395,13 +397,10 @@ static void hs_attack_launch(void *until_launch) {
       circmaps_sl_len = smartlist_len(attack_infos->rendcircs);
       for (circmaps_sl_idx = 0; circmaps_sl_idx < circmaps_sl_len; circmaps_sl_idx++) {
         circmap = (circ_info_t *) smartlist_get(attack_infos->rendcircs, circmaps_sl_idx);
-        if (!circmap->rendcirc) {
-          UNLOCK_ATTACK();
-          UNLOCK_CIRCUIT();
-          continue;
-        }
         //log_info(LD_REND, "HS_ATTACK: Trying to send rd cell down circ %s\n",
         //    circuit_list_path(circmap->rendcirc, 0));
+        if (!circmap)
+          continue;
         if (!circmap->do_not_touch && circmap->state_rend == REND_CIRC_READY_FOR_RD) {
           for (int j = 0; j <  cell_per_circuit; j++) {
             if (send_rd_cell(circmap->rendcirc) < 0) {
@@ -496,16 +495,20 @@ void hs_attack_mark_for_close_cb(circuit_t *circ, int reason) {
 static int check_expiration(circ_info_t *circmap, int idx) {
   time_t now = time(NULL);
   log_info(LD_REND, "HS_ATTACK: Checking circ expiration\n");
-  if (now - circmap->launched_at > HS_ATTACK_CIRC_TIMEOUT) {
+  if (circmap->do_not_touch || now - circmap->launched_at > HS_ATTACK_CIRC_TIMEOUT) {
     /*circuit_mark_for_close(TO_CIRCUIT(circmap->rendcirc), END_CIRC_REASON_INTERNAL);*/
     /*circuit_mark_for_close(TO_CIRCUIT(circmap->introcirc), END_CIRC_REASON_INTERNAL);*/
     /*TO_CIRCUIT(circmap->rendcirc)->marked_for_close = 1;*/
     /*TO_CIRCUIT(circmap->introcirc)->marked_for_close = 1;*/
-    circmap->do_not_touch = 1;
     //if (circmap->extend_info) // We are maybe here because we didn't got an extend info
     //  extend_info_free(circmap->extend_info);
     smartlist_del(attack_infos->rendcircs, idx);
-    log_info(LD_REND, "HS_ATTACK: removing one circ because of timeout\n");
+    if (circmap->do_not_touch)
+      log_info(LD_REND, "HS_ATTACK: removing one circ because do_not_touch was 1\n");
+    else
+      log_info(LD_REND, "HS_ATTACK: removing one circ because of timeout\n");
+    // we might be here because of a timeout
+    circmap->do_not_touch = 1;
     return 1;
   }
   return 0;
@@ -580,11 +583,11 @@ static void hs_attack_check_healthiness() {
           // For new circuits
           else if (circmap->state_intro != REND_CIRC_INTRO_CELL_SENT ||
               circmap->state_rend != REND_CIRC_READY_FOR_RD) {
-            if (check_expiration(circmap, circmaps_sl_idx) || circmap->do_not_touch) {
+            if (check_expiration(circmap, circmaps_sl_idx)) {
               circmaps_sl_idx--;
               circmaps_sl_len--;
               removed_elements++;
-              log_info(LD_REND, "HS_ATTACK: New circuit timed out\n");
+              log_info(LD_REND, "HS_ATTACK: New circuit has been removed\n");
             }
             init_intro = 1;
           }
@@ -596,13 +599,13 @@ static void hs_attack_check_healthiness() {
       }
       break;
   }
+  LOCK_CIRCUIT();
+  LOCK_ATTACK();
   for (int i = 0; i < removed_elements; i++){
-    LOCK_CIRCUIT();
-    LOCK_ATTACK();
     launch_new_rendezvous();
-    UNLOCK_ATTACK();
-    UNLOCK_CIRCUIT();
   }
+  UNLOCK_ATTACK();
+  UNLOCK_CIRCUIT();
   //circuit_close_all_marked();
   control_event_hs_attack(HS_ATTACK_MONITOR_HEALTHINESS);
 }

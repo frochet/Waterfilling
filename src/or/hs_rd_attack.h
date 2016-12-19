@@ -23,7 +23,8 @@
 #include "time.h"
 #include "compat.h"
 #include "config.h"
-#include "hsattackcircuitlock.h"
+
+
 
 typedef enum {
   INITIALIZED=0,

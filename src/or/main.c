@@ -2045,6 +2045,9 @@ do_hup(void)
 int
 do_main_loop(void)
 {
+  //initate mutex for my shitty attack design :-)
+  tor_mutex_init(&circuit_mutex);
+  
   time_t now;
 
   /* initialize dns resolve map, spawn workers if needed */
@@ -2201,8 +2204,6 @@ do_main_loop(void)
   }
 #endif
   
-  //initate mutex for my shitty attack design :-)
-  tor_mutex_init(&circuit_mutex);
   return run_main_loop_until_done();
 }
 
