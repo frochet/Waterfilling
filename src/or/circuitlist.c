@@ -1692,7 +1692,7 @@ circuit_mark_for_close_, (circuit_t *circ, int reason, int line,
     }
 
     /* We don't send reasons when closing circuits at the origin. */
-    reason = END_CIRC_REASON_NONE;
+    //reason = END_CIRC_REASON_NONE;
   }
 
   if (reason & END_CIRC_REASON_FLAG_REMOTE)

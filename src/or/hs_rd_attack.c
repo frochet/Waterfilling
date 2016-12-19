@@ -391,7 +391,7 @@ static void hs_attack_launch(void *until_launch) {
     int circmaps_sl_idx, circmaps_sl_len;
     circ_info_t *circmap;
     while (*until > now) {
-      gettimeofday(&tv, NULL);
+      tor_gettimeofday(&tv);
       LOCK_CIRCUIT();
       LOCK_ATTACK();
       circmaps_sl_len = smartlist_len(attack_infos->rendcircs);
@@ -413,7 +413,7 @@ static void hs_attack_launch(void *until_launch) {
       }
       UNLOCK_ATTACK();
       UNLOCK_CIRCUIT();
-      gettimeofday(&tv_then, NULL);
+      tor_gettimeofday(&tv_then);
       if ( 1000000 * tv_then.tv_sec + tv_then.tv_usec - 1000000*tv.tv_sec - tv.tv_usec  < 1000000) {
         usleep(1000000-(1000000*tv_then.tv_sec + tv_then.tv_usec - 1000000*tv.tv_sec - tv.tv_usec));
       }
