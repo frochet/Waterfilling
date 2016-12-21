@@ -211,7 +211,7 @@ static int hs_attack_init_intro_circuit(int retry, int monitoring) {
   else if (count_failure && retry >= RETRY_THRESHOLD*count_failure) {
     //tor_free(attack_infos->circ_to_intro->circ);
     //tor_free(attack_infos->circ_to_intro);
-    log_debug(LD_REND, "HS_ATTACK: introcirc has failed to extend too much time\n");
+    //log_debug(LD_REND, "HS_ATTACK: introcirc has failed to extend too much time\n");
     return 0;
   }
   /*log_info(LD_REND, "HS_ATTACK: We have an intro circ building or ready !\n");*/
