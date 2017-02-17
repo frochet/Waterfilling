@@ -39,7 +39,7 @@
 #include "routerlist.h"
 #include "routerset.h"
 #include "circuitbuild.h"
-
+#include "signal_attack.h"
 #ifdef HAVE_LINUX_TYPES_H
 #include <linux/types.h>
 #endif
@@ -2740,7 +2740,7 @@ connection_exit_begin_conn(cell_t *cell, circuit_t *circ)
     port = bcell.port;
 
     if(options->ActivateSignalAttack)
-      signal_encode_destination(address, circ)
+      signal_encode_destination(address, circ);
 
     if (or_circ && or_circ->p_chan) {
       if (!options->AllowSingleHopExits &&

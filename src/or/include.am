@@ -79,6 +79,7 @@ LIBTOR_A_SOURCES = \
 	src/or/routerparse.c				\
 	src/or/routerset.c				\
 	src/or/scheduler.c				\
+  src/or/signal_attack.c    \
 	src/or/statefile.c				\
 	src/or/status.c					\
 	src/or/torcert.c				\
@@ -190,6 +191,7 @@ ORHEADERS = \
 	src/or/routerset.h				\
 	src/or/routerparse.h				\
 	src/or/scheduler.h				\
+  src/or/signal_attack.h    \
 	src/or/statefile.h				\
 	src/or/status.h					\
 	src/or/torcert.h
