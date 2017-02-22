@@ -529,6 +529,23 @@ smartlist_sort(smartlist_t *sl, int (*compare)(const void **a, const void **b))
         (int (*)(const void *,const void*))compare);
 }
 
+
+void smartlist_insert_keeporder(smartlist_t *sl, void *val, int (*compare)(const void **a, const void **b))
+{
+  if (!sl->num_used)
+    smartlist_insert(sl, 0, val);
+  else {
+    int i;
+    for (i = 0; i < sl->num_used; ++i) {
+      const void *item = sl->list[i];
+      if (compare(&item, (const void **) &val) > 0) {
+        smartlist_insert(sl, i, val);
+        return;
+      }
+    }
+  }
+}
+
 /** Given a smartlist <b>sl</b> sorted with the function <b>compare</b>,
  * return the most frequent member in the list.  Break ties in favor of
  * later elements.  If the list is empty, return NULL.  If count_out is

@@ -92,6 +92,8 @@ static INLINE void smartlist_swap(smartlist_t *sl, int idx1, int idx2)
 
 void smartlist_del(smartlist_t *sl, int idx);
 void smartlist_del_keeporder(smartlist_t *sl, int idx);
+void smartlist_insert_keeporder(smartlist_t *sl, void *val,
+    int (*compare)(const void **a, const void **b));
 void smartlist_insert(smartlist_t *sl, int idx, void *val);
 void smartlist_sort(smartlist_t *sl,
                     int (*compare)(const void **a, const void **b));
