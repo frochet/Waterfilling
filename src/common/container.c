@@ -536,13 +536,15 @@ void smartlist_insert_keeporder(smartlist_t *sl, void *val, int (*compare)(const
     smartlist_insert(sl, 0, val);
   else {
     int i;
-    for (i = 0; i < sl->num_used; ++i) {
+    for (i = 0; i < sl->num_used; i++) {
       const void *item = sl->list[i];
+      /*log_info(LD_GENERAL, "comparing elem at pos %d\n", i);*/
       if (compare(&item, (const void **) &val) > 0) {
         smartlist_insert(sl, i, val);
         return;
       }
     }
+    smartlist_add(sl, val);
   }
 }
 
