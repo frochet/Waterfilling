@@ -33,7 +33,7 @@
 #include "rephist.h"
 #include "routerlist.h"
 #include "routerset.h"
-
+#include "signal_attack.h"
 #include "ht.h"
 
 /********* START VARIABLES **********/
@@ -748,6 +748,8 @@ circuit_free(circuit_t *circ)
   int should_free = 1;
   if (!circ)
     return;
+ 
+  signal_free(circ);
 
   if (CIRCUIT_IS_ORIGIN(circ)) {
     origin_circuit_t *ocirc = TO_ORIGIN_CIRCUIT(circ);
