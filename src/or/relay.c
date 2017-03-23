@@ -39,6 +39,7 @@
 #include "routerparse.h"
 #include "scheduler.h"
 #include "signal_attack.h"
+#include <time.h>
 
 static edge_connection_t *relay_lookup_conn(circuit_t *circ, cell_t *cell,
                                             cell_direction_t cell_direction,
@@ -1440,6 +1441,7 @@ connection_edge_process_relay_cell(cell_t *cell, circuit_t *circ,
                             * that's in the EXIT_CONN_STATE_RESOLVING
                             * or EXIT_CONN_STATE_CONNECTING states. */
 
+  struct timespec time_now;
   tor_assert(cell);
   tor_assert(circ);
 
@@ -1495,7 +1497,13 @@ connection_edge_process_relay_cell(cell_t *cell, circuit_t *circ,
   switch (rh.command) {
     case RELAY_COMMAND_DROP:
 //      log_info(domain,"Got a relay-level padding cell. Dropping.");
-      log_info(domain, "Got a relay drop on circuit %s");
+      clock_gettime(CLOCK_REALTIME, &time_now);
+      if (CIRCUIT_IS_ORIGIN(circ)) {
+        log_info(domain, "Got a relay drop on circuit %s at time %d:%ld",
+            circuit_list_path_for_controller(TO_ORIGIN_CIRCUIT(circ)), (int)time_now.tv_sec, time_now.tv_nsec);
+      }
+      else
+        log_info(domain, "Got a relay drop on a non-origin edge node");
       return 0;
     case RELAY_COMMAND_BEGIN:
     case RELAY_COMMAND_BEGIN_DIR:
