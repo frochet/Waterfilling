@@ -1499,7 +1499,7 @@ connection_edge_process_relay_cell(cell_t *cell, circuit_t *circ,
 //      log_info(domain,"Got a relay-level padding cell. Dropping.");
       clock_gettime(CLOCK_REALTIME, &time_now);
       if (CIRCUIT_IS_ORIGIN(circ)) {
-        log_info(domain, "Got a relay drop on circuit %s at time %d:%ld",
+        log_info(LD_SIGNAL, "Got a relay drop on circuit %s at time %d:%ld",
             circuit_list_path_for_controller(TO_ORIGIN_CIRCUIT(circ)), (int)time_now.tv_sec, time_now.tv_nsec);
       }
       else

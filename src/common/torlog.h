@@ -100,7 +100,7 @@
 /** Scheduler */
 #define LD_SCHED     (1u<<22)
 /** signal attack logs */
-#define LD_SIGNAL_ATTACK  (1u<<23)
+#define LD_SIGNAL (1u<<23)
 /** Number of logging domains in the code. */
 #define N_LOGGING_DOMAINS 24
 
