@@ -407,7 +407,7 @@ static config_var_t option_vars_[] = {
   V(SchedulerHighWaterMark__,    MEMUNIT,  "101 MB"),
   V(SchedulerMaxFlushCells__,    UINT,     "1000"),
   V(ShutdownWaitLength,          INTERVAL, "30 seconds"),
-  V(SignalBlankIntervalMS,       MSEC_INTERVAL, "15 msec"),
+  V(SignalBlankIntervalMS,       MSEC_INTERVAL, "50 msec"),
   V(SignalMethod,                UINT,     "0"),
   V(SocksListenAddress,          LINELIST, NULL),
   V(SocksPolicy,                 LINELIST, NULL),
