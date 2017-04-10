@@ -408,6 +408,7 @@ static config_var_t option_vars_[] = {
   V(SchedulerMaxFlushCells__,    UINT,     "1000"),
   V(ShutdownWaitLength,          INTERVAL, "30 seconds"),
   V(SignalBlankIntervalMS,       MSEC_INTERVAL, "50 msec"),
+  V(SignalLogEachRelayedCellTiming, BOOL, "0"),
   V(SignalMethod,                UINT,     "0"),
   V(SocksListenAddress,          LINELIST, NULL),
   V(SocksPolicy,                 LINELIST, NULL),
