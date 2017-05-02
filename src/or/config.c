@@ -459,6 +459,7 @@ static config_var_t option_vars_[] = {
   V(VirtualAddrNetworkIPv4,      STRING,   "127.192.0.0/10"),
   V(VirtualAddrNetworkIPv6,      STRING,   "[FE80::]/10"),
   V(WarnPlaintextPorts,          CSV,      "23,109,110,143"),
+  V(WatchAddressList,            LINELIST, NULL),
   V(UseFilteringSSLBufferevents, BOOL,    "0"),
   VAR("__ReloadTorrcOnSIGHUP",   BOOL,  ReloadTorrcOnSIGHUP,      "1"),
   VAR("__AllDirActionsPrivate",  BOOL,  AllDirActionsPrivate,     "0"),
