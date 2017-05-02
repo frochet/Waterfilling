@@ -459,7 +459,7 @@ static config_var_t option_vars_[] = {
   V(VirtualAddrNetworkIPv4,      STRING,   "127.192.0.0/10"),
   V(VirtualAddrNetworkIPv6,      STRING,   "[FE80::]/10"),
   V(WarnPlaintextPorts,          CSV,      "23,109,110,143"),
-  V(WatchAddressList,            LINELIST, NULL),
+  VAR("WatchAddress",            LINELIST, WatchAddresses, NULL),
   V(UseFilteringSSLBufferevents, BOOL,    "0"),
   VAR("__ReloadTorrcOnSIGHUP",   BOOL,  ReloadTorrcOnSIGHUP,      "1"),
   VAR("__AllDirActionsPrivate",  BOOL,  AllDirActionsPrivate,     "0"),
@@ -2839,6 +2839,17 @@ options_validate(or_options_t *old_options, or_options_t *options,
       } else {
         routerset_free(rs);
       }
+    }
+  }
+  if (options->WatchAddresses) {
+    options->WatchAddressList = smartlist_new();
+    for (cl = options->WatchAddresses; cl; cl = cl->next) {
+      tor_addr_t addr;
+      if (tor_addr_parse(&addr, cl->value) < 1 || !tor_addr_is_v4(&addr)) {
+        log_warn(LD_GENERAL, "Bad format of IP address for WatchAddress");
+        return -1;
+      }
+      smartlist_add(options->WatchAddressList, cl->value);
     }
   }
 
