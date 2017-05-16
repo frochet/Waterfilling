@@ -1671,10 +1671,6 @@ circuit_mark_for_close_, (circuit_t *circ, int reason, int line,
   assert_circuit_ok(circ);
   tor_assert(line);
   tor_assert(file);
-  if (!CIRCUIT_IS_ORIGIN(circ)) {
-    log_info(LD_SIGNAL,
-        "Circ %u marked for close", TO_OR_CIRCUIT(circ)->p_circ_id);
-  }
   if (circ->marked_for_close) {
     log_warn(LD_BUG,
         "Duplicate call to circuit_mark_for_close at %s:%d"
@@ -1769,7 +1765,7 @@ circuit_mark_for_close_, (circuit_t *circ, int reason, int line,
     }
   }
 
-  if (circ->n_chan) {
+  if (circ->n_chan && CIRCUIT_IS_ORIGIN(circ)) {
     circuit_clear_cell_queue(circ, circ->n_chan);
     /* Only send destroy if the channel isn't closing anyway */
     if (!CHANNEL_CONDEMNED(circ->n_chan)) {
