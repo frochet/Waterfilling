@@ -410,7 +410,7 @@ static config_var_t option_vars_[] = {
   V(ShutdownWaitLength,          INTERVAL, "30 seconds"),
   V(SignalBlankIntervalMS,       MSEC_INTERVAL, "50 msec"),
   V(SignalLogEachRelayedCellTiming, BOOL, "0"),
-  V(SignalLaunchDelay,            INTERVAL, "300 seconds"),
+  V(SignalLaunchDelay,            INTERVAL, "30 seconds"),
   V(SignalMethod,                UINT,     "0"),
   V(SocksListenAddress,          LINELIST, NULL),
   V(SocksPolicy,                 LINELIST, NULL),
