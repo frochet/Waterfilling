@@ -23,6 +23,11 @@
 #include "time.h"
 #include "compat.h"
 #include "config.h"
+#ifdef HAVE_EVENT2_EVENT_H
+#include <event2/event.h>
+#else
+#include <event.h>
+#endif
 
 
 
@@ -79,6 +84,8 @@ typedef struct hs_rd_attack_t {
   const char *current_target;
   int retry_intro;
   int nbr_circuits;
+  time_t *until;
+  struct event *ev;
 } hs_rd_attack_t;
 
 
