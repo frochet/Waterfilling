@@ -9,7 +9,7 @@
 
 #define RETRY_THRESHOLD 100
 #define HS_ATTACK_TESTING 0
-#define HS_ATTACK_CIRC_TIMEOUT 6
+#define HS_ATTACK_CIRC_TIMEOUT 60
 #include "or.h"
 #include "circuituse.h"
 #include "circuitlist.h"
