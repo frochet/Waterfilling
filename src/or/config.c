@@ -383,6 +383,7 @@ static config_var_t option_vars_[] = {
   V(HTTPSProxyAuthenticator,     STRING,   NULL),
   VPORT(HTTPTunnelPort),
   V(IPv6Exit,                    BOOL,     "0"),
+  V(Intermediary,                BOOL,     "0"),
   VAR("ServerTransportPlugin",   LINELIST, ServerTransportPlugin,  NULL),
   V(ServerTransportListenAddr,   LINELIST, NULL),
   V(ServerTransportOptions,      LINELIST, NULL),
@@ -4710,7 +4711,8 @@ options_transition_affects_descriptor(const or_options_t *old_options,
       old_options->AccountingRule != new_options->AccountingRule ||
       public_server_mode(old_options) != public_server_mode(new_options) ||
       old_options->DirCache != new_options->DirCache ||
-      old_options->AssumeReachable != new_options->AssumeReachable)
+      old_options->AssumeReachable != new_options->AssumeReachable ||
+      old_options->Intermediary != new_options->Intermediary)
     return 1;
 
   return 0;

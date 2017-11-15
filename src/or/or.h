@@ -2214,6 +2214,8 @@ typedef struct {
 
   unsigned int wants_to_be_hs_dir:1; /**< True iff this router claims to be
                                       * a hidden service directory. */
+  unsigned int wants_to_be_intermediary:1; /** < True iff this router claims
+                                             to be an intermediary. */
   unsigned int policy_is_reject_star:1; /**< True iff the exit policy for this
                                          * router rejects everything. */
   /** True if, after we have added this router, we should re-launch
@@ -2293,6 +2295,7 @@ typedef struct routerstatus_t {
    * this funny name so that we don't accidentally use this bit as a view of
    * whether we think the router is *currently* running.  If that's what you
    * want to know, look at is_running in node_t. */
+  unsigned int is_intermediary:1; /**< True iff this router is an intermediary. */
   unsigned int is_flagged_running:1;
   unsigned int is_named:1; /**< True iff "nickname" belongs to this router. */
   unsigned int is_unnamed:1; /**< True iff "nickname" belongs to another
@@ -2488,6 +2491,7 @@ typedef struct node_t {
   unsigned int is_valid:1; /**< Has a trusted dirserver validated this OR?
                             *  (For Authdir: Have we validated this OR?) */
   unsigned int is_fast:1; /** Do we think this is a fast OR? */
+  unsigned int is_intermediary:1; /** Do we think this is an intermediary? */
   unsigned int is_stable:1; /** Do we think this is a stable OR? */
   unsigned int is_possible_guard:1; /**< Do we think this is an OK guard? */
   unsigned int is_exit:1; /**< Do we think this is an OK exit? */
@@ -4603,6 +4607,10 @@ typedef struct {
 
   /** Bool (default: 0): Tells if a %include was used on torrc */
   int IncludeUsed;
+
+  /** Bool (default: 0): Relay has an intermediary role if enabled */
+
+  int Intermediary;
 
   /** The seconds after expiration which we as a relay should keep old
    * consensuses around so that we can generate diffs from them.  If 0,
