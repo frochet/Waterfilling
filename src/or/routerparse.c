@@ -2671,7 +2671,7 @@ routerstatus_parse_entry_from_string(memarea_t *area,
         rs->is_stable = 1;
       else if (!strcmp(tok->args[i], "Fast"))
         rs->is_fast = 1;
-      else if (!strcmp(tok->args[i], "Intermediary"))
+      else if (!strcmp(tok->args[i], "Inter"))
         rs->is_intermediary = 1;
       else if (!strcmp(tok->args[i], "Running"))
         rs->is_flagged_running = 1;
