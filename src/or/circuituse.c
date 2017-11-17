@@ -1951,6 +1951,8 @@ circuit_launch_by_extend_info(uint8_t purpose,
         case CIRCUIT_PURPOSE_S_CONNECT_REND:
         case CIRCUIT_PURPOSE_C_GENERAL:
         case CIRCUIT_PURPOSE_S_ESTABLISH_INTRO:
+        case CIRCUIT_PURPOSE_C_INTERMEDIARY:
+        case CIRCUIT_PURPOSE_C_LEDGER:
           /* need to add a new hop */
           tor_assert(extend_info);
           if (circuit_extend_to_new_exit(circ, extend_info) < 0)
@@ -2201,7 +2203,22 @@ circuit_get_open_circ_or_launch(entry_connection_t *conn,
                safe_str_client(rend_data_get_address(edge_conn->rend_data)) :
                "service");
     }
+    
+    /*XXX MoneTor*/
+    /*If this is an Intermediary circuit, handle that case*/
+    if (desired_circuit_purpose == CIRCUIT_PURPOSE_C_INTERMEDIARY) {
+      // pick the intermediary node
+      /**
+       * Need to implement intermediary choice abstraction; how to remember
+       * the choice (state file), etc. Then the function to here basically
+       * returns the intermediary on which we have a payment channel linked
+       * or a random one matching our policies
+       */
+    }
 
+    /*XXX MoneTor*/
+    /**Do the same as above for ledger circuit
+     */
     /* If we have specified a particular exit node for our
      * connection, then be sure to open a circuit to that exit node.
      */

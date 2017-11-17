@@ -658,7 +658,12 @@ circuit_purpose_to_controller_string(uint8_t purpose)
       return "CONTROLLER";
     case CIRCUIT_PURPOSE_PATH_BIAS_TESTING:
       return "PATH_BIAS_TESTING";
-
+    case CIRCUIT_PURPOSE_C_INTERMEDIARY:
+      return "MT_CLIENT_INTER";
+    case CIRCUIT_PURPOSE_C_LEDGER:
+      return "MT_CLIENT_LEDGER";
+    case CIRCUIT_PURPOSE_R_INTERMEDIARY:
+      return "MT_RELAY_INTERMEDIARY";
     default:
       tor_snprintf(buf, sizeof(buf), "UNKNOWN_%d", (int)purpose);
       return buf;

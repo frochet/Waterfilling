@@ -384,6 +384,7 @@ static config_var_t option_vars_[] = {
   VPORT(HTTPTunnelPort),
   V(IPv6Exit,                    BOOL,     "0"),
   V(Intermediary,                BOOL,     "0"),
+  V(EnablePayment,               BOOL,     "0"),
   VAR("ServerTransportPlugin",   LINELIST, ServerTransportPlugin,  NULL),
   V(ServerTransportListenAddr,   LINELIST, NULL),
   V(ServerTransportOptions,      LINELIST, NULL),

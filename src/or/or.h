@@ -544,7 +544,16 @@ typedef enum {
 #define CIRCUIT_PURPOSE_CONTROLLER 19
 /** This circuit is used for path bias probing only */
 #define CIRCUIT_PURPOSE_PATH_BIAS_TESTING 20
-#define CIRCUIT_PURPOSE_MAX_ 20
+
+#define CIRCUIT_PURPOSE_C_INTERMEDIARY 21
+
+/** This circuit is used for whatever interaction with the ledger from
+ * client, intermediary or relay (no need to divide at first glance)*/
+#define CIRCUIT_PURPOSE_C_LEDGER 22
+
+#define CIRCUIT_PURPOSE_R_INTERMEDIARY 23
+
+#define CIRCUIT_PURPOSE_MAX_ 23
 /** A catch-all for unrecognized purposes. Currently we don't expect
  * to make or see any circuits with this purpose. */
 #define CIRCUIT_PURPOSE_UNKNOWN 255
@@ -4114,6 +4123,11 @@ typedef struct {
    * decide. */
   int UseGuardFraction;
 
+  /** If 1, the client can pay to get prioritization, relay can handle
+   *  payment and Intermediary can be set to 1
+   */
+  int EnablePayment; 
+
   int NumDirectoryGuards; /**< How many dir guards do we try to establish?
                            * If 0, use value from NumEntryGuards. */
   int RephistTrackTime; /**< How many seconds do we keep rephist info? */
@@ -5472,6 +5486,10 @@ typedef struct tor_version_t {
   int git_tag_len;
   char git_tag[DIGEST_LEN];
 } tor_version_t;
+
+/***************************** MoneTor **********************************/
+
+//XXX MoneTor merging moneTor enum & co here
 
 #endif /* !defined(TOR_OR_H) */
 
