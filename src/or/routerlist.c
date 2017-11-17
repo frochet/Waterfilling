@@ -2800,7 +2800,10 @@ router_choose_random_node(smartlist_t *excludedsmartlist,
   const int pref_addr = (flags & CRN_PREF_ADDR) != 0;
   const int direct_conn = (flags & CRN_DIRECT_CONN) != 0;
   const int rendezvous_v3 = (flags & CRN_RENDEZVOUS_V3) != 0;
-
+  
+  /**
+   * XXX MoneTor - choose random intro
+   */
   smartlist_t *sl=smartlist_new(),
     *excludednodes=smartlist_new();
   const node_t *choice = NULL;

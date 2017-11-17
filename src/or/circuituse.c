@@ -1282,6 +1282,10 @@ circuit_predict_and_launch_new(void)
       circuit_launch(CIRCUIT_PURPOSE_C_GENERAL, flags);
       return;
   }
+
+  /** XXX MoneTor
+   * Build Intermediary circuit if we need to
+   */
 }
 
 /** Build a new test circuit every 5 minutes */
