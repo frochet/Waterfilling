@@ -1,7 +1,7 @@
 #ifndef mt_client_h
 #define mt_client_h
 
-#include "mt.h"
+#include "or.h"
 #include "mt_crypto.h"
 #include "mt_tokens.h"
 
@@ -65,9 +65,9 @@ const node_t* choose_random_intermediary(void);
 extend_info_t* mt_client_get_intermediary_from_edge(edge_connection_t* conn);
 
 
-/** 
+/**
  * Parse the state file to get the intermediaries we were using before
- * 
+ *
  * NOT URGENT
  */
 int intermediary_parse_state(or_state_t *state, int set, char** msg);

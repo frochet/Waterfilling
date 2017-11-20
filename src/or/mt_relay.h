@@ -1,7 +1,7 @@
 #ifndef mt_relay_h
 #define mt_relay_h
 
-#include "mt.h"
+#include "or.h"
 #include "mt_crypto.h"
 #include "mt_tokens.h"
 

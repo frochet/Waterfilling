@@ -9,7 +9,7 @@
 #ifndef mt_crypto_h
 #define mt_crypto_h
 
-#include "mt.h"
+#include "or.h"
 
 // common
 int mt_crypt_setup(byte (*pp_out)[MT_SZ_PP]);

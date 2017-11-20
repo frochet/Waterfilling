@@ -2138,7 +2138,7 @@ monetor_callback(time_t now, const or_options_t *options)
     goto end;
 
   if (!have_completed_a_circuit() || net_is_disabled() ||
-      network_status_get_live_consensus(now) == NULL)
+      networkstatus_get_live_consensus(now) == NULL)
     goto end;
 
   monetor_run_scheduled_events(now);
@@ -3833,4 +3833,3 @@ tor_main(int argc, char *argv[])
   tor_cleanup();
   return result;
 }
-

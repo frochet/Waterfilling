@@ -1,9 +1,7 @@
 #ifndef mt_tokens_h
 #define mt_tokens_h
 
-#include <glib.h>
-
-#include "mt.h"
+#include "or.h"
 
 //TODO should probably put these in terms of Tor variables somewhere
 #define CELL_SIZE 512
