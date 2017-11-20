@@ -22,30 +22,30 @@ typedef struct {
 } mt_client
 
 // Tor-facing API
-int mt_client_init(mt_client* client, byte (*pk)[SIZE_PK], byte (*sk)[SIZE_SIZE],
+int mt_client_init(mt_client_t* client, byte (*pk)[SIZE_PK], byte (*sk)[SIZE_SIZE],
 		   chn_end_data* chn_data, int num_chns, mt_pay_cb* pay, mt_send_cb* send);
-int mt_client_establish(mt_client* client, circuit_t* circ);
-int mt_client_pay(mt_client* client, circuit_t* circ);
-int mt_client_close(mt_client* client, circuit_t* circ);
-int mt_client_cashout(mt_client* client, byte (*chn_addrs)[SIZE_ADDR]);
-int mt_client_handle(mt_client* client, cell_t* cell, mt_ctx* ctx);
+int mt_client_establish(mt_client_t* client, circuit_t* circ);
+int mt_client_pay(mt_client_t* client, circuit_t* circ);
+int mt_client_close(mt_client_t* client, circuit_t* circ);
+int mt_client_cashout(mt_client_t* client, byte (*chn_addrs)[SIZE_ADDR]);
+int mt_client_handle(mt_client_t* client, cell_t* cell, mt_ctx* ctx);
 
 // private handler functions
-int handle_chn_int_estab2(mt_client* client, chn_int_estab2* token, mt_ctx* ctx);
-int handle_chn_int_estab4(mt_client* client, chn_int_estab4* token, mt_ctx* ctx);
-int handle_mic_cli_pay1(mt_client* client, mic_cli_pay1* token, mt_ctx* ctx);
-int handle_mic_rel_pay2(mt_client* client, mic_rel_pay2* token, mt_ctx* ctx);
-int handle_mic_int_pay4(mt_client* client, mic_int_pay4* token, mt_ctx* ctx);
-int handle_mic_int_pay7(mt_client* client, mic_int_pay7* token, mt_ctx* ctx);
-int handle_nan_int_setup2(mt_client* client, nan_int_setup2* token, mt_ctx* ctx);
-int handle_nan_int_setup4(mt_client* client, nan_int_setup4* token, mt_ctx* ctx);
-int handle_nan_int_setup6(mt_client* client, nan_int_setup6* token, mt_ctx* ctx);
-int handle_nan_int_close2(mt_client* client, nan_int_close2* token, mt_ctx* ctx);
-int handle_nan_int_close4(mt_client* client, nan_int_close4* token, mt_ctx* ctx);
-int handle_nan_int_close6(mt_client* client, nan_int_close6* token, mt_ctx* ctx);
-int handle_nan_int_close8(mt_client* client, nan_int_close8* token, mt_ctx* ctx);
-int handle_mac_led_data(mt_client* client, mac_led_data* token, mt_ctx* ctx);
-int handle_chn_led_data(mt_client* client, chn_led_data* token, mt_ctx* ctx);
+int handle_chn_int_estab2(mt_client_t* client, chn_int_estab2* token, mt_ctx* ctx);
+int handle_chn_int_estab4(mt_client_t* client, chn_int_estab4* token, mt_ctx* ctx);
+int handle_mic_cli_pay1(mt_client_t* client, mic_cli_pay1* token, mt_ctx* ctx);
+int handle_mic_rel_pay2(mt_client_t* client, mic_rel_pay2* token, mt_ctx* ctx);
+int handle_mic_int_pay4(mt_client_t* client, mic_int_pay4* token, mt_ctx* ctx);
+int handle_mic_int_pay7(mt_client_t* client, mic_int_pay7* token, mt_ctx* ctx);
+int handle_nan_int_setup2(mt_client_t* client, nan_int_setup2* token, mt_ctx* ctx);
+int handle_nan_int_setup4(mt_client_t* client, nan_int_setup4* token, mt_ctx* ctx);
+int handle_nan_int_setup6(mt_client_t* client, nan_int_setup6* token, mt_ctx* ctx);
+int handle_nan_int_close2(mt_client_t* client, nan_int_close2* token, mt_ctx* ctx);
+int handle_nan_int_close4(mt_client_t* client, nan_int_close4* token, mt_ctx* ctx);
+int handle_nan_int_close6(mt_client_t* client, nan_int_close6* token, mt_ctx* ctx);
+int handle_nan_int_close8(mt_client_t* client, nan_int_close8* token, mt_ctx* ctx);
+int handle_mac_led_data(mt_client_t* client, mac_led_data* token, mt_ctx* ctx);
+int handle_chn_led_data(mt_client_t* client, chn_led_data* token, mt_ctx* ctx);
 
 //handle intermediaries
 //XXX MoneTor maybe all of intermediary-handling

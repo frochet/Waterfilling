@@ -1,3 +1,4 @@
+#include "or.h"
 #include "mt_client.h"
 
 //TODO:
@@ -7,7 +8,7 @@
 //    have all functions return list of cells + connection to send it to
 
 //TODO: rethink end user / intermediary tokens
-int mt_client_init(mt_client* client, byte (*pk)[SIZE_PK], byte (*sk)[SIZE_SIZE], chn_end_data* chns[], int num_chns){
+int mt_client_init(mt_client_t* client, byte (*pk)[SIZE_PK], byte (*sk)[SIZE_SIZE], chn_end_data* chns[], int num_chns){
 
   // record key and addrs
   if(pk != NULL && sk != NULL){
@@ -34,7 +35,7 @@ int mt_client_init(mt_client* client, byte (*pk)[SIZE_PK], byte (*sk)[SIZE_SIZE]
   return 0; // for compilation
 }
 
-int mt_client_establish(mt_client* client, circuit_t* circ){
+int mt_client_establish(mt_client_t* client, circuit_t* circ){
 
   // if we do not have enough open channels
   //    send first cell of chn_init with the ledger
@@ -45,25 +46,25 @@ int mt_client_establish(mt_client* client, circuit_t* circ){
   return 0;
 }
 
-int mt_client_pay(mt_client* client, circuit_t* circ){
+int mt_client_pay(mt_client_t* client, circuit_t* circ){
   // loop through all relays in circuit
   //    send nan_pay cell
   return 0;
 }
 
-int mt_client_close(mt_client* client, circuit_t* circ){
+int mt_client_close(mt_client_t* client, circuit_t* circ){
   // loop through middle and entry
   //     send first cell of nan_close with each
   return 0;
 }
 
-int mt_client_cashout(mt_client* client, byte (*chn_addrs)[SIZE_ADDR]){
+int mt_client_cashout(mt_client_t* client, byte (*chn_addrs)[SIZE_ADDR]){
   // send first cell of cashout protocol with ledger
   // optional: connect to intermediary/entry and warn them
   return 0;
 }
 
-int mt_client_handle(mt_client* client, edge_connection_t* conn){
+int mt_client_handle(mt_client_t* client, edge_connection_t* conn){
 
   ntype type; //= extract from cell
   int result;
