@@ -8,7 +8,7 @@
 #define TARGET_NUM_CHANNELS
 
 typedef struct {
-    mt_pay_cb* pay;
+    mt_pay_cb_t* pay;
     mt_send_cb* send;
 
     pk[SIZE_PK];
@@ -23,7 +23,7 @@ typedef struct {
 
 // Tor-facing API
 int mt_client_init(mt_client_t* client, byte (*pk)[SIZE_PK], byte (*sk)[SIZE_SIZE],
-		   chn_end_data* chn_data, int num_chns, mt_pay_cb* pay, mt_send_cb* send);
+		   chn_end_data* chn_data, int num_chns, mt_pay_cb_t* pay, mt_send_cb* send);
 int mt_client_establish(mt_client_t* client, circuit_t* circ);
 int mt_client_pay(mt_client_t* client, circuit_t* circ);
 int mt_client_close(mt_client_t* client, circuit_t* circ);
