@@ -1144,6 +1144,39 @@ needs_hs_server_circuits(time_t now, int num_uptime_internal)
   return 0;
 }
 
+/* MoneTor needs at least one circuit for each intermediary (1 for middle,
+ * 1 for exit node) + one circuit to the ledger*/
+#define SUFFICIENT_UPTIME_INTERNAL_MT_CIRCUITS 3
+
+STATIC int
+needs_mt_circuits(time_t now, int num_uptime_internal) {
+
+  if (!get_options()->EnablePayment || !mt_check_enough_fund()) {
+    goto no_need;
+  }
+
+  if (num_uptime_internal >= SUFFICIENT_UPTIME_INTERNAL_MT_CIRCUITS) {
+    goto no_need;
+  }
+  
+  if (router_have_consensus_path() == CONSENSUS_PATH_UNKNOWN) {
+    /* Consensus hasn't been checked or might be invalid so requesting
+     * internal circuits is not wise. */
+    goto no_need;
+  }
+  /*
+   * We are going to need this circuit anyway
+   *
+   * No need for high-capacity circuit, we just need
+   * one reliable circuit.
+   * */
+  rep_hist_note_used_internal(now, 1, 0);
+
+  return 1;
+ no_need:
+  return 0;
+}
+
 /* We need at least this many internal circuits for hidden service clients */
 #define SUFFICIENT_INTERNAL_HS_CLIENTS 3
 
@@ -1285,7 +1318,18 @@ circuit_predict_and_launch_new(void)
 
   /** XXX MoneTor
    * Build Intermediary circuit if we need to
+   *
+   * -  done
    */
+
+  if (needs_mt_circuits(now, num_uptime_internal)) {
+    flags = CIRCLAUNCH_NEED_UPTIME;
+    flags |= CIRCLAUNCH_IS_INTERNAL;
+    log_info(LD_CIRC,
+        "Have %d clean uptime-internal clean circs, need"
+        " another MoneTor circuit.", num_uptime_internal);
+    circuit_launch(CIRCUIT_PURPOSE_C_GENERAL, flags);
+  }
 }
 
 /** Build a new test circuit every 5 minutes */
