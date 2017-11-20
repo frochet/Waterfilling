@@ -28,4 +28,9 @@ void mt_circuit_intermediary_has_opened(origin_circuit_t* circuit);
  * Has enough funds to pay for prioritization? returns 1 or 0
  */
 int mt_check_enough_fund(void);
+
+/**
+ * gets called by the main loop every second.
+ */
+void monetor_run_scheduled_events(time_t now);
 #endif

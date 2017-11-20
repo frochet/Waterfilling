@@ -85,6 +85,7 @@
 #include "keypin.h"
 #include "main.h"
 #include "microdesc.h"
+#include "mt_common.h"
 #include "networkstatus.h"
 #include "nodelist.h"
 #include "ntmain.h"
@@ -1198,6 +1199,7 @@ CALLBACK(clean_consdiffmgr);
 CALLBACK(reset_padding_counts);
 CALLBACK(check_canonical_channels);
 CALLBACK(hs_service);
+CALLBACK(monetor);
 
 #undef CALLBACK
 
@@ -1234,6 +1236,7 @@ static periodic_event_item_t periodic_events[] = {
   CALLBACK(reset_padding_counts),
   CALLBACK(check_canonical_channels),
   CALLBACK(hs_service),
+  CALLBACK(monetor),
   END_OF_PERIODIC_EVENTS
 };
 #undef CALLBACK
@@ -2123,6 +2126,25 @@ hs_service_callback(time_t now, const or_options_t *options)
  end:
   /* Every 1 second. */
   return 1;
+}
+
+/*
+ * Periodic callback: run scheduled events for MoneTor every second
+ */
+static int
+monetor_callback(time_t now, const or_options_t *options)
+{
+  if (!options->EnablePayment)
+    goto end;
+
+  if (!have_completed_a_circuit() || net_is_disabled() ||
+      network_status_get_live_consensus(now) == NULL)
+    goto end;
+
+  monetor_run_scheduled_events(now);
+
+end:
+  return 1; // Says to call again in 1 sec.
 }
 
 /** Timer: used to invoke second_elapsed_callback() once per second. */
