@@ -105,3 +105,4 @@ int mt_check_enough_fund(void) {
  */
 void monetor_run_scheduled_events(time_t now) {
 }
+
