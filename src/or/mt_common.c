@@ -82,6 +82,15 @@ int mt_hc_verify(byte (*tail)[MT_SZ_HASH], byte (*preimage)[MT_SZ_HASH], int k){
   return MT_SUCCESS;
 }
 
+/*
+ * Should be called by the tor_init() function - initialize all environment
+ * for the payment system
+ *
+ * XXX MoneTor to do regardless of the role played.
+ */
+void mt_init(void){
+}
+
 /**
  * Verifies enough money remains in the wallet - NOT URGENT
  */

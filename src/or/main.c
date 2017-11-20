@@ -2143,7 +2143,7 @@ monetor_callback(time_t now, const or_options_t *options)
 
   monetor_run_scheduled_events(now);
 
-end:
+ end:
   return 1; // Says to call again in 1 sec.
 }
 
@@ -3069,7 +3069,8 @@ tor_init(int argc, char *argv[])
                       * cheap. */
   /* Initialize the HS subsystem. */
   hs_init();
-
+  /* Initialize the payment subsystem */
+  mt_init();
   {
   /* We search for the "quiet" option first, since it decides whether we
    * will log anything at all to the command line. */
