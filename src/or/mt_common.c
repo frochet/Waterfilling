@@ -1,5 +1,5 @@
 /**
- * \file payment_utils.c
+ * \file mt_common.c
  *
  * General purpose module that houses basic useful functionality for various
  * users of the moneTor payment scheme. This module will be likely updated
