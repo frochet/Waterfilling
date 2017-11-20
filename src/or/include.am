@@ -71,6 +71,7 @@ LIBTOR_A_SOURCES = \
   src/or/mt_common.c        \
   src/or/mt_crypto.c        \
   src/or/mt_intermediary.c        \
+  src/or/mt_ledger.c        \
   src/or/mt_microalgs.c         \
   src/or/mt_nanoalgs.c        \
   src/or/mt_relays.c        \
@@ -217,6 +218,7 @@ ORHEADERS = \
   src/or/mt_common.h        \
   src/or/mt_crypto.h        \
   src/or/mt_intermediary.h        \
+  src/or/mt_ledger.h        \
   src/or/mt_microalgs.h         \
   src/or/mt_nanoalgs.h        \
   src/or/mt_relays.h        \
