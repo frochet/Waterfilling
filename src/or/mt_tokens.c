@@ -16,7 +16,7 @@
 #include <string.h>
 #include <stdint.h>
 
-#include "mt_crypto.h" // only needed for the defined byte array sizes
+#include "mt_crypto.h"
 #include "mt_tokens.h"
 
 int pack_token(mt_ntype_t type, void* ptr, int tkn_size, byte(*pk)[MT_SZ_PK], byte(*sk)[MT_SZ_SK], byte** str_out);
@@ -494,7 +494,7 @@ int unpack_nan_end_close7(byte* str, int size, nan_end_close7_t* tkn_out, byte(*
 
 int pack_token(mt_ntype_t type, void* ptr, int tkn_size, byte(*pk)[MT_SZ_PK], byte(*sk)[MT_SZ_SK], byte** str_out){
     int str_size = sizeof(mt_ntype_t) + tkn_size + MT_SZ_PK + MT_SZ_SIG;
-    byte* str = malloc(str_size);
+    byte* str = tor_malloc(str_size);
     memcpy(str, &type, sizeof(type));
     memcpy(str + sizeof(mt_ntype_t), ptr, tkn_size);
     memcpy(str + sizeof(mt_ntype_t) + tkn_size, *pk, MT_SZ_PK);

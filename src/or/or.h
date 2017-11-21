@@ -5512,8 +5512,8 @@ typedef enum {
 //-------------------- Cryptographic String Sizes (bytes) -------------------//
 
 #define MT_SZ_HASH 32
-#define MT_SZ_PK 162
-#define MT_SZ_SK 612
+#define MT_SZ_PK 273
+#define MT_SZ_SK 893
 #define MT_SZ_SIG 128
 #define MT_SZ_COM 128
 
