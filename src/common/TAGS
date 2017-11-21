@@ -1,0 +1,1093 @@
+
+address.h,1779
+#define TOR_ADDRESS_H12,288
+#define HAVE_IFADDRS_TO_SMARTLIST27,531
+#define HAVE_IP_ADAPTER_TO_SMARTLIST31,587
+#define HAVE_IFCONF_TO_SMARTLIST35,680
+typedef uint8_t maskbits_t;51,1026
+typedef struct tor_addr_t56,1162
+  sa_family_t family;58,1190
+    uint32_t dummy_;60,1222
+    struct in_addr in_addr;62,1364
+    struct in6_addr in6_addr;63,1392
+  } addr;64,1422
+} tor_addr_t;65,1432
+typedef struct tor_addr_port_t68,1495
+  tor_addr_t addr;70,1528
+  uint16_t port;71,1547
+} tor_addr_port_t;72,1564
+#define TOR_ADDR_NULL 74,1584
+tor_addr_to_in6(97,2739
+tor_addr_to_in6_assert(105,2962
+#define tor_addr_to_in6_addr8(115,3207
+#define tor_addr_to_in6_addr16(121,3408
+#define tor_addr_to_in6_addr32(126,3612
+tor_addr_to_ipv4n(131,3813
+tor_addr_to_ipv4h(138,4041
+tor_addr_to_mapped_ipv4h(147,4334
+tor_addr_family(165,4923
+tor_addr_to_in(172,5118
+tor_addr_eq_ipv4h(179,5334
+#define TOR_ADDR_BUF_LEN 191,5671
+char *tor_addr_to_str_dup(tor_addr_to_str_dup195,5823
+#define fmt_addr(199,5972
+#define fmt_and_decorate_addr(202,6091
+  CMP_EXACT,219,6970
+  CMP_SEMANTIC,220,6983
+} tor_addr_comparison_t;221,6999
+#define tor_addr_eq(229,7387
+#define tor_addr_is_internal(235,7674
+#define REVERSE_LOOKUP_NAME_BUF_LEN 241,7995
+#define TAPMP_EXTENDED_STAR 254,8657
+#define TAPMP_STAR_IPV4_ONLY 257,8806
+#define TAPMP_STAR_IPV6_ONLY 260,8967
+#define tor_addr_from_ipv4h(273,9750
+#define tor_addr_from_in(277,9978
+#define tor_addr_is_valid_ipv4h(285,10360
+#define tor_addr_port_is_valid(289,10578
+#define tor_addr_port_is_valid_ap(293,10795
+#define tor_addr_port_is_valid_ipv4n(296,10979
+#define tor_addr_port_is_valid_ipv4h(300,11225
+#define INET_NTOA_BUF_LEN 320,12141
+char *tor_dup_ip(tor_dup_ip322,12242
+get_interface_address_list(340,13010
+
+aes.h,79
+#define TOR_AES_H9,277
+typedef struct aes_cnt_cipher aes_cnt_cipher_t;16,348
+
+backtrace.h,30
+#define TOR_BACKTRACE_H5,122
+
+buffers.h,684
+#define TOR_BUFFERS_H13,331
+typedef struct buf_t buf_t;20,440
+#define PEEK_BUF_STARTSWITH_MAX 54,1732
+#define DEBUG_CHUNK_ALLOC72,2264
+typedef struct chunk_t 74,2325
+  struct chunk_t *next;next75,2350
+  size_t datalen;76,2412
+  size_t memlen;77,2479
+  size_t DBG_alloc;79,2582
+  char *data;data81,2609
+  uint32_t inserted_time;82,2689
+  char mem[mem84,2820
+} chunk_t;86,2931
+#define BUFFER_MAGIC 89,3004
+struct buf_t 91,3100
+  uint32_t magic;92,3115
+  size_t datalen;94,3221
+  size_t default_chunk_size;95,3296
+  chunk_t *head;head97,3426
+  chunk_t *tail;tail98,3494
+#define MIN_READ_LEN 104,3752
+CHUNK_REMAINING_CAPACITY(109,3902
+CHUNK_WRITE_PTR(117,4195
+
+buffers_tls.h,32
+#define TOR_BUFFERS_TLS_H8,269
+
+compat.h,6457
+#define TOR_COMPAT_H7,226
+#    undef strcmp52,1191
+#define CHECK_PRINTF(75,1822
+#define CHECK_PRINTF(78,1929
+#define CHECK_SCANF(81,2018
+#define CHECK_SCANF(84,2123
+#define GCC_VERSION 89,2239
+#define GCC_VERSION 91,2299
+#  define PRAGMA_STRINGIFY_(96,2392
+#  define PRAGMA_JOIN_STRINGIFY_(97,2426
+#  define PRAGMA_(99,2538
+#    define PRAGMA_DIAGNOSTIC_(101,2591
+#    define PRAGMA_DIAGNOSTIC_(103,2661
+#    define DISABLE_GCC_WARNING(107,2808
+#    define ENABLE_GCC_WARNING(110,2967
+#    define DISABLE_GCC_WARNING(114,3151
+#    define ENABLE_GCC_WARNING(116,3272
+# define DISABLE_GCC_WARNING(121,3500
+# define ENABLE_GCC_WARNING(122,3538
+#define inline 127,3658
+#define __func__ 133,3773
+#define __func__ 140,3950
+#define __func__ 142,4005
+#define __func__ 144,4037
+#define U64_TO_DBL(149,4186
+#define DBL_TO_U64(150,4223
+#define ENUM_BF(153,4291
+#define ENUM_BF(159,4619
+#define ATTR_NORETURN 164,4764
+#define ATTR_CONST 165,4812
+#define ATTR_MALLOC 166,4854
+#define ATTR_NORETURN 167,4898
+#define ATTR_WUR 168,4946
+#define ATTR_NONNULL(178,5561
+#define ATTR_UNUSED 179,5585
+#define PREDICT_LIKELY(188,5968
+#define PREDICT_UNLIKELY(196,6360
+#define ATTR_NORETURN198,6469
+#define ATTR_CONST199,6491
+#define ATTR_MALLOC200,6510
+#define ATTR_NORETURN201,6530
+#define ATTR_NONNULL(202,6552
+#define ATTR_UNUSED203,6576
+#define ATTR_WUR204,6596
+#define PREDICT_LIKELY(205,6613
+#define PREDICT_UNLIKELY(206,6647
+#define STMT_NIL 210,6790
+#define STMT_VOID(214,6911
+#define STMT_BEGIN 219,7112
+#define STMT_END 220,7141
+#define STMT_BEGIN 222,7200
+#define STMT_END 223,7228
+#define STMT_BEGIN 225,7267
+#define STMT_END 226,7291
+#define OP_LT 231,7445
+#define OP_GT 232,7461
+#define OP_GE 233,7477
+#define OP_LE 234,7494
+#define OP_EQ 235,7511
+#define OP_NE 236,7528
+#define strncasecmp 241,7669
+#define strcasecmp 242,7699
+#undef strlcat252,8023
+#undef strlcpy253,8038
+size_t strlcat(257,8106
+#define U64_PRINTF_ARG(266,8402
+#define U64_SCANF_ARG(269,8524
+#define U64_LITERAL(271,8629
+#define I64_PRINTF_ARG(272,8664
+#define I64_SCANF_ARG(273,8694
+#define I64_LITERAL(274,8723
+#define U64_PRINTF_ARG(276,8790
+#define U64_SCANF_ARG(277,8846
+#define U64_LITERAL(278,8902
+#define I64_PRINTF_ARG(279,8936
+#define I64_SCANF_ARG(280,8990
+#define I64_LITERAL(281,9044
+#define MINGW_ANY285,9158
+#define U64_FORMAT 291,9368
+#define I64_FORMAT 292,9395
+#define U64_FORMAT 294,9477
+#define I64_FORMAT 295,9503
+#define INTPTR_T_FORMAT 299,9619
+#define INTPTR_PRINTF_ARG(300,9648
+#define INTPTR_T_FORMAT 302,9727
+#define INTPTR_PRINTF_ARG(303,9757
+#define INTPTR_T_FORMAT 305,9827
+#define INTPTR_PRINTF_ARG(306,9862
+typedef struct tor_mmap_t 313,10094
+  const char *data;data314,10122
+  size_t size;315,10182
+  size_t mapping_size;319,10321
+  HANDLE mmap_handle;322,10485
+} tor_mmap_t;325,10553
+tor_mmap_t *tor_mmap_file(tor_mmap_file327,10568
+#define DECLARE_CTYPE_FN(352,11624
+DECLARE_CTYPE_FN(359,12072
+#define TOR_TOLOWER(369,12365
+#define TOR_TOUPPER(370,12420
+#define tor_strtok_r(374,12564
+#define tor_strtok_r(376,12634
+#define SHORT_FILE__ 380,12729
+#define SHORT_FILE__ 383,12840
+#define tor_fix_source_file(384,12872
+#define timeradd(395,13227
+#define timersub(409,13829
+#define timercmp(428,14665
+typedef struct tor_lockfile_t tor_lockfile_t;442,15192
+#define PATH_SEPARATOR 455,15603
+#define PATH_SEPARATOR 457,15637
+typedef int socklen_t;463,15731
+#define tor_socket_t 470,15945
+#define TOR_SOCKET_T_FORMAT 471,15975
+#define SOCKET_OK(472,16019
+#define TOR_INVALID_SOCKET 473,16072
+#define tor_socket_t 476,16184
+#define TOR_SOCKET_T_FORMAT 477,16209
+#define SOCKET_OK(479,16321
+#define TOR_INVALID_SOCKET 481,16406
+#define tor_socket_send(510,17805
+#define tor_socket_recv(511,17874
+struct in6_addr518,18217
+    uint8_t u6_addr8[u6_addr8521,18245
+    uint16_t u6_addr16[u6_addr16522,18271
+    uint32_t u6_addr32[u6_addr32523,18298
+  } in6_u;524,18325
+#define s6_addr 525,18336
+#define s6_addr16 526,18369
+#define s6_addr32 527,18403
+#define s6_addr16 536,18685
+#define s6_addr32 539,18750
+typedef uint16_t sa_family_t;545,18895
+#define S6_ADDR32(552,19120
+#define S6_ADDR32(554,19174
+#define S6_ADDR16(557,19275
+#define S6_ADDR16(559,19329
+struct sockaddr_in6 566,19554
+  sa_family_t sin6_family;567,19576
+  uint16_t sin6_port;568,19603
+  struct in6_addr sin6_addr;570,19654
+int tor_inet_aton(576,19825
+#define SOCK_ERRNO(592,20674
+#define ERRNO_IS_EAGAIN(594,20762
+#define ERRNO_IS_EINPROGRESS(596,20904
+#define ERRNO_IS_CONN_EINPROGRESS(599,21067
+#define ERRNO_IS_ACCEPT_EAGAIN(603,21303
+#define ERRNO_IS_RESOURCE_LIMIT(606,21498
+#define ERRNO_IS_EADDRINUSE(609,21640
+#define ERRNO_IS_EINTR(611,21757
+#define SOCK_ERRNO(615,21929
+#define ERRNO_IS_EAGAIN(618,22053
+#define ERRNO_IS_EAGAIN(620,22117
+#define ERRNO_IS_EINTR(622,22227
+#define ERRNO_IS_EINPROGRESS(623,22284
+#define ERRNO_IS_CONN_EINPROGRESS(624,22347
+#define ERRNO_IS_ACCEPT_EAGAIN(625,22410
+#define ERRNO_IS_RESOURCE_LIMIT(627,22492
+#define ERRNO_IS_EADDRINUSE(629,22599
+#define tor_socket_errno(630,22663
+#define tor_socket_strerror(631,22708
+  SOCKS5_SUCCEEDED 636,22840
+  SOCKS5_SUCCEEDED                  = 0x00,x00636,22840
+  SOCKS5_GENERAL_ERROR 637,22884
+  SOCKS5_GENERAL_ERROR              = 0x01,x01637,22884
+  SOCKS5_NOT_ALLOWED 638,22928
+  SOCKS5_NOT_ALLOWED                = 0x02,x02638,22928
+  SOCKS5_NET_UNREACHABLE 639,22972
+  SOCKS5_NET_UNREACHABLE            = 0x03,x03639,22972
+  SOCKS5_HOST_UNREACHABLE 640,23016
+  SOCKS5_HOST_UNREACHABLE           = 0x04,x04640,23016
+  SOCKS5_CONNECTION_REFUSED 641,23060
+  SOCKS5_CONNECTION_REFUSED         = 0x05,x05641,23060
+  SOCKS5_TTL_EXPIRED 642,23104
+  SOCKS5_TTL_EXPIRED                = 0x06,x06642,23104
+  SOCKS5_COMMAND_NOT_SUPPORTED 643,23148
+  SOCKS5_COMMAND_NOT_SUPPORTED      = 0x07,x07643,23148
+  SOCKS5_ADDRESS_TYPE_NOT_SUPPORTED 644,23192
+  SOCKS5_ADDRESS_TYPE_NOT_SUPPORTED = 0x08,x08644,23192
+} socks5_reply_status_t;645,23236
+uint16_t get_uint16(650,23336
+#define get_uint8(658,23743
+typedef unsigned long rlim_t;667,23935
+#define HAVE_LINUX_CAPABILITIES674,24158
+#define SWITCH_ID_KEEP_BINDLOW 680,24295
+#define SWITCH_ID_WARN_IF_NO_CAPS 682,24397
+#define MAX(711,25157
+#define MIN(714,25219
+#define VER_SUITE_EMBEDDEDNT 728,25590
+#define VER_SUITE_SINGLEUSERTS 732,25669
+#define NEED_ERSATZ_SOCKETPAIR739,25847
+
+compat_libevent.h,411
+#define TOR_COMPAT_LIBEVENT_H5,128
+#define tor_event_new 15,323
+#define tor_evtimer_new 16,359
+#define tor_evsignal_new 17,397
+#define tor_evdns_add_server_port(18,436
+typedef struct periodic_timer_t periodic_timer_t;24,624
+#define tor_event_base_loopexit 32,911
+typedef struct tor_libevent_cfg 36,1113
+  int num_cpus;38,1208
+  int msec_per_tick;41,1335
+} tor_libevent_cfg;42,1356
+#define V(68,2282
+
+compat_openssl.h,401
+#define TOR_COMPAT_OPENSSL_H8,273
+#define OPENSSL_1_1_API27,788
+#define OPENSSL_VERSION 31,907
+#define OpenSSL_version(32,946
+#define OpenSSL_version_num(33,991
+#define RAND_OpenSSL(34,1030
+#define STATE_IS_SW_SERVER_HELLO(35,1067
+#define OSSL_HANDSHAKE_STATE 38,1195
+#define CONST_IF_OPENSSL_1_1_API39,1228
+#define STATE_IS_SW_SERVER_HELLO(41,1302
+#define CONST_IF_OPENSSL_1_1_API 43,1374
+
+compat_rust.h,70
+#define TOR_RUST_COMPAT_H10,188
+typedef uintptr_t rust_str_t;19,455
+
+compat_threads.h,1159
+#define TOR_COMPAT_THREADS_H7,234
+#define USE_WIN32_THREADS18,429
+#define USE_PTHREADS20,517
+void spawn_exit(26,670
+typedef struct tor_mutex_t 33,984
+  CRITICAL_SECTION mutex;36,1122
+  pthread_mutex_t mutex;40,1261
+  int _unused;43,1369
+} tor_mutex_t;45,1431
+#define tor_mutex_init_for_cond(59,1899
+typedef struct tor_cond_t 64,2021
+  pthread_cond_t cond;66,2069
+  HANDLE event;68,2125
+  CRITICAL_SECTION lock;70,2142
+  int n_waiting;71,2167
+  int n_to_wake;72,2184
+  int generation;73,2201
+} tor_cond_t;77,2309
+typedef struct alert_sockets_s 90,2792
+  tor_socket_t read_fd;95,3025
+  tor_socket_t write_fd;97,3103
+  int (*alert_fn)alert_fn99,3171
+  int (*drain_fn)drain_fn101,3274
+} alert_sockets_t;102,3315
+#define ASOCKS_NOEVENTFD2 105,3394
+#define ASOCKS_NOEVENTFD 106,3430
+#define ASOCKS_NOPIPE2 107,3466
+#define ASOCKS_NOPIPE 108,3502
+#define ASOCKS_NOSOCKETPAIR 109,3538
+typedef struct tor_threadlocal_s 114,3696
+  DWORD index;116,3745
+  pthread_key_t key;118,3766
+} tor_threadlocal_t;120,3794
+typedef struct atomic_counter_t 153,4940
+  tor_mutex_t mutex;154,4974
+  size_t val;155,4995
+} atomic_counter_t;156,5009
+
+compat_time.h,1049
+#define TOR_COMPAT_TIME_H19,652
+#undef HAVE_CLOCK_GETTIME23,715
+struct timeval 33,982
+  time_t tv_sec;34,999
+  unsigned int tv_usec;35,1016
+typedef struct monotime_t 40,1159
+  uint64_t abstime_;43,1281
+  struct timespec ts_;46,1413
+  int64_t pcount_;49,1538
+#define MONOTIME_USING_GETTIMEOFDAY51,1563
+  struct timeval tv_;53,1655
+} monotime_t;55,1716
+#define MONOTIME_COARSE_FN_IS_DIFFERENT59,1802
+#define monotime_coarse_t 60,1842
+#define MONOTIME_COARSE_FN_IS_DIFFERENT62,1901
+#define MONOTIME_COARSE_TYPE_IS_DIFFERENT63,1941
+typedef struct monotime_coarse_t 65,2056
+  uint64_t tick_count_;66,2091
+} monotime_coarse_t;67,2115
+#define monotime_coarse_t 69,2142
+#define monotime_coarse_get 114,3609
+#define monotime_coarse_absolute_nsec 115,3650
+#define monotime_coarse_absolute_usec 116,3711
+#define monotime_coarse_absolute_msec 117,3772
+#define monotime_coarse_diff_nsec 128,4296
+#define monotime_coarse_diff_usec 129,4349
+#define monotime_coarse_diff_msec 130,4402
+#define monotime_coarse_set_mock_time_nsec 144,4842
+
+compress.h,660
+#define TOR_COMPRESS_H12,286
+  NO_METHOD=19,592
+  GZIP_METHOD=20,637
+  ZLIB_METHOD=21,654
+  LZMA_METHOD=22,671
+  ZSTD_METHOD=23,688
+  UNKNOWN_METHOD=24,705
+} compress_method_t;25,782
+  BEST_COMPRESSION,33,995
+  BEST_COMPRESSION, HIGH_COMPRESSION,33,995
+  BEST_COMPRESSION, HIGH_COMPRESSION, MEDIUM_COMPRESSION,33,995
+  BEST_COMPRESSION, HIGH_COMPRESSION, MEDIUM_COMPRESSION, LOW_COMPRESSION33,995
+} compression_level_t;34,1069
+  TOR_COMPRESS_OK,66,2294
+  TOR_COMPRESS_DONE,67,2313
+  TOR_COMPRESS_BUFFER_FULL,68,2334
+  TOR_COMPRESS_ERROR69,2362
+} tor_compress_output_t;70,2383
+typedef struct tor_compress_state_t tor_compress_state_t;73,2477
+
+compress_lzma.h,110
+#define TOR_COMPRESS_LZMA_H12,300
+typedef struct tor_lzma_compress_state_t tor_lzma_compress_state_t;21,537
+
+compress_none.h,35
+#define TOR_COMPRESS_NONE_H12,300
+
+compress_zlib.h,110
+#define TOR_COMPRESS_ZLIB_H12,300
+typedef struct tor_zlib_compress_state_t tor_zlib_compress_state_t;21,542
+
+compress_zstd.h,110
+#define TOR_COMPRESS_ZSTD_H12,300
+typedef struct tor_zstd_compress_state_t tor_zstd_compress_state_t;21,542
+
+confline.h,412
+#define TOR_CONFLINE_H8,266
+#define CONFIG_LINE_NORMAL 11,326
+#define CONFIG_LINE_APPEND 14,458
+#define CONFIG_LINE_CLEAR 16,543
+#define MAX_INCLUDE_RECURSION_LEVEL 18,572
+typedef struct config_line_t 21,673
+  char *key;key22,704
+  char *value;value23,717
+  struct config_line_t *next;next24,732
+  unsigned int command:command27,828
+  unsigned int fragile:fragile31,1018
+} config_line_t;32,1044
+
+container.h,2246
+#define TOR_CONTAINER_H7,229
+typedef struct smartlist_t 18,561
+  void **list;list24,806
+  int num_used;25,821
+  int capacity;26,837
+} smartlist_t;28,865
+static inline int smartlist_len(58,2440
+static inline void *smartlist_get(smartlist_get65,2656
+static inline void smartlist_set(71,2824
+#define smartlist_len(78,3035
+#define smartlist_get(79,3078
+#define smartlist_set(80,3127
+static inline void smartlist_swap(85,3327
+#define smartlist_get_most_frequent(102,3989
+#define SPLIT_SKIP_SPACE 142,5939
+#define SPLIT_IGNORE_BLANK 143,5971
+#define SPLIT_STRIP_SPACE 144,6003
+char *smartlist_join_strings(smartlist_join_strings147,6161
+#define SMARTLIST_FOREACH_BEGIN(217,8425
+#define SMARTLIST_FOREACH_END(225,8846
+#define SMARTLIST_FOREACH(238,9332
+#define SMARTLIST_DEL_CURRENT(246,9744
+#define SMARTLIST_DEL_CURRENT_KEEPORDER(256,10188
+#define SMARTLIST_REPLACE_CURRENT(267,10716
+#define SMARTLIST_FOREACH_JOIN(316,12674
+#define SMARTLIST_FOREACH_JOIN_END(342,14525
+#define DECLARE_MAP_FNS(346,14637
+#undef DECLARE_MAP_FNS371,16215
+#define MAP_FOREACH(397,17015
+#define MAP_FOREACH_MODIFY(437,18597
+#define MAP_DEL_CURRENT(455,19764
+#define MAP_FOREACH_END 461,19974
+#define DIGESTMAP_FOREACH(469,20209
+#define DIGESTMAP_FOREACH_MODIFY(480,20603
+#define DIGESTMAP_FOREACH_END 483,20802
+#define DIGEST256MAP_FOREACH(485,20849
+#define DIGEST256MAP_FOREACH_MODIFY(487,21000
+#define DIGEST256MAP_FOREACH_END 490,21194
+#define STRMAP_FOREACH(492,21244
+#define STRMAP_FOREACH_MODIFY(494,21382
+#define STRMAP_FOREACH_END 496,21527
+#define DECLARE_TYPED_DIGESTMAP_FNS(502,21751
+#define BITARRAY_SHIFT 578,27155
+#define BITARRAY_SHIFT 580,27202
+#define BITARRAY_MASK 584,27332
+typedef unsigned int bitarray_t;587,27435
+bitarray_init_zero(590,27559
+bitarray_expand(600,27926
+bitarray_free(617,28564
+bitarray_set(623,28683
+bitarray_clear(629,28854
+bitarray_is_set(636,29100
+  int mask;643,29285
+  bitarray_t *ba;ba645,29404
+} digestset_t;646,29473
+#define BIT(648,29489
+digestset_add(651,29592
+digestset_contains(667,30132
+#undef BIT679,30606
+median_int(695,31394
+median_time(700,31518
+median_double(705,31647
+median_uint32(710,31782
+median_int32(715,31918
+third_quartile_uint32(721,32053
+
+crypto_curve25519.h,602
+#define TOR_CRYPTO_CURVE25519_H5,130
+#define CURVE25519_PUBKEY_LEN 11,264
+#define CURVE25519_SECKEY_LEN 13,352
+#define CURVE25519_OUTPUT_LEN 15,440
+typedef struct curve25519_public_key_t 22,639
+  uint8_t public_key[public_key23,680
+} curve25519_public_key_t;24,725
+typedef struct curve25519_secret_key_t 31,914
+  uint8_t secret_key[secret_key32,955
+} curve25519_secret_key_t;33,1000
+typedef struct curve25519_keypair_t 36,1084
+  curve25519_public_key_t pubkey;37,1122
+  curve25519_secret_key_t seckey;38,1156
+} curve25519_keypair_t;39,1190
+#define CURVE25519_BASE64_PADDED_LEN 76,2750
+
+crypto_ed25519.h,649
+#define TOR_CRYPTO_ED25519_H5,127
+#define ED25519_PUBKEY_LEN 11,234
+#define ED25519_SECKEY_LEN 12,264
+#define ED25519_SECKEY_SEED_LEN 13,294
+#define ED25519_SIG_LEN 14,329
+  uint8_t sig[sig18,403
+} ed25519_signature_t;19,435
+  uint8_t pubkey[pubkey23,505
+} ed25519_public_key_t;24,543
+  uint8_t seckey[seckey34,1044
+} ed25519_secret_key_t;35,1082
+  ed25519_public_key_t pubkey;39,1151
+  ed25519_secret_key_t seckey;40,1182
+} ed25519_keypair_t;41,1213
+  const ed25519_public_key_t *pubkey;pubkey78,2776
+  ed25519_signature_t signature;80,2847
+  const uint8_t *msg;msg82,2957
+  size_t len;84,3015
+} ed25519_checkable_t;85,3029
+
+crypto_format.h,110
+#define TOR_CRYPTO_FORMAT_H8,272
+#define ED25519_BASE64_LEN 26,1011
+#define ED25519_SIG_BASE64_LEN 34,1359
+
+crypto.h,1490
+#define TOR_CRYPTO_H14,327
+#define OPENSSL_VER(37,855
+#define OPENSSL_V(45,1306
+#define OPENSSL_V_NOPATCH(50,1539
+#define OPENSSL_V_SERIES(55,1806
+#define DIGEST_LEN 59,1923
+#define DIGEST256_LEN 62,2092
+#define DIGEST512_LEN 64,2195
+#define CIPHER_KEY_LEN 66,2277
+#define CIPHER_IV_LEN 68,2358
+#define CIPHER256_KEY_LEN 70,2440
+#define PK_BYTES 72,2503
+#define DH_BYTES 74,2559
+#define BASE32_DIGEST_LEN 78,2682
+#define BASE64_DIGEST_LEN 81,2807
+#define BASE64_DIGEST256_LEN 84,2934
+#define BASE64_DIGEST512_LEN 87,3064
+#define PK_PKCS1_OAEP_PADDING 90,3169
+#define PKCS1_OAEP_PADDING_OVERHEAD 93,3259
+#define FINGERPRINT_LEN 97,3404
+#define HEX_DIGEST_LEN 99,3502
+#define HEX_DIGEST256_LEN 101,3601
+#define HEX_DIGEST512_LEN 103,3703
+  DIGEST_SHA1 106,3749
+  DIGEST_SHA256 107,3768
+  DIGEST_SHA512 108,3789
+  DIGEST_SHA3_256 109,3810
+  DIGEST_SHA3_512 110,3833
+} digest_algorithm_t;111,3856
+#define  N_DIGEST_ALGORITHMS 112,3878
+#define  N_COMMON_DIGEST_ALGORITHMS 113,3927
+  char d[d124,4315
+} common_digests_t;125,4368
+typedef struct crypto_pk_t crypto_pk_t;127,4389
+typedef struct aes_cnt_cipher crypto_cipher_t;128,4429
+typedef struct crypto_digest_t crypto_digest_t;129,4476
+typedef struct crypto_xof_t crypto_xof_t;130,4524
+typedef struct crypto_dh_t crypto_dh_t;131,4566
+int crypto_early_init(136,4735
+#define crypto_pk_generate_key(162,5761
+#define DH_TYPE_CIRCUIT 282,12413
+#define DH_TYPE_REND 283,12439
+#define DH_TYPE_TLS 284,12462
+
+crypto_pwbox.h,132
+#define CRYPTO_PWBOX_H_INCLUDED_2,33
+#define UNPWBOX_OKAY 6,88
+#define UNPWBOX_BAD_SECRET 7,111
+#define UNPWBOX_CORRUPTED 8,141
+
+crypto_s2k.h,467
+#define TOR_CRYPTO_S2K_H_INCLUDED8,278
+#define S2K_RFC2440_SPECIFIER_LEN 15,476
+#define S2K_FLAG_NO_SCRYPT 21,740
+#define S2K_FLAG_LOW_MEM 24,894
+#define S2K_FLAG_USE_PBKDF2 27,1046
+#define S2K_MAXLEN 30,1145
+#define S2K_OKAY 33,1228
+#define S2K_FAILED 35,1311
+#define S2K_BAD_SECRET 37,1410
+#define S2K_BAD_ALGORITHM 39,1515
+#define S2K_BAD_PARAMS 41,1615
+#define S2K_NO_SCRYPT_SUPPORT 43,1713
+#define S2K_TRUNCATED 46,1829
+#define S2K_BAD_LEN 48,1930
+
+di_ops.h,252
+#define TOR_DI_OPS_H12,285
+#define tor_memneq(19,463
+#define fast_memcmp(26,749
+#define fast_memeq(27,798
+#define fast_memneq(28,850
+typedef struct di_digest256_map_t di_digest256_map_t;37,1208
+typedef void (*dimap_free_fn)dimap_free_fn38,1262
+
+handles.h,117
+#define TOR_HANDLE_H50,1629
+#define HANDLE_ENTRY(56,1715
+#define HANDLE_DECL(59,1810
+#define HANDLE_IMPL(88,3507
+
+memarea.h,70
+#define TOR_MEMAREA_H6,143
+typedef struct memarea_t memarea_t;8,166
+
+procmon.h,165
+#define TOR_PROCMON_H10,181
+typedef struct tor_process_monitor_t tor_process_monitor_t;17,275
+typedef void (*tor_procmon_callback_t)tor_procmon_callback_t20,372
+
+pubsub.h,782
+#define TOR_PUBSUB_H43,1749
+#define SUBSCRIBE_ATSTART 52,1975
+#define DECLARE_PUBSUB_STRUCT_TYPES(54,2010
+#define DECLARE_PUBSUB_TOPIC(60,2379
+#define DECLARE_NOTIFY_PUBSUB_TOPIC(76,3474
+typedef int (*pubsub_subscriber_fn_t)pubsub_subscriber_fn_t90,4181
+typedef struct pubsub_subscriber_t 96,4349
+  pubsub_subscriber_fn_t fn;98,4439
+  void *subscriber_data;subscriber_data100,4515
+  unsigned priority;102,4608
+  unsigned subscriber_flags;104,4681
+} pubsub_subscriber_t;105,4710
+typedef struct pubsub_topic_t 111,4876
+  struct smartlist_t *subscribers;subscribers113,4965
+  uint64_t n_events_fired;116,5094
+  unsigned locked;119,5242
+} pubsub_topic_t;120,5261
+typedef int (*pubsub_notify_fn_t)pubsub_notify_fn_t129,5747
+#define IMPLEMENT_PUBSUB_TOPIC(134,6003
+
+sandbox.h,942
+#define SANDBOX_H_13,328
+#define SYS_SECCOMP 24,526
+#define USE_LIBSECCOMP29,635
+typedef struct sandbox_cfg_elem sandbox_cfg_t;35,760
+#define PARAM_PTR 46,927
+#define PARAM_NUM 47,947
+  LIBSECCOMP2 54,1118
+} SB_IMPL;55,1136
+typedef struct smp_param 61,1246
+  int syscall;63,1317
+  char *value;value66,1359
+  char *value2;value268,1417
+  int prot;71,1495
+} smp_param_t;72,1507
+struct sandbox_cfg_elem 80,1712
+  SB_IMPL implem;82,1805
+  smp_param_t *param;param85,1858
+  struct sandbox_cfg_elem *next;next88,1923
+typedef int (*sandbox_filter_func_t)sandbox_filter_func_t92,2028
+  sandbox_filter_func_t *filter_func;filter_func98,2264
+  sandbox_cfg_t *filter_dynamic;filter_dynamic101,2347
+} sandbox_t;102,2380
+#define sandbox_getaddrinfo(118,2944
+#define sandbox_add_addrinfo(120,3051
+#define sandbox_freeaddrinfo(122,3105
+#define sandbox_free_getaddrinfo_cache(124,3173
+#define sandbox_intern_string(133,3476
+
+storagedir.h,81
+#define TOR_STORAGEDIR_H5,118
+typedef struct storage_dir_t storage_dir_t;7,144
+
+testsupport.h,366
+#define TOR_TESTSUPPORT_H5,124
+#define STATIC8,173
+#define EXTERN(9,188
+#define STATIC 11,239
+#define EXTERN(12,261
+#define MOCK_DECL(59,1538
+#define MOCK_IMPL(62,1663
+#define MOCK_DECL_ATTR(65,1788
+#define MOCK_IMPL(68,1927
+#define MOCK(71,2052
+#define UNMOCK(75,2216
+#define MOCK_DECL(80,2419
+#define MOCK_DECL_ATTR(82,2484
+#define MOCK_IMPL(84,2565
+
+timers.h,121
+#define TOR_TIMERS_H5,119
+typedef struct timeout tor_timer_t;11,208
+typedef void (*timer_cb_fn_t)timer_cb_fn_t12,244
+
+torint.h,2799
+#define TOR_TORINT_H12,302
+#define HAVE_INT8_T44,1151
+#define HAVE_INT16_T47,1204
+#define HAVE_INT32_T50,1258
+#define HAVE_INT64_T53,1312
+#define HAVE_UINT8_T56,1366
+#define HAVE_UINT16_T59,1421
+#define HAVE_UINT32_T62,1477
+#define HAVE_UINT64_T65,1533
+#define HAVE_INTPTR_T68,1589
+#define HAVE_UINTPTR_T71,1646
+typedef signed char int8_t;76,1720
+#define HAVE_INT8_T77,1748
+typedef unsigned char uint8_t;80,1796
+#define HAVE_UINT8_T81,1827
+typedef signed short int16_t;87,1933
+#define HAVE_INT16_T88,1963
+typedef unsigned short uint16_t;91,2013
+#define HAVE_UINT16_T92,2046
+typedef signed int int16_t;98,2152
+#define HAVE_INT16_T99,2180
+typedef unsigned int uint16_t;102,2230
+#define HAVE_UINT16_T103,2261
+typedef signed int int32_t;107,2335
+#define HAVE_INT32_T108,2363
+typedef unsigned int uint32_t;111,2413
+#define HAVE_UINT32_T112,2444
+#define UINT16_MAX 115,2492
+#define INT16_MAX 118,2544
+#define INT16_MIN 121,2594
+#define UINT32_MAX 124,2653
+#define INT32_MAX 127,2709
+#define INT32_MIN 130,2763
+typedef signed long int32_t;136,2887
+#define HAVE_INT32_T137,2916
+typedef unsigned long uint32_t;140,2966
+#define HAVE_UINT32_T141,2998
+#define UINT32_MAX 143,3039
+typedef signed long int64_t;148,3161
+#define HAVE_INT64_T149,3190
+typedef unsigned long uint64_t;152,3240
+#define HAVE_UINT32_T153,3272
+#define UINT64_MAX 156,3320
+typedef signed long long int64_t;162,3456
+#define HAVE_INT64_T163,3490
+typedef unsigned long long uint64_t;166,3540
+#define HAVE_UINT64_T167,3577
+#define UINT64_MAX 170,3625
+#define INT64_MAX 173,3691
+typedef signed __int64 int64_t;179,3822
+#define HAVE_INT64_T180,3854
+typedef unsigned __int64 uint64_t;183,3904
+#define HAVE_UINT64_T184,3939
+#define UINT64_MAX 187,3987
+#define INT64_MAX 190,4054
+#define INT64_MIN 195,4155
+#define SIZE_MAX 200,4241
+#define SIZE_MAX 202,4295
+typedef int64_t ssize_t;210,4476
+typedef int32_t ssize_t;212,4526
+typedef int64_t intptr_t;220,4732
+#define SIZEOF_INTPTR_T 221,4758
+typedef uint64_t uintptr_t;224,4814
+#define SIZEOF_UINTPTR_T 225,4842
+typedef int32_t intptr_t;229,4946
+#define SIZEOF_INTPTR_T 230,4972
+typedef uint32_t uintptr_t;233,5028
+#define SIZEOF_UINTPTR_T 234,5056
+#define LONG_MAX 273,6050
+#define LONG_MAX 275,6104
+#define INT_MAX 283,6288
+#define INT_MAX 285,6340
+#define UINT_MAX 293,6521
+#define UINT_MAX 295,6570
+#define UINT_MAX 297,6623
+#define SHORT_MAX 305,6810
+#define SHORT_MAX 307,6861
+#define TIME_MAX 316,7054
+#define TIME_MAX 318,7126
+#define TIME_MAX 320,7189
+#define TIME_MIN 330,7399
+#define TIME_MIN 332,7471
+#define TIME_MIN 334,7534
+#define SIZE_MAX 343,7734
+#define SIZE_MAX 345,7789
+#define SSIZE_MAX 353,7971
+#define SSIZE_MAX 355,8026
+#define SSIZE_T_CEILING 362,8240
+#define SIZE_T_CEILING 364,8362
+
+torlog.h,1618
+#define LOG_WARN 20,412
+#define LOG_DEBUG 36,1060
+#define LOG_INFO 39,1174
+#define LOG_NOTICE 44,1361
+#define LOG_WARN 47,1475
+#define LOG_ERR 50,1638
+#define LD_GENERAL 56,1780
+#define LD_CRYPTO 58,1843
+#define LD_NET 60,1890
+#define LD_CONFIG 62,1966
+#define LD_FS 64,2042
+#define LD_PROTOCOL 66,2131
+#define LD_MM 68,2185
+#define LD_HTTP 70,2241
+#define LD_APP 72,2306
+#define LD_CONTROL 74,2384
+#define LD_CIRC 76,2459
+#define LD_REND 78,2512
+#define LD_BUG 80,2585
+#define LD_DIR 82,2671
+#define LD_DIRSERV 84,2757
+#define LD_OR 86,2817
+#define LD_EDGE 88,2892
+#define LD_EXIT 89,2921
+#define LD_ACCT 91,2978
+#define LD_HIST 93,3029
+#define LD_HANDSHAKE 95,3080
+#define LD_HEARTBEAT 97,3136
+#define LD_CHANNEL 99,3197
+#define LD_SCHED 101,3244
+#define LD_GUARD 103,3293
+#define LD_CONSDIFF 105,3377
+#define N_LOGGING_DOMAINS 107,3453
+#define LD_NOCB 111,3605
+#define LD_NOFUNCNAME 114,3755
+#define LD_NO_MOCK 118,3879
+typedef uint32_t log_domain_mask_t;122,3971
+typedef struct log_severity_list_t 126,4105
+  log_domain_mask_t masks[masks129,4233
+} log_severity_list_t;130,4281
+typedef void (*log_callback)log_callback133,4353
+void tor_log(167,5821
+#define log_fn(195,6767
+#define log_fn_ratelim(200,7000
+#define log_debug(202,7131
+#define log_info(207,7431
+#define log_notice(209,7541
+#define log_warn(211,7653
+#define log_err(213,7763
+#define log_debug(220,7996
+#define log_info(225,8312
+#define log_notice(227,8449
+#define log_warn(229,8588
+#define log_err(231,8725
+#define log_fn(235,8972
+#define log_fn_ratelim(240,9236
+# define TOR_TORLOG_H251,9651
+
+tortls.h,2591
+#define TOR_TORTLS_H7,221
+typedef struct tor_tls_t tor_tls_t;20,445
+typedef struct tor_x509_cert_t tor_x509_cert_t;23,534
+#define MIN_TOR_TLS_ERROR_VAL_ 26,642
+#define TOR_TLS_ERROR_MISC 27,680
+#define TOR_TLS_ERROR_IO 29,770
+#define TOR_TLS_ERROR_CONNREFUSED 30,808
+#define TOR_TLS_ERROR_CONNRESET 31,846
+#define TOR_TLS_ERROR_NO_ROUTE 32,884
+#define TOR_TLS_ERROR_TIMEOUT 33,922
+#define TOR_TLS_CLOSE 34,960
+#define TOR_TLS_WANTREAD 35,998
+#define TOR_TLS_WANTWRITE 36,1036
+#define TOR_TLS_DONE 37,1074
+#define CASE_TOR_TLS_ERROR_ANY_NONIO 41,1215
+#define CASE_TOR_TLS_ERROR_ANY 50,1636
+#define TOR_TLS_IS_ERROR(54,1761
+#define TOR_TLS_MAGIC 57,1836
+    TOR_TLS_ST_HANDSHAKE,60,1885
+    TOR_TLS_ST_HANDSHAKE, TOR_TLS_ST_OPEN,60,1885
+    TOR_TLS_ST_HANDSHAKE, TOR_TLS_ST_OPEN, TOR_TLS_ST_GOTCLOSE,60,1885
+    TOR_TLS_ST_SENTCLOSE,61,1949
+    TOR_TLS_ST_SENTCLOSE, TOR_TLS_ST_CLOSED,61,1949
+    TOR_TLS_ST_SENTCLOSE, TOR_TLS_ST_CLOSED, TOR_TLS_ST_RENEGOTIATE,61,1949
+    TOR_TLS_ST_BUFFEREVENT62,2018
+} tor_tls_state_t;63,2045
+#define tor_tls_state_bitfield_t 64,2064
+typedef struct tor_tls_context_t 74,2284
+  int refcnt;75,2319
+  struct ssl_ctx_st *ctx;ctx76,2333
+  tor_x509_cert_t *my_link_cert;my_link_cert77,2359
+  tor_x509_cert_t *my_id_cert;my_id_cert78,2392
+  tor_x509_cert_t *my_auth_cert;my_auth_cert79,2423
+  crypto_pk_t *link_key;link_key80,2456
+  crypto_pk_t *auth_key;auth_key81,2481
+} tor_tls_context_t;82,2506
+struct tor_x509_cert_t 85,2583
+  struct x509_st *cert;cert86,2608
+  uint8_t *encoded;encoded87,2632
+  size_t encoded_len;88,2652
+  unsigned pkey_digests_set 89,2674
+  common_digests_t cert_digests;90,2707
+  common_digests_t pkey_digests;91,2740
+struct tor_tls_t 97,2881
+  uint32_t magic;98,2900
+  tor_tls_context_t *context;context99,2918
+  struct ssl_st *ssl;ssl100,2998
+  int socket;101,3051
+  char *address;address102,3129
+  tor_tls_state_bitfield_t state 103,3205
+  unsigned int isServer:isServer106,3415
+  unsigned int wasV2Handshake:wasV2Handshake107,3492
+  unsigned int got_renegotiate:got_renegotiate113,3932
+  int8_t client_cipher_list_type;116,4076
+  uint8_t server_handshake_count;118,4183
+  size_t wantwrite_n;119,4217
+  unsigned long last_write_count;124,4435
+  unsigned long last_read_count;125,4469
+  void (*negotiated_callback)negotiated_callback128,4601
+  void *callback_arg;callback_arg130,4709
+#define TOR_TLS_CTX_IS_PUBLIC_SERVER 205,8441
+#define TOR_TLS_CTX_USE_ECDHE_P256 206,8486
+#define TOR_TLS_CTX_USE_ECDHE_P224 207,8531
+#define check_no_tls_errors(260,11025
+
+util_bug.h,1002
+#define TOR_UTIL_BUG_H37,1240
+#define tor_assert(62,2191
+#define tor_assert(68,2443
+#define tor_assert_unreached(75,2832
+#undef BUG89,3259
+#define ALL_BUGS_ARE_FATAL100,3795
+#define tor_assert_nonfatal_unreached(104,3856
+#define tor_assert_nonfatal(105,3910
+#define tor_assert_nonfatal_unreached_once(106,3963
+#define tor_assert_nonfatal_once(107,4022
+#define BUG(108,4080
+#define tor_assert_nonfatal_unreached(114,4456
+#define tor_assert_nonfatal(115,4505
+#define tor_assert_nonfatal_unreached_once(116,4554
+#define tor_assert_nonfatal_once(117,4608
+#define BUG(118,4662
+#define tor_assert_nonfatal_unreached(120,4790
+#define tor_assert_nonfatal(123,4949
+#define tor_assert_nonfatal_unreached_once(128,5252
+#define tor_assert_nonfatal_once(135,5707
+#define BUG(142,6162
+#define IF_BUG_ONCE__(149,6458
+#define IF_BUG_ONCE__(160,7199
+#define IF_BUG_ONCE_VARNAME_(170,7833
+#define IF_BUG_ONCE_VARNAME__(172,7913
+#define IF_BUG_ONCE(179,8118
+#define tor_fragile_assert(186,8479
+
+util_format.h,418
+#define TOR_UTIL_FORMAT_H8,270
+#define BASE64_LEN(18,598
+#define BASE32_LEN(19,643
+#define BASE16_LEN(20,688
+#define BASE64_BUFSIZE(22,721
+#define BASE32_BUFSIZE(23,767
+#define BASE16_BUFSIZE(24,813
+#define BASE64_NOPAD_LEN(26,860
+#define BASE32_NOPAD_LEN(27,911
+#define BASE64_NOPAD_BUFSIZE(29,963
+#define BASE32_NOPAD_BUFSIZE(30,1021
+#define BASE64_ENCODE_MULTILINE 33,1090
+#define BASE32_CHARS 42,1554
+
+util.h,3786
+#define TOR_UTIL_H12,279
+#define O_BINARY 28,571
+#define O_TEXT 31,612
+#define O_NOFOLLOW 34,655
+#define DMALLOC_PARAMS 43,1004
+#define DMALLOC_ARGS 44,1062
+#define DMALLOC_PARAMS46,1114
+#define DMALLOC_ARGS47,1137
+void *tor_malloc_(tor_malloc_51,1217
+#define tor_free(69,2145
+#define tor_free(83,2766
+#define tor_malloc(91,3137
+#define tor_malloc_zero(92,3199
+#define tor_calloc(93,3266
+#define tor_realloc(94,3335
+#define tor_reallocarray(95,3403
+#define tor_strdup(97,3499
+#define tor_strndup(98,3558
+#define tor_memdup(99,3621
+#define tor_memdup_nulterm(100,3683
+#define raw_malloc 105,3926
+#define raw_realloc 106,3953
+#define raw_free 107,3981
+#define raw_strdup 108,4006
+#define STRUCT_VAR_P(121,4356
+#define SUBTYPE_P(132,4727
+#define bool_eq(137,4907
+#define bool_neq(139,5005
+#define CEIL_DIV(160,5991
+#define CLAMP(168,6339
+#define HEX_CHARACTERS 176,6580
+#define RFC1123_TIME_LEN 242,9875
+#define ISO_TIME_LEN 245,10002
+#define ISO_TIME_USEC_LEN 246,10026
+#define approx_time(259,10620
+#define update_approx_time(260,10653
+typedef struct ratelim_t 292,11584
+  int rate;293,11611
+  time_t last_allowed;294,11623
+  int n_calls_since_last_time;295,11646
+} ratelim_t;296,11677
+#define RATELIM_INIT(298,11691
+#define RATELIM_TOOMANY 299,11729
+enum stream_status 308,12026
+  IO_STREAM_OKAY,309,12047
+  IO_STREAM_EAGAIN,310,12065
+  IO_STREAM_TERM,311,12085
+  IO_STREAM_CLOSED312,12103
+typedef enum { FN_ERROR,323,12415
+typedef enum { FN_ERROR, FN_NOENT,323,12415
+typedef enum { FN_ERROR, FN_NOENT, FN_FILE,323,12415
+typedef enum { FN_ERROR, FN_NOENT, FN_FILE, FN_DIR,323,12415
+typedef enum { FN_ERROR, FN_NOENT, FN_FILE, FN_DIR, FN_EMPTY 323,12415
+typedef enum { FN_ERROR, FN_NOENT, FN_FILE, FN_DIR, FN_EMPTY } file_status_t;323,12415
+typedef unsigned int cpd_check_t;328,12684
+#define CPD_NONE 329,12718
+#define CPD_CREATE 330,12753
+#define CPD_CHECK 331,12796
+#define CPD_GROUP_OK 332,12839
+#define CPD_GROUP_READ 333,12882
+#define CPD_CHECK_MODE_ONLY 334,12925
+#define CPD_RELAX_DIRMODE_CHECK 335,12968
+#define OPEN_FLAGS_REPLACE 340,13126
+#define OPEN_FLAGS_APPEND 341,13180
+#define OPEN_FLAGS_DONT_REPLACE 342,13234
+typedef struct open_file_t open_file_t;343,13301
+typedef struct sized_chunk_t 358,14043
+  const char *bytes;bytes359,14074
+  size_t len;360,14095
+} sized_chunk_t;361,14109
+#define RFTS_BIN 370,14543
+#define RFTS_IGNORE_MISSING 372,14644
+char *read_file_to_str_until_eof(read_file_to_str_until_eof380,14853
+typedef struct process_handle_t process_handle_t;401,15641
+typedef struct process_environment_t process_environment_t;402,15691
+#define SPAWN_ERROR_MESSAGE 407,15942
+struct process_environment_t 416,16212
+  char *windows_environment_block;windows_environment_block419,16364
+  char **unixoid_environment_block;unixoid_environment_block422,16514
+#define PROCESS_STATUS_NOTRUNNING 438,17226
+#define PROCESS_STATUS_RUNNING 439,17262
+#define PROCESS_STATUS_ERROR 440,17295
+struct process_handle_t 446,17517
+  int status;448,17587
+  HANDLE stdin_pipe;450,17615
+  HANDLE stdout_pipe;451,17636
+  HANDLE stderr_pipe;452,17658
+  PROCESS_INFORMATION pid;453,17680
+  int stdin_pipe;455,17738
+  int stdout_pipe;456,17756
+  int stderr_pipe;457,17775
+  pid_t pid;458,17794
+  struct waitpid_callback_t *waitpid_cb;waitpid_cb462,17966
+  int waitpid_exit_status;464,18053
+#define PROCESS_EXIT_RUNNING 470,18191
+#define PROCESS_EXIT_EXITED 471,18222
+#define PROCESS_EXIT_ERROR 472,18252
+typedef struct tor_weak_rng_t 515,19829
+  uint32_t state;516,19861
+} tor_weak_rng_t;517,19879
+#define TOR_WEAK_RNG_INIT 519,19898
+#define TOR_WEAK_RANDOM_MAX 520,19936
+#define tor_weak_random_one_in_n(526,20244
+#define HEX_ERRNO_SIZE 540,20821
+#define ARRAY_LENGTH(548,21039
+
+util_process.h,95
+#define TOR_UTIL_PROCESS_H10,196
+typedef struct waitpid_callback_t waitpid_callback_t;17,525
+
+workqueue.h,464
+#define TOR_WORKQUEUE_H5,122
+typedef struct replyqueue_s replyqueue_t;11,281
+typedef struct threadpool_s threadpool_t;13,395
+typedef struct workqueue_entry_s workqueue_entry_t;16,525
+typedef enum workqueue_reply_t 19,629
+  WQ_RPL_REPLY 20,662
+  WQ_RPL_ERROR 21,707
+  WQ_RPL_SHUTDOWN 22,756
+} workqueue_reply_t;23,820
+typedef enum workqueue_priority_t 26,921
+  WQ_PRI_HIGH 27,957
+  WQ_PRI_MED 28,976
+  WQ_PRI_LOW 29,995
+} workqueue_priority_t;30,1014

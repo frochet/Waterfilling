@@ -30,7 +30,6 @@
 #include <string.h>
 #include <time.h>
 
-#include <glib.h>
 #include <openssl/bn.h>
 #include <openssl/rsa.h>
 #include <openssl/pem.h>
@@ -93,10 +92,10 @@ void decode_key(char* in, byte* out){
     char in_body[body_end + 1];
     memcpy(in_body, in + body_start, body_end - body_start);
     in_body[body_end - body_start] = '\0';
-    unsigned long decoded_size;
-    byte* decoded = g_base64_decode(in_body, &decoded_size);
-    memcpy(out, decoded, decoded_size);
-    g_free(decoded);
+    //unsigned long decoded_size;
+    //byte* decoded = g_base64_decode(in_body, &decoded_size);
+    //memcpy(out, decoded, decoded_size);
+    //g_free(decoded);
 }
 
 /**
@@ -104,7 +103,7 @@ void decode_key(char* in, byte* out){
  * footer, and linebreaks every 64 characters
  */
 void encode_key(char* header, char* footer, byte* in, int in_size, char** out){
-    char* encoded = g_base64_encode(in, in_size);
+    /*char* encoded = g_base64_encode(in, in_size);
 
     int newlines = (strlen(encoded) + PEM_LINE_SIZE - 1) / PEM_LINE_SIZE;
     int out_size = strlen(header) + strlen(encoded) + strlen(footer) + newlines;
@@ -132,7 +131,7 @@ void encode_key(char* header, char* footer, byte* in, int in_size, char** out){
     pos1 += strlen(pos2);
     *pos1 = '\n';
 
-    g_free(encoded);
+    g_free(encoded);*/
 }
 
 /**

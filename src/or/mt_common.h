@@ -1,3 +1,10 @@
+/**
+ * \file mt_common.h
+ * \brief Header file for mt_common.c
+ *
+ * All functions return MT_SUCCESS/MT_ERROR unless void or otherwise stated.
+ **/
+
 #ifndef mt_common_h
 #define mt_common_h
 
@@ -5,10 +12,25 @@
 #include "mt_crypto.h"
 #include "mt_tokens.h"
 
+/**
+ * Convert a mt public key into an mt address
+ */
 int mt_pk2addr(byte (*pk)[MT_SZ_PK], byte (*addr_out)[MT_SZ_ADDR]);
+
+/**
+ * Convert an mt address into a printable hexidecimal c-string
+ */
 int mt_addr2hex(byte (*addr)[MT_SZ_ADDR], char (*hex_out)[MT_SZ_ADDR * 2 + 3]);
 
+/**
+ * Create malloc'd hash chain of the given size using the given head
+ */
 int mt_hc_create(int size, byte (*head)[MT_SZ_HASH], byte (*hc_out)[][MT_SZ_HASH]);
+
+/**
+ * Verify that a given preimage is indeed the kth preimage of the
+ * given hash chain tail
+ */
 int mt_hc_verify(byte (*tail)[MT_SZ_HASH], byte (*preimage)[MT_SZ_HASH], int k);
 
 /** Canibalize a general circuit => extends it to

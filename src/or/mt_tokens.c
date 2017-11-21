@@ -21,13 +21,7 @@
 
 //---------------------------- General Functions ----------------------------//
 
-/**
- * Extracts the claimed token type of the message
- */
-mt_ntype_t token_type(cell_t* cell){
-    return (mt_ntype_t)(cell->payload[11]);
-}
-
+/*
 int pack_token(mt_ntype_t type, void* ptr, int tkn_size, byte(*pk)[MT_SZ_PK], byte(*sk)[MT_SZ_SK], cell_t** c_out){
 
     // copy token information into a temporary message byte string
@@ -465,3 +459,4 @@ int unpack_nan_int_close6(cell_t* cells, nan_int_close6_t* tkn_out, byte(*pk_out
 int unpack_nan_end_close7(cell_t* cells, nan_end_close7_t* tkn_out, byte(*pk_out)[MT_SZ_PK]){
     return unpack_token(MT_NTYPE_NAN_END_CLOSE7, cells, sizeof(*tkn_out), tkn_out, pk_out);
 }
+*/

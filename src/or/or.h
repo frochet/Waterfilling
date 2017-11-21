@@ -5525,6 +5525,7 @@ typedef enum {
 #define MT_SZ_ZKP 128
 
 #define MT_SZ_ADDR 20
+#define MT_SZ_ID 20
 
 //---------------------------- Tor-Facing API -------------------------------//
 
@@ -5540,7 +5541,7 @@ typedef enum {
 } mt_party_t;
 
 typedef struct {
-    int id;
+    byte id[MT_SZ_ID];
     mt_party_t party;
 } mt_desc_t;
 
@@ -6065,6 +6066,5 @@ typedef struct {
     mt_code_t success;
     byte sig[MT_SZ_SIG];
 } nan_int_close8_t;
-
 
 #endif /* !defined(TOR_OR_H) */

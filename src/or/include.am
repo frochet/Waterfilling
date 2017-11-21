@@ -67,14 +67,14 @@ LIBTOR_A_SOURCES = \
 	src/or/keypin.c					\
 	src/or/main.c					\
 	src/or/microdesc.c				\
-  src/or/mt_client.c        \
+  src/or/mt_cpay.c        \
   src/or/mt_common.c        \
   src/or/mt_crypto.c        \
-  src/or/mt_intermediary.c        \
-  src/or/mt_ledger.c        \
+  src/or/mt_ipay.c        \
+  src/or/mt_lpay.c        \
   src/or/mt_microalgs.c         \
   src/or/mt_nanoalgs.c        \
-  src/or/mt_relays.c        \
+  src/or/mt_rpay.c        \
   src/or/mt_tokens.c        \
 	src/or/networkstatus.c				\
 	src/or/nodelist.c				\
@@ -214,14 +214,14 @@ ORHEADERS = \
 	src/or/keypin.h					\
 	src/or/main.h					\
 	src/or/microdesc.h				\
-  src/or/mt_client.h        \
+  src/or/mt_cpay.h        \
   src/or/mt_common.h        \
   src/or/mt_crypto.h        \
-  src/or/mt_intermediary.h        \
-  src/or/mt_ledger.h        \
+  src/or/mt_ipay.h        \
+  src/or/mt_lpay.h        \
   src/or/mt_microalgs.h         \
   src/or/mt_nanoalgs.h        \
-  src/or/mt_relays.h        \
+  src/or/mt_rpay.h        \
 	src/or/networkstatus.h				\
 	src/or/nodelist.h				\
 	src/or/ntmain.h					\
