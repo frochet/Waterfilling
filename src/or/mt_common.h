@@ -17,11 +17,12 @@
 #define INTERMEDIARY_REACHABLE_YES 1
 #define INTERMEDIARY_REACHABLE_MAYBE 2
 
-typedef struct intemerdiary_t {
+typedef struct intermediary_t {
   char identity[DIGEST_LEN];
   char nickname[MAX_HEX_NICKNAME_LEN+1];
   unsigned int is_reachable : 2;
-  my_dest_t *m_channel;
+  // TD: doesn't compile, is this supposed to be my_dest_t?
+  //  my_dest_t *m_channel;
 } intermediary_t;
 
 /**
