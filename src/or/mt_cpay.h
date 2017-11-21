@@ -25,6 +25,11 @@ typedef struct {
 
 } mt_cpay_t;
 
+/* Intialize the client payment module. Should be called
+ * only once at Tor startup.
+ */
+void mt_pclient_init(void);
+
 /**
  * Initialize a client instance given public parameters, a currency
  * keypair, and a list of channels associated with the keypair.
