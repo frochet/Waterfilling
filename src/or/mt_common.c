@@ -104,5 +104,16 @@ int mt_check_enough_fund(void) {
  * TODO : - check healthiness of intermediary circuit, consider cacshout?, etc?
  */
 void monetor_run_scheduled_events(time_t now) {
+  (void) now;
 }
 
+int send_message(mt_desc_t *desc, mt_ntype_t type, bytes* msg, int size) {
+  (void) desc;
+  (void) type;
+  (void) msg;
+  (void) size;
+}
+
+int alert_payment(mt_desc_t *desc) {
+  (void) desc;
+}

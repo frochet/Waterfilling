@@ -56,4 +56,12 @@ int mt_check_enough_fund(void);
  * gets called by the main loop every second.
  */
 void monetor_run_scheduled_events(time_t now);
+
+
+/************ Tor - Payment event interface *********************/
+
+int send_message(mt_desc_t *desc, mt_ntype_t type, bytes* msg, int size);
+
+int alert_payment(mt_desc_t *desc);
+
 #endif

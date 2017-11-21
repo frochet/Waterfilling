@@ -46,6 +46,7 @@
 #include "hs_circuit.h"
 #include "hs_ident.h"
 #include "nodelist.h"
+#include "mt_common.h"
 #include "networkstatus.h"
 #include "policies.h"
 #include "rendclient.h"
