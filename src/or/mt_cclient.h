@@ -5,6 +5,19 @@
  * Controller moneTor client part
  */
 
+
+/* Scheduled event run from the main loop every second.
+ * Make sure our controller is healthy, including
+ * intermediaries status, payment status, etc
+ */
+STATIC void run_housekeeping_event(time_t now);
+
+/*
+ * Scheduled event run from the main loop every second.
+ * Makes sure we always have circuits build towards
+ * the intermediaries
+ */
+STATIC void run_build_circuit_event(time_t now);
 /** Gets called every second, job:
  *
  * XXX MoneTor Todo
@@ -27,6 +40,8 @@ const node_t* choose_random_intermediary(void);
  * or does not if this is a fresh payment channel
  */
 extend_info_t* mt_cclient_get_intermediary_from_edge(edge_connection_t* conn);
+
+void  mt_cclient_init(void);
 
 /**
  * Parse the state file to get the intermediaries we were using before

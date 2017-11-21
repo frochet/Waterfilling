@@ -12,6 +12,18 @@
 #include "mt_crypto.h"
 #include "mt_tokens.h"
 
+
+#define INTERMEDIARY_REACHABLE_NO 0
+#define INTERMEDIARY_REACHABLE_YES 1
+#define INTERMEDIARY_REACHABLE_MAYBE 2
+
+typedef struct intemerdiary_t {
+  char identity[DIGEST_LEN];
+  char nickname[MAX_HEX_NICKNAME_LEN+1];
+  unsigned int is_reachable : 2;
+  my_dest_t *m_channel;
+} intermediary_t;
+
 /**
  * Convert a mt public key into an mt address
  */
