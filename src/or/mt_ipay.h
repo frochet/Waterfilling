@@ -43,9 +43,4 @@ int mt_ipay_cashout(mt_ipay_t* intermediary, byte (*chn_addrs)[MT_SZ_ADDR]);
  */
 int mt_ipay_recv_cells(mt_ipay_t* intermediary, mt_desc_t desc, mt_ntype_t type, byte** msg, int size);
 
-
-/*************** Should probably be in controller? **********/
-
-int node_is_intermediary(const node_t *node);
-
 #endif
