@@ -40,6 +40,6 @@ int mt_rpay_cashout(mt_rpay_t* relay, byte (*chn_addrs)[MT_SZ_ADDR]);
 /**
  * Handle an incoming message. Requires the message sender, type, and size.
  */
-int mt_rpay_recv_cells(mt_rpay_t* relay, mt_desc_t desc, mt_ntype_t type, byte** msg, int size);
+int mt_rpay_recv_message(mt_rpay_t* relay, mt_desc_t desc, mt_ntype_t type, byte* msg, int size);
 
 #endif

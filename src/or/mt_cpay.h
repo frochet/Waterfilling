@@ -60,6 +60,6 @@ int mt_cpay_cashout(mt_cpay_t* client, byte (*chn_addrs)[MT_SZ_ADDR]);
 /**
  * Handle an incoming message. Requires the message sender, type, and size.
  */
-int mt_cpay_recv_cells(mt_cpay_t* client, mt_desc_t desc, mt_ntype_t type, byte* msg, int size);
+int mt_cpay_recv_message(mt_cpay_t* client, mt_desc_t desc, mt_ntype_t type, byte* msg, int size);
 
 #endif

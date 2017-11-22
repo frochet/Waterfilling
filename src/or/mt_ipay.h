@@ -41,6 +41,6 @@ int mt_ipay_cashout(mt_ipay_t* intermediary, byte (*chn_addrs)[MT_SZ_ADDR]);
 /**
  * Handle an incoming message. Requires the message sender, type, and size.
  */
-int mt_ipay_recv_cells(mt_ipay_t* intermediary, mt_desc_t desc, mt_ntype_t type, byte* msg, int size);
+int mt_ipay_recv_message(mt_ipay_t* intermediary, mt_desc_t desc, mt_ntype_t type, byte* msg, int size);
 
 #endif
