@@ -1,10 +1,38 @@
 #ifndef mt_cclient_h
 #define mt_cclient_h
 
+#include "mt_common.h"
 /**
  * Controller moneTor client part
  */
 
+
+static intermediary_t* intermediary_new(const node_t *node, extend_info_t *ei);
+
+#define MAX_INTERMEDIARY_CHOSEN 2 // XXX MoneTor - do we need backup intermediaries?
+/*
+ * Fill the intermediaries smartlist_t with selected
+ * intermediary_t
+ *
+ * XXX MoneTor - parse the state file to recover previously
+ *               intermediaries
+ * 
+ * If no intermediaries in the statefile, select new ones
+ */
+static void choose_intermediaries(time_t now, smartlist_t *exclude_list);
+
+/**
+ * 
+ * Remove the intermdiary from the list we are using because
+ * of one of the following reasons::
+ * XXX MoneTor - FR: do we implement all of them?
+ * - Node does not exist anymore in the consensus (do we care for simulation?)
+ * - The intermediary maximum circuit retry count has been reached (we DO care about that)
+ * - The intermediary has expired (we need to cashout and rotate => do we care?)
+ */
+
+static void cleanup_intermediary(intermediary_t *intermediary,
+    time_t now);
 
 /* Scheduled event run from the main loop every second.
  * Make sure our controller is healthy, including
@@ -18,9 +46,8 @@ STATIC void run_housekeeping_event(time_t now);
  * the intermediaries
  */
 STATIC void run_build_circuit_event(time_t now);
+
 /** Gets called every second, job:
- *
- * XXX MoneTor Todo
  */
 void run_cclient_scheduled_events(time_t now);
 
