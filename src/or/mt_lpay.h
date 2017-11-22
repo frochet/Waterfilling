@@ -43,6 +43,6 @@ int mt_lpay_init(mt_lpay_t* ledger, byte (*pp)[MT_SZ_PP], int fee,  double tax, 
 /**
  * Handle an incoming message. Requires the message sender, type, and size.
  */
-int mt_lpay_recv_cells(mt_lpay_t* ledger, mt_desc_t desc, mt_ntype_t type, byte** msg, int size);
+int mt_lpay_recv_cells(mt_lpay_t* ledger, mt_desc_t desc, mt_ntype_t type, byte* msg, int size);
 
 #endif
