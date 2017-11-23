@@ -222,6 +222,7 @@ extern struct testcase_t logging_tests[];
 extern struct testcase_t microdesc_tests[];
 extern struct testcase_t mt_common_tests[];
 extern struct testcase_t mt_crypto_tests[];
+extern struct testcase_t mt_lpay_tests[];
 extern struct testcase_t mt_tokens_tests[];
 extern struct testcase_t nodelist_tests[];
 extern struct testcase_t oom_tests[];

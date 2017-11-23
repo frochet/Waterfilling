@@ -5524,7 +5524,7 @@ typedef enum {
 #define MT_SZ_PP 128
 #define MT_SZ_ZKP 128
 
-#define MT_SZ_ADDR 20
+#define MT_SZ_ADDR DIGEST_LEN
 #define MT_SZ_ID 20
 
 //---------------------------- Tor-Facing API -------------------------------//

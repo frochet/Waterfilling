@@ -135,6 +135,7 @@ src_test_test_SOURCES = \
 	src/test/test_microdesc.c \
 	src/test/test_mt_common.c \
 	src/test/test_mt_crypto.c \
+	src/test/test_mt_lpay.c \
 	src/test/test_mt_tokens.c \
 	src/test/test_nodelist.c \
 	src/test/test_oom.c \

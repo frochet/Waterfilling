@@ -27,6 +27,8 @@
  *   outside of the delay
  */
 
+#pragma GCC diagnostic ignored "-Wmissing-prototypes"
+
 #include <string.h>
 #include <time.h>
 
@@ -55,15 +57,15 @@
 
 // global parameters for key generation
 int num_bits = 1024;
-char* exp_str = "65537";
+const char* exp_str = "65537";
 
 // random byte string used to simulate a "blinder" for bsig operations
 byte* bsig_fake_blinder = (byte*)"1234567812345678123456781234567812345678";
 
-char* pk_header = "-----BEGIN PUBLIC KEY-----\n";
-char* pk_footer = "-----END PUBLIC KEY-----\n";
-char* sk_header = "-----BEGIN RSA PRIVATE KEY-----\n";
-char* sk_footer = "-----END RSA PRIVATE KEY-----\n";
+const char* pk_header = "-----BEGIN PUBLIC KEY-----\n";
+const char* pk_footer = "-----END PUBLIC KEY-----\n";
+const char* sk_header = "-----BEGIN RSA PRIVATE KEY-----\n";
+const char* sk_footer = "-----END RSA PRIVATE KEY-----\n";
 
 /**
  * Call system nanosleep() to delay the thread for given the microseconds
@@ -88,6 +90,7 @@ int mt_crypt_setup(byte (*pp_out)[MT_SZ_PP]){
  * it may be necessary for the keys to carry extra information for ZKP scheme
  */
 int mt_crypt_keygen(byte (*pp)[MT_SZ_PP], byte (*pk_out)[MT_SZ_PK], byte  (*sk_out)[MT_SZ_SK]){
+  (void)pp;
 
     // generate the rsa struct
     BIGNUM *exponent = BN_new();
@@ -254,6 +257,7 @@ int mt_com_decommit(byte* msg, int msg_size, byte (*rand)[MT_SZ_HASH], byte  (*c
  */
 int mt_bsig_blind(byte *msg, int msg_size, byte (*pk)[MT_SZ_PK], byte (*blinded_out)[MT_SZ_BL],
 		  byte(*unblinder_out)[MT_SZ_UBLR]){
+  (void)pk;
 
   byte digest[MT_SZ_HASH];
   if(mt_crypt_hash(msg, msg_size, &digest) != MT_SUCCESS)
@@ -276,6 +280,9 @@ int mt_bsig_blind(byte *msg, int msg_size, byte (*pk)[MT_SZ_PK], byte (*blinded_
  */
 int mt_bsig_unblind(byte (*pk)[MT_SZ_PK], byte (*blinded_sig)[MT_SZ_SIG], byte (*unblinder)[MT_SZ_UBLR],
 		    byte (*unblinded_sig_out)[MT_SZ_SIG]){
+  (void)pk;
+  (void)unblinder;
+
   memcpy(*unblinded_sig_out, *blinded_sig, MT_SZ_SIG);
   micro_sleep(MT_DELAY_BSIG_UNBLIND);
   return MT_SUCCESS;

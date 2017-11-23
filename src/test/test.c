@@ -1211,6 +1211,7 @@ struct testgroup_t testgroups[] = {
   { "link-handshake/", link_handshake_tests },
   { "mt_common/", mt_common_tests },
   { "mt_crypto/", mt_crypto_tests },
+  { "mt_lpay/", mt_lpay_tests },
   { "mt_tokens/", mt_tokens_tests },
   { "nodelist/", nodelist_tests },
   { "oom/", oom_tests },
