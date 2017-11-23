@@ -7,7 +7,7 @@
  */
 
 
-static intermediary_t* intermediary_new(const node_t *node, extend_info_t *ei);
+static intermediary_t* intermediary_new(const node_t *node, extend_info_t *ei, time_t now);
 
 #define MAX_INTERMEDIARY_CHOSEN 2 // XXX MoneTor - do we need backup intermediaries?
 /*
@@ -76,4 +76,7 @@ void  mt_cclient_init(void);
  * NOT URGENT
  */
 int intermediary_parse_state(or_state_t *state, int set, char** msg);
+
+static void intermediary_free(intermediary_t *intermediary);
+
 #endif

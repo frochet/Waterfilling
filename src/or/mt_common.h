@@ -22,6 +22,7 @@ typedef struct intermediary_t {
   char nickname[MAX_HEX_NICKNAME_LEN+1];
   unsigned int is_reachable : 2;
   time_t chosen_at;
+  extend_info_t *ei;
   // TD: doesn't compile, is this supposed to be my_dest_t?
   // FR: yup - typos
   mt_desc_t *m_channel;

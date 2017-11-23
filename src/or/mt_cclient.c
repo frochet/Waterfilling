@@ -32,17 +32,6 @@ cleanup_intermediary(intermediary_t *intermediary, time_t now) {
   (void) now;
 }
 
-/**
- * Allocate on the heap a new intermediary and returns the pointer
- */
-
-static intermediary_t *
-intermediary_new(const node_t *node, extend_info_t *ei) {
-  intermediary_t *intermediary = tor_malloc_zero(sizeof(intermediary_t));
-
-  // XXX MoneTor todo
-  return intermediary;
-}
 
 static void
 choose_intermediaries(time_t now, smartlist_t *exclude_list) {
@@ -71,8 +60,9 @@ choose_intermediaries(time_t now, smartlist_t *exclude_list) {
     goto err;
   }
   /* Create the intermediary object */
-  intermediary = intermediary_new(node, ei);
-  log_info(LD_MT, "Chose an intermediary: %s", extend_info_describe(ei));
+  intermediary = intermediary_new(node, ei, now);
+  log_info(LD_MT, "Chose an intermediary: %s at time %ld", extend_info_describe(ei),
+      (long) now);
   smartlist_add(intermediaries, intermediary);
  err:
   extend_info_free(ei);
@@ -124,3 +114,37 @@ run_cclient_scheduled_events(time_t now) {
   /*Make sure our intermediaries are up*/
   run_build_circuit_event(now);
 }
+
+/*************************** Object creation and cleanup *******************************/
+
+
+/**
+ * Allocate on the heap a new intermediary and returns the pointer
+ */
+
+static intermediary_t *
+intermediary_new(const node_t *node, extend_info_t *ei, time_t now) {
+  tor_assert(node);
+  tor_assert(ei);
+  intermediary_t *intermediary = tor_malloc_zero(sizeof(intermediary_t));
+  
+  memcpy(intermediary->identity, node->identity, DIGEST_LEN);
+  strlcpy(intermediary->nickname, node->ri->nickname, sizeof(intermediary->nickname));
+  intermediary->is_reachable = INTERMEDIARY_REACHABLE_MAYBE;
+  intermediary->chosen_at = now;
+  intermediary->ei = ei;
+  return intermediary;
+}
+
+static void
+intermediary_free(intermediary_t *intermediary) {
+  if (!intermediary)
+    return;
+  extend_info_free(intermediary->ei);
+  if (intermediary->m_channel) {
+    // XXX MoneTor implem following function
+    //mt_desc_free(intermediary->m_channel);
+  }
+  tor_free(intermediary);
+}
+
