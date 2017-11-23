@@ -13,12 +13,19 @@
 #include "mt_tokens.h"
 
 
+
+typedef enum {
+  MIDDLE,
+  EXIT,
+} position_t;
+
 #define INTERMEDIARY_REACHABLE_NO 0
 #define INTERMEDIARY_REACHABLE_YES 1
 #define INTERMEDIARY_REACHABLE_MAYBE 2
 
+
 typedef struct intermediary_t {
-  char identity[DIGEST_LEN];
+  intermediary_identity_t* identity;
   char nickname[MAX_HEX_NICKNAME_LEN+1];
   unsigned int is_reachable : 2;
   time_t chosen_at;
@@ -26,6 +33,14 @@ typedef struct intermediary_t {
   // TD: doesn't compile, is this supposed to be my_dest_t?
   // FR: yup - typos
   mt_desc_t *m_channel;
+  /*
+   * Whether this intermediary is used
+   * to pay for middle or exit
+   */
+  position_t linked_to;
+  /* how many times we try to build a circuit
+   * with that intermediary */
+  uint32_t circuit_retries;
 } intermediary_t;
 
 /**

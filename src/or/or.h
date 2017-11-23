@@ -803,6 +803,13 @@ typedef enum {
  * rendezvous point. */
 #define REND_COOKIE_LEN DIGEST_LEN
 
+
+/* identity definition for an intermediary - origin_circuit_t is
+ * going to need it*/
+typedef struct intermediary_identity_t {
+  char identity[DIGEST_LEN];
+} intermediary_identity_t;
+
 /** Client authorization type that a hidden service performs. */
 typedef enum rend_auth_type_t {
   REND_NO_AUTH      = 0,
@@ -3255,6 +3262,10 @@ typedef struct origin_circuit_t {
   /** Holds hidden service identifier on either client or service side. This
    * is for both introduction and rendezvous circuit. */
   struct hs_ident_circuit_t *hs_ident;
+  
+  /** Holds intermediary identifier. Works for circuit created by relay
+   *  for circuit created by clients*/
+  intermediary_identity_t *inter_ident;
 
   /** Holds the data that the entry guard system uses to track the
    * status of the guard this circuit is using, and thereby to determine
