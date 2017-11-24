@@ -171,8 +171,19 @@ run_cclient_build_circuit_event(time_t now) {
 }
 
 intermediary_t* mt_cclient_get_intermediary_from_ocirc(origin_circuit_t *ocirc) {
-  (void)ocirc;
-  return NULL;
+  intermediary_identity_t *inter_ident = ocirc->inter_ident;
+  intermediary_t *intermediary = NULL;
+  SMARTLIST_FOREACH_BEGIN(intermediaries, intermediary_t *, intermediary_tmp) {
+    if (tor_memeq(inter_ident->identity, intermediary_tmp->identity->identity,
+          DIGEST_LEN)) {
+      intermediary = intermediary_tmp;
+      break;
+    }
+  } SMARTLIST_FOREACH_END(intermediary_tmp);
+  /* This should be considered as a bug ?*/
+  if (BUG(!intermediary))
+    return NULL;
+  return intermediary;
 }
 
 void
