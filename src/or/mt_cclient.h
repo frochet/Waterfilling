@@ -7,6 +7,8 @@
  */
 
 
+void mt_cclient_intermediary_circ_has_closed(origin_circuit_t *circ);
+
 static intermediary_t* intermediary_new(const node_t *node, extend_info_t *ei, time_t now);
 
 #define MAX_INTERMEDIARY_CHOSEN 2 // XXX MoneTor - do we need backup intermediaries?
@@ -38,14 +40,14 @@ static void cleanup_intermediary(intermediary_t *intermediary,
  * Make sure our controller is healthy, including
  * intermediaries status, payment status, etc
  */
-STATIC void run_housekeeping_event(time_t now);
+STATIC void run_cclient_housekeeping_event(time_t now);
 
 /*
  * Scheduled event run from the main loop every second.
  * Makes sure we always have circuits build towards
  * the intermediaries
  */
-STATIC void run_build_circuit_event(time_t now);
+STATIC void run_cclient_build_circuit_event(time_t now);
 
 /** Gets called every second, job:
  */
@@ -67,6 +69,12 @@ const node_t* choose_random_intermediary(void);
  * or does not if this is a fresh payment channel
  */
 extend_info_t* mt_cclient_get_intermediary_from_edge(edge_connection_t* conn);
+
+
+/**
+ * Get the intermediary whose identity is linked to that origin_circuit_t 
+ */
+intermediary_t* mt_cclient_get_intermediary_from_ocirc(origin_circuit_t* circ);
 
 void  mt_cclient_init(void);
 

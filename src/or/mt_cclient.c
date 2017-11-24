@@ -8,6 +8,7 @@
 #include "util.h"
 #include "container.h"
 #include "circuitbuild.h"
+#include "circuituse.h"
 #include "torlog.h"
 #include "router.h"
 #include "main.h"
@@ -71,7 +72,7 @@ choose_intermediaries(time_t now, smartlist_t *exclude_list) {
 }
 
 STATIC void
-run_housekeeping_event(time_t now) {
+run_cclient_housekeeping_event(time_t now) {
   
   /* Check intermediary health*/
   SMARTLIST_FOREACH_BEGIN(intermediaries, intermediary_t *,
@@ -86,7 +87,7 @@ run_housekeeping_event(time_t now) {
 }
 
 STATIC void
-run_build_circuit_event(time_t now) {
+run_cclient_build_circuit_event(time_t now) {
   /*If Tor is not fully up (can takes 30 sec), we do not consider
    *building circuits*/
   if (router_have_consensus_path() == CONSENSUS_PATH_UNKNOWN ||
@@ -100,19 +101,55 @@ run_build_circuit_event(time_t now) {
 
   /*For each intermediary in our list, verifies that we have a circuit
    *up and running. If not, build one.*/
-
+  origin_circuit_t *circ = NULL;
   SMARTLIST_FOREACH_BEGIN(intermediaries, intermediary_t *,
       intermediary) {
-    //XXX MoneTor todo - define intermediary_t
+    // XXX MoneTor - make unit test for this function
+    circ = circuit_get_by_intermediary_ident(intermediary->identity);
+    /* If no circ, launch one */
+    if (!circ) {
+      int purpose = CIRCUIT_PURPOSE_C_INTERMEDIARY;
+      int flags = CIRCLAUNCH_IS_INTERNAL;
+      flags |= CIRCLAUNCH_NEED_UPTIME;
+      circ = circuit_launch_by_extend_info(purpose, intermediary->ei,
+          flags);
+      if (!circ) {
+        /*intermediary->circuit_retries++;*/
+        //problems going to be handled by a function called
+        //by cicuit_about_to_free
+        continue;
+      }
+      /*We have circuit building - mark the intermediary*/
+      memcpy(circ->inter_ident->identity,
+          intermediary->identity->identity, DIGEST_LEN);
+    }
+    //XXX MoneTor - Check circuit healthiness? - check that it is already
+    // done by an other Tor intern function 
   } SMARTLIST_FOREACH_END(intermediary);
+}
+
+intermediary_t * mt_cclient_get_intermediary_from_ocirc(origin_circuit_t *ocirc) {
+  return NULL;
 }
 
 void
 run_cclient_scheduled_events(time_t now) {
   /*Make sure our controller is healthy*/
-  run_housekeeping_event(now);
+  run_cclient_housekeeping_event(now);
   /*Make sure our intermediaries are up*/
-  run_build_circuit_event(now);
+  run_cclient_build_circuit_event(now);
+}
+
+void mt_cclient_intermediary_circ_has_closed(origin_circuit_t *circ) {
+  if (TO_CIRCUIT(circ)->state != CIRCUIT_STATE_OPEN) {
+    // means that we did not reach the intermediary point for whatever reason
+    // (probably timeout -- retry)
+    intermediary_t* intermediary = mt_cclient_get_intermediary_from_ocirc(circ);
+    intermediary->circuit_retries++;
+  } else {
+    /* Circuit has been closed - notify the payment module */
+
+  }
 }
 
 /*************************** Object creation and cleanup *******************************/

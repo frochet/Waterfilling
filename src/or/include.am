@@ -70,6 +70,7 @@ LIBTOR_A_SOURCES = \
   src/or/mt_cclient.c       \
   src/or/mt_cpay.c        \
   src/or/mt_common.c        \
+  src/or/mt_crelay.c        \
   src/or/mt_crypto.c        \
   src/or/mt_ipay.c        \
   src/or/mt_lpay.c        \
@@ -218,12 +219,14 @@ ORHEADERS = \
   src/or/mt_cclient.h         \
   src/or/mt_cpay.h        \
   src/or/mt_common.h        \
+  src/or/mt_crelay.h        \
   src/or/mt_crypto.h        \
   src/or/mt_ipay.h        \
   src/or/mt_lpay.h        \
   src/or/mt_microalgs.h         \
   src/or/mt_nanoalgs.h        \
   src/or/mt_rpay.h        \
+  src/or/mt_tokens.h        \
 	src/or/networkstatus.h				\
 	src/or/nodelist.h				\
 	src/or/ntmain.h					\

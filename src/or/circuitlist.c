@@ -69,6 +69,9 @@
 #include "hs_circuitmap.h"
 #include "hs_common.h"
 #include "hs_ident.h"
+#include "mt_common.h"
+#include "mt_cclient.h"
+#include "mt_crelay.h"
 #include "networkstatus.h"
 #include "nodelist.h"
 #include "onion.h"
@@ -1244,6 +1247,7 @@ circuit_get_by_global_id(uint32_t id)
   return NULL;
 }
 
+
 /** Return a circ such that:
  *  - circ-\>n_circ_id or circ-\>p_circ_id is equal to <b>circ_id</b>, and
  *  - circ is attached to <b>chan</b>, either as p_chan or n_chan.
@@ -1509,6 +1513,23 @@ circuit_get_ready_rend_circ_by_rend_data(const rend_data_t *rend_data)
     }
   }
   SMARTLIST_FOREACH_END(circ);
+  return NULL;
+}
+
+/** Return the circuit whose intermediary_identity_t matches 
+ *  or NULL if no such circuit exists */
+
+origin_circuit_t *
+circuit_get_by_intermediary_ident(intermediary_identity_t* inter_identity) {
+  SMARTLIST_FOREACH_BEGIN(circuit_get_global_list(), circuit_t *, circ) {
+    if (!circ->marked_for_close &&
+        (circ->purpose == CIRCUIT_PURPOSE_C_INTERMEDIARY ||
+         circ->purpose == CIRCUIT_PURPOSE_R_INTERMEDIARY)) {
+      origin_circuit_t *ocirc = TO_ORIGIN_CIRCUIT(circ);
+      if (tor_memeq(ocirc->inter_ident->identity, inter_identity->identity, DIGEST_LEN))
+        return ocirc;
+    }
+  } SMARTLIST_FOREACH_END(circ);
   return NULL;
 }
 
@@ -2000,6 +2021,15 @@ circuit_about_to_free(circuit_t *circ)
       circ->state == CIRCUIT_STATE_GUARD_WAIT) ?
                                  CIRC_EVENT_CLOSED:CIRC_EVENT_FAILED,
      orig_reason);
+  }
+  
+  /* Notify the payment controller for any intermediary circuit closing*/
+
+  if (circ->purpose == CIRCUIT_PURPOSE_C_INTERMEDIARY) {
+    mt_cclient_intermediary_circ_has_closed(TO_ORIGIN_CIRCUIT(circ));
+  }
+  if (circ->purpose == CIRCUIT_PURPOSE_R_INTERMEDIARY) {
+    mt_crelay_intermediary_circ_has_closed(TO_ORIGIN_CIRCUIT(circ));
   }
 
   /* Notify the HS subsystem for any intro point circuit closing so it can be

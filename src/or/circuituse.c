@@ -2001,6 +2001,7 @@ circuit_launch_by_extend_info(uint8_t purpose,
         case CIRCUIT_PURPOSE_C_GENERAL:
         case CIRCUIT_PURPOSE_S_ESTABLISH_INTRO:
         case CIRCUIT_PURPOSE_C_INTERMEDIARY:
+        case CIRCUIT_PURPOSE_R_INTERMEDIARY:
         case CIRCUIT_PURPOSE_C_LEDGER:
           /* need to add a new hop */
           tor_assert(extend_info);
