@@ -5660,9 +5660,11 @@ typedef enum {
     MT_NTYPE_NAN_INT_ESTAB3,      // to relay
     MT_NTYPE_NAN_REL_ESTAB4,      // to intermediary
     MT_NTYPE_NAN_INT_ESTAB5,      // to relay
+    MT_NTYPE_NAN_REL_ESTAB6,      // to client
 
     // nanopayment pay protocol messages
-    MT_NTYPE_NAN_CLI_PAY1,	  // to relay or intermediary
+    MT_NTYPE_NAN_CLI_PAY1,	  // to relay
+    MT_NTYPE_NAN_REL_PAY2,        // to client
 
     // nanopayment close protocol messages
     MT_NTYPE_NAN_END_CLOSE1,      // to intermediary
@@ -5999,6 +6001,10 @@ typedef struct {
 } nan_int_direct2_t;
 
 typedef struct {
+    mt_code_t success;
+} nan_rel_direct2_t;
+
+typedef struct {
     nan_any_chntok_t chntok;
 } nan_cli_estab1_t;
 
@@ -6024,8 +6030,16 @@ typedef struct {
 } nan_int_estab5_t;
 
 typedef struct {
+    mt_code_t success;
+} nan_rel_estab6_t;
+
+typedef struct {
     byte preimage[MT_SZ_HASH];
 } nan_cli_pay1_t;
+
+typedef struct {
+    mt_code_t success;
+} nan_rel_pay2_t;
 
 typedef struct {
     byte wpk[MT_SZ_PK];

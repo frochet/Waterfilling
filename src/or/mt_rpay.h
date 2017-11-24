@@ -33,9 +33,10 @@ int mt_rpay_init(mt_rpay_t* relay, byte (*pp)[MT_SZ_PP], byte (*pk)[MT_SZ_PK], b
 		   chn_end_data_t* chn_data, int num_chns);
 
 /**
- * Cashout of a payment channel
+ * Handle a special establish init message. This is needed because unlike other
+ * messages, we need to consider not one but two descriptors
  */
-int mt_rpay_cashout(mt_rpay_t* relay, byte (*chn_addrs)[MT_SZ_ADDR]);
+int mt_cpay_recvestab(mt_desc_t relay, mt_desc_t intermediary, byte* msg, int size);
 
 /**
  * Handle an incoming message. Requires the message sender, type, and size.

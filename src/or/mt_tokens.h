@@ -56,8 +56,10 @@ int pack_nan_cli_estab1(nan_cli_estab1_t tkn, byte(*pk)[MT_SZ_PK], byte(*sk)[MT_
 int pack_nan_rel_estab2(nan_rel_estab2_t tkn, byte(*pk)[MT_SZ_PK], byte(*sk)[MT_SZ_SK], byte** str_out);
 int pack_nan_int_estab3(nan_int_estab3_t tkn, byte(*pk)[MT_SZ_PK], byte(*sk)[MT_SZ_SK], byte** str_out);
 int pack_nan_rel_estab4(nan_rel_estab4_t tkn, byte(*pk)[MT_SZ_PK], byte(*sk)[MT_SZ_SK], byte** str_out);
-int pack_nan_int_estab5(nan_int_estab5_t tkn, byte(*pk)[MT_SZ_PK], byte(*sk)[MT_SZ_SK], byte** str_out);
-int pack_nan_cli_pay1(nan_cli_pay1_t tkn, byte(*pk)[MT_SZ_PK], byte(*sk)[MT_SZ_SK], byte** str_out);
+int pack_nan_int_estab5(nan_int_estab5_t tkn, byte(*pk)[MT_SZ_PK],  byte(*sk)[MT_SZ_SK], byte** str_out);
+int pack_nan_rel_estab6(nan_rel_estab6_t tkn, byte(*pk)[MT_SZ_PK], byte(*sk)[MT_SZ_SK], byte** str_out);
+int pack_nan_cli_pay1(nan_cli_pay1_t tkn, byte(*pk)[MT_SZ_PK],  byte(*sk)[MT_SZ_SK], byte** str_out);
+int pack_nan_rel_pay2(nan_rel_pay2_t tkn, byte(*pk)[MT_SZ_PK], byte(*sk)[MT_SZ_SK], byte** str_out);
 int pack_nan_end_close1(nan_end_close1_t tkn, byte(*pk)[MT_SZ_PK], byte(*sk)[MT_SZ_SK], byte** str_out);
 int pack_nan_int_close2(nan_int_close2_t tkn, byte(*pk)[MT_SZ_PK], byte(*sk)[MT_SZ_SK], byte** str_out);
 int pack_nan_end_close3(nan_end_close3_t tkn, byte(*pk)[MT_SZ_PK], byte(*sk)[MT_SZ_SK], byte** str_out);
@@ -111,8 +113,10 @@ int unpack_nan_cli_estab1(byte* str, int size, nan_cli_estab1_t* tkn_out, byte(*
 int unpack_nan_rel_estab2(byte* str, int size, nan_rel_estab2_t* tkn_out, byte(*pk_out)[MT_SZ_PK]);
 int unpack_nan_int_estab3(byte* str, int size, nan_int_estab3_t* tkn_out, byte(*pk_out)[MT_SZ_PK]);
 int unpack_nan_rel_estab4(byte* str, int size, nan_rel_estab4_t* tkn_out, byte(*pk_out)[MT_SZ_PK]);
-int unpack_nan_int_estab5(byte* str, int size, nan_int_estab5_t* tkn_out, byte(*pk_out)[MT_SZ_PK]);
-int unpack_nan_cli_pay1(byte* str, int size, nan_cli_pay1_t* tkn_out, byte(*pk_out)[MT_SZ_PK]);
+int unpack_nan_int_estab5(byte* str, int size, nan_int_estab5_t* tkn_out,  byte(*pk_out)[MT_SZ_PK]);
+int unpack_nan_rel_estab6(byte* str, int size, nan_rel_estab6_t* tkn_out, byte(*pk_out)[MT_SZ_PK]);
+int unpack_nan_cli_pay1(byte* str, int size, nan_cli_pay1_t* tkn_out,  byte(*pk_out)[MT_SZ_PK]);
+int unpack_nan_rel_pay2(byte* str, int size, nan_rel_pay2_t* tkn_out, byte(*pk_out)[MT_SZ_PK]);
 int unpack_nan_end_close1(byte* str, int size, nan_end_close1_t* tkn_out, byte(*pk_out)[MT_SZ_PK]);
 int unpack_nan_int_close2(byte* str, int size, nan_int_close2_t* tkn_out, byte(*pk_out)[MT_SZ_PK]);
 int unpack_nan_end_close3(byte* str, int size, nan_end_close3_t* tkn_out, byte(*pk_out)[MT_SZ_PK]);

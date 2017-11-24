@@ -34,11 +34,6 @@ int mt_ipay_init(mt_ipay_t* intermediary, byte (*pp)[MT_SZ_PP], byte (*pk)[MT_SZ
 		   chn_end_data_t* chn_data, int num_chns);
 
 /**
- * Cashout of a payment channel
- */
-int mt_ipay_cashout(mt_ipay_t* intermediary, byte (*chn_addrs)[MT_SZ_ADDR]);
-
-/**
  * Handle an incoming message. Requires the message sender, type, and size.
  */
 int mt_ipay_recv_message(mt_ipay_t* intermediary, mt_desc_t desc, mt_ntype_t type, byte* msg, int size);

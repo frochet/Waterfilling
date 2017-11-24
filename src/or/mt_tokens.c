@@ -176,8 +176,16 @@ int pack_nan_int_estab5(nan_int_estab5_t token, byte(*pk)[MT_SZ_PK],  byte(*sk)[
     return pack_token(MT_NTYPE_NAN_INT_ESTAB5, &token, sizeof(token), pk, sk, str_out);
 }
 
+int pack_nan_rel_estab6(nan_rel_estab6_t token, byte(*pk)[MT_SZ_PK],  byte(*sk)[MT_SZ_SK], byte** str_out){
+    return pack_token(MT_NTYPE_NAN_REL_ESTAB6, &token, sizeof(token), pk, sk, str_out);
+}
+
 int pack_nan_cli_pay1(nan_cli_pay1_t token, byte(*pk)[MT_SZ_PK],  byte(*sk)[MT_SZ_SK], byte** str_out){
     return pack_token(MT_NTYPE_NAN_CLI_PAY1, &token, sizeof(token), pk, sk, str_out);
+}
+
+int pack_nan_rel_pay2(nan_rel_pay2_t token, byte(*pk)[MT_SZ_PK],  byte(*sk)[MT_SZ_SK], byte** str_out){
+    return pack_token(MT_NTYPE_NAN_REL_PAY2, &token, sizeof(token), pk, sk, str_out);
 }
 
 int pack_nan_end_close1(nan_end_close1_t token, byte(*pk)[MT_SZ_PK],  byte(*sk)[MT_SZ_SK], byte** str_out){
@@ -442,10 +450,22 @@ int unpack_nan_int_estab5(byte* str, int size, nan_int_estab5_t* tkn_out, byte(*
     return unpack_token(MT_NTYPE_NAN_INT_ESTAB5, str, sizeof(*tkn_out), tkn_out, pk_out);
 }
 
+int unpack_nan_rel_estab6(byte* str, int size, nan_rel_estab6_t* tkn_out, byte(*pk_out)[MT_SZ_PK]){
+    if(size != sizeof(mt_ntype_t) + sizeof(*tkn_out) + MT_SZ_PK + MT_SZ_SIG)
+	return MT_ERROR;
+    return unpack_token(MT_NTYPE_NAN_REL_ESTAB6, str, sizeof(*tkn_out), tkn_out, pk_out);
+}
+
 int unpack_nan_cli_pay1(byte* str, int size, nan_cli_pay1_t* tkn_out, byte(*pk_out)[MT_SZ_PK]){
     if(size != sizeof(mt_ntype_t) + sizeof(*tkn_out) + MT_SZ_PK + MT_SZ_SIG)
 	return MT_ERROR;
     return unpack_token(MT_NTYPE_NAN_CLI_PAY1, str, sizeof(*tkn_out), tkn_out, pk_out);
+}
+
+int unpack_nan_rel_pay2(byte* str, int size, nan_rel_pay2_t* tkn_out, byte(*pk_out)[MT_SZ_PK]){
+    if(size != sizeof(mt_ntype_t) + sizeof(*tkn_out) + MT_SZ_PK + MT_SZ_SIG)
+	return MT_ERROR;
+    return unpack_token(MT_NTYPE_NAN_REL_PAY2, str, sizeof(*tkn_out), tkn_out, pk_out);
 }
 
 int unpack_nan_end_close1(byte* str, int size, nan_end_close1_t* tkn_out, byte(*pk_out)[MT_SZ_PK]){
