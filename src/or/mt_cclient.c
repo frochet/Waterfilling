@@ -8,25 +8,50 @@
 #include "util.h"
 #include "container.h"
 #include "circuitbuild.h"
+#include "circuitlist.h"
 #include "circuituse.h"
 #include "torlog.h"
 #include "router.h"
 #include "main.h"
 
+
+/* Some forward static declaration for ease of implem */
+
+static intermediary_t* intermediary_new(const node_t *node, extend_info_t *ei, time_t now);
+
+STATIC void run_cclient_housekeeping_event(time_t now);
+
+static void choose_intermediaries(time_t now, smartlist_t *exclude_list);
+
+static void cleanup_intermediary(intermediary_t *intermediary,
+    time_t now);
+
+STATIC void run_cclient_build_circuit_event(time_t now);
+
+static void intermediary_free(intermediary_t *intermediary);
+
 /*List of selected intermediaries */
 static smartlist_t *intermediaries = NULL;
 
-
 smartlist_t *get_intermediaries(int for_circuit) {
+  (void)for_circuit;
   return NULL;
 }
 
 void
-mt_cclient_init() {
+mt_cclient_init(void) {
   tor_assert(!intermediaries); //should never be called twice
   intermediaries = smartlist_new();
 }
 
+/**
+ * Remove the intermdiary from the list we are using because
+ * of one of the following reasons::
+ * XXX MoneTor - FR: do we implement all of them?
+ * - Node does not exist anymore in the consensus (do we care for simulation?)
+ * - The intermediary maximum circuit retry count has been reached (we DO care about that)
+ * - The intermediary has expired (we need to cashout and rotate => do we care?)
+ */
 static void
 cleanup_intermediary(intermediary_t *intermediary, time_t now) {
   (void) intermediary;
@@ -34,6 +59,15 @@ cleanup_intermediary(intermediary_t *intermediary, time_t now) {
 }
 
 
+/*
+ * Fill the intermediaries smartlist_t with selected
+ * intermediary_t
+ *
+ * XXX MoneTor - parse the state file to recover previously
+ *               intermediaries
+ * 
+ * If no intermediaries in the statefile, select new ones
+ */
 static void
 choose_intermediaries(time_t now, smartlist_t *exclude_list) {
   if (smartlist_len(intermediaries) == MAX_INTERMEDIARY_CHOSEN)
@@ -67,10 +101,13 @@ choose_intermediaries(time_t now, smartlist_t *exclude_list) {
   smartlist_add(intermediaries, intermediary);
  err:
   extend_info_free(ei);
-  //free intermediary - todo
-  //intermediary_free(intermediary);
+  intermediary_free(intermediary);
 }
 
+/* Scheduled event run from the main loop every second.
+ * Make sure our controller is healthy, including
+ * intermediaries status, payment status, etc
+ */
 STATIC void
 run_cclient_housekeeping_event(time_t now) {
   
@@ -86,6 +123,11 @@ run_cclient_housekeeping_event(time_t now) {
   } SMARTLIST_FOREACH_END(intermediary);
 }
 
+/*
+ * Scheduled event run from the main loop every second.
+ * Makes sure we always have circuits build towards
+ * the intermediaries
+ */
 STATIC void
 run_cclient_build_circuit_event(time_t now) {
   /*If Tor is not fully up (can takes 30 sec), we do not consider
@@ -128,7 +170,8 @@ run_cclient_build_circuit_event(time_t now) {
   } SMARTLIST_FOREACH_END(intermediary);
 }
 
-intermediary_t * mt_cclient_get_intermediary_from_ocirc(origin_circuit_t *ocirc) {
+intermediary_t* mt_cclient_get_intermediary_from_ocirc(origin_circuit_t *ocirc) {
+  (void)ocirc;
   return NULL;
 }
 
@@ -177,7 +220,8 @@ static void
 intermediary_free(intermediary_t *intermediary) {
   if (!intermediary)
     return;
-  extend_info_free(intermediary->ei);
+  if (intermediary->ei)
+    extend_info_free(intermediary->ei);
   if (intermediary->m_channel) {
     // XXX MoneTor implem following function
     //mt_desc_free(intermediary->m_channel);
