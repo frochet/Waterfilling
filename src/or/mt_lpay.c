@@ -35,26 +35,48 @@
 #include "mt_common.h"
 #include "mt_lpay.h"
 
-//TODO change glib calls to Tor containers
 //TODO move resolve to separate algs file
 //TODO enforce nonce
 
+/**
+ * Single instance of a ledger payment object.
+ */
+typedef struct {
+
+    digestmap_t* mac_accounts;
+    digestmap_t* chn_accounts;
+
+    byte pp[MT_SZ_PP];
+    int fee;
+    int tax;
+    int epoch;
+    int close_window;
+
+    byte auth_addr[MT_SZ_ADDR];
+    byte led_pk[MT_SZ_PK];
+    byte led_sk[MT_SZ_SK];
+    byte led_addr[MT_SZ_ADDR];
+
+} mt_lpay_t;
+
+static mt_lpay_t ledger;
+
 // private token handlers
-int handle_mac_aut_mint(mt_lpay_t* ledger, mac_aut_mint_t* token, byte (*addr)[MT_SZ_ADDR]);
-int handle_mac_any_trans(mt_lpay_t* ledger, mac_any_trans_t* token, byte (*addr)[MT_SZ_ADDR]);
-int handle_chn_end_escrow(mt_lpay_t* ledger, chn_end_escrow_t* token, byte (*addr)[MT_SZ_ADDR]);
-int handle_chn_int_escrow(mt_lpay_t* ledger, chn_int_escrow_t* token, byte (*addr)[MT_SZ_ADDR]);
-int handle_chn_int_reqclose(mt_lpay_t* ledger, chn_int_reqclose_t* token, byte (*addr)[MT_SZ_ADDR]);
-int handle_chn_end_close(mt_lpay_t* ledger, chn_end_close_t* token, byte (*addr)[MT_SZ_ADDR]);
-int handle_chn_int_close(mt_lpay_t* ledger, chn_int_close_t* token, byte (*addr)[MT_SZ_ADDR]);
-int handle_chn_end_cashout(mt_lpay_t* ledger, chn_end_cashout_t* token, byte (*addr)[MT_SZ_ADDR]);
-int handle_chn_int_cashout(mt_lpay_t* ledger, chn_int_cashout_t* token, byte (*addr)[MT_SZ_ADDR]);
-int handle_mac_led_query(mt_lpay_t* ledger, mac_led_query_t* token, mt_desc_t desc);
-int handle_chn_led_query(mt_lpay_t* ledger, chn_led_query_t* token, mt_desc_t desc);
+int handle_mac_aut_mint(mac_aut_mint_t* token, mt_desc_t* desc, byte (*proto_id)[DIGEST_LEN]);
+int handle_mac_any_trans(mac_any_trans_t* token, mt_desc_t* desc, byte (*proto_id)[DIGEST_LEN]);
+int handle_chn_end_escrow(chn_end_escrow_t* token, mt_desc_t* desc, byte (*proto_id)[DIGEST_LEN]);
+int handle_chn_int_escrow(chn_int_escrow_t* token, mt_desc_t* desc, byte (*proto_id)[DIGEST_LEN]);
+int handle_chn_int_reqclose(chn_int_reqclose_t* token, mt_desc_t* desc, byte (*proto_id)[DIGEST_LEN]);
+int handle_chn_end_close(chn_end_close_t* token, mt_desc_t* desc, byte (*proto_id)[DIGEST_LEN]);
+int handle_chn_int_close(chn_int_close_t* token, mt_desc_t* desc, byte (*proto_id)[DIGEST_LEN]);
+int handle_chn_end_cashout(chn_end_cashout_t* token, mt_desc_t* desc, byte (*proto_id)[DIGEST_LEN]);
+int handle_chn_int_cashout(chn_int_cashout_t* token, mt_desc_t* desc, byte (*proto_id)[DIGEST_LEN]);
+int handle_mac_led_query(mac_led_query_t* token, mt_desc_t* desc, byte (*proto_id)[DIGEST_LEN]);
+int handle_chn_led_query(chn_led_query_t* token, mt_desc_t* desc, byte (*proto_id)[DIGEST_LEN]);
 
 // helper functions
-int transfer(mt_lpay_t* ledger, int* bal_from, int* bal_to, int val_from, int val_to, int val_auth);
-int close_channel(mt_lpay_t* ledger, chn_led_data_t* data);
+int transfer(int* bal_from, int* bal_to, int val_from, int val_to, int val_auth);
+int close_channel(chn_led_data_t* data);
 
 // formal protocol algorithm to resolve disputes (this will replaced with algs call)
 void resolve(byte (*pp)[MT_SZ_PP], chn_end_chntok_t T_E, chn_int_chntok_t T_I,
@@ -63,32 +85,36 @@ void resolve(byte (*pp)[MT_SZ_PP], chn_end_chntok_t T_E, chn_int_chntok_t T_I,
 /**
  * Called at the system setup to create brand new ledger.
  */
-int mt_lpay_init(mt_lpay_t* ledger, byte (*pp)[MT_SZ_PP], int fee,  double tax, int close_window, byte (*auth_pk)[MT_SZ_PK]){
+int mt_lpay_init(void){
 
   // initialize state
-  ledger->mac_accounts = digestmap_new();
-  ledger->chn_accounts = digestmap_new();
+  ledger.mac_accounts = digestmap_new();
+  ledger.chn_accounts = digestmap_new();
 
-  if(ledger->mac_accounts == NULL || ledger->chn_accounts == NULL)
+  if(ledger.mac_accounts == NULL || ledger.chn_accounts == NULL)
     return MT_ERROR;
 
   // set ledger attributes
-  memcpy(ledger->pp, pp, MT_SZ_PP);
-  ledger->fee = fee;
-  ledger->tax = tax;
-  ledger->close_window = close_window;
-  ledger->epoch = 0;
+  mt_crypt_setup(&ledger.pp);
+  ledger.fee = MT_FEE;
+  ledger.tax = MT_TAX;
+  ledger.close_window = MT_CLOSEWINDOW;
+  ledger.epoch = 0;
+
+  byte auth_pk[MT_SZ_PK];
+  byte auth_sk[MT_SZ_SK];
+  mt_crypt_keygen(&ledger.pp, &auth_pk, &auth_sk);
 
   // add auth's address as the first node in the state
-  if(mt_pk2addr(auth_pk, &ledger->auth_addr) != MT_SUCCESS)
+  if(mt_pk2addr(&auth_pk, &ledger.auth_addr) != MT_SUCCESS)
     return MT_ERROR;
 
   // generate ledger keys/address
-  mt_crypt_keygen(&ledger->pp, &ledger->led_pk, &ledger->led_sk);
-  if(mt_pk2addr(&ledger->led_pk, &ledger->led_addr) != MT_SUCCESS)
+  mt_crypt_keygen(&ledger.pp, &ledger.led_pk, &ledger.led_sk);
+  if(mt_pk2addr(&ledger.led_pk, &ledger.led_addr) != MT_SUCCESS)
     return MT_ERROR;
 
-  digestmap_set(ledger->mac_accounts, (char*)ledger->auth_addr, calloc(1, sizeof(mac_led_data_t)));
+  digestmap_set(ledger.mac_accounts, (char*)ledger.auth_addr, calloc(1, sizeof(mac_led_data_t)));
   return MT_SUCCESS;
 }
 
@@ -97,8 +123,9 @@ int mt_lpay_init(mt_lpay_t* ledger, byte (*pp)[MT_SZ_PP], int fee,  double tax, 
  * function is responsible for parsing the message to interpret what should be
  * done with the request.
  */
-int mt_lpay_recv_message(mt_lpay_t* ledger, mt_desc_t desc, mt_ntype_t type, byte* msg, int size){
+int mt_lpay_recv_message(mt_desc_t* desc, mt_ntype_t type, byte* msg, int size){
 
+  byte proto_id[DIGEST_LEN];
   byte pk[MT_SZ_PK];
   byte addr[MT_SZ_ADDR];
   int result;
@@ -106,90 +133,90 @@ int mt_lpay_recv_message(mt_lpay_t* ledger, mt_desc_t desc, mt_ntype_t type, byt
   switch(type){
     case MT_NTYPE_MAC_AUT_MINT:;
       mac_aut_mint_t mac_aut_mint_tkn;
-      if(unpack_mac_aut_mint(msg, size, &mac_aut_mint_tkn, &pk) != MT_SUCCESS)
+      if(unpack_mac_aut_mint(msg, size, &mac_aut_mint_tkn, &proto_id) != MT_SUCCESS)
 	return MT_ERROR;
       mt_pk2addr(&pk, &addr);
-      result = handle_mac_aut_mint(ledger, &mac_aut_mint_tkn, &addr);
+      result = handle_mac_aut_mint(&mac_aut_mint_tkn, desc, &proto_id);
       break;
 
     case MT_NTYPE_MAC_ANY_TRANS:;
       mac_any_trans_t mac_any_trans_tkn;
-      if(unpack_mac_any_trans(msg, size, &mac_any_trans_tkn, &pk) != MT_SUCCESS)
+      if(unpack_mac_any_trans(msg, size, &mac_any_trans_tkn, &proto_id) != MT_SUCCESS)
 	return MT_ERROR;
       mt_pk2addr(&pk, &addr);
-      result = handle_mac_any_trans(ledger, &mac_any_trans_tkn, &addr);
+      result = handle_mac_any_trans(&mac_any_trans_tkn, desc, &proto_id);
       break;
 
     case MT_NTYPE_CHN_END_ESCROW:;
       chn_end_escrow_t chn_end_escrow_tkn;
-      if(unpack_chn_end_escrow(msg, size, &chn_end_escrow_tkn, &pk) != MT_SUCCESS)
+      if(unpack_chn_end_escrow(msg, size, &chn_end_escrow_tkn, &proto_id) != MT_SUCCESS)
 	return MT_ERROR;
       mt_pk2addr(&pk, &addr);
-      result = handle_chn_end_escrow(ledger, &chn_end_escrow_tkn, &addr);
+      result = handle_chn_end_escrow(&chn_end_escrow_tkn, desc, &proto_id);
       break;
 
     case MT_NTYPE_CHN_INT_ESCROW:;
       chn_int_escrow_t chn_int_escrow_tkn;
-      if(unpack_chn_int_escrow(msg, size, &chn_int_escrow_tkn, &pk) != MT_SUCCESS)
+      if(unpack_chn_int_escrow(msg, size, &chn_int_escrow_tkn, &proto_id) != MT_SUCCESS)
 	return MT_ERROR;
       mt_pk2addr(&pk, &addr);
-      result = handle_chn_int_escrow(ledger, &chn_int_escrow_tkn, &addr);
+      result = handle_chn_int_escrow(&chn_int_escrow_tkn, desc, &proto_id);
       break;
 
     case MT_NTYPE_CHN_INT_REQCLOSE:;
       chn_int_reqclose_t chn_int_reqclose_tkn;
-      if(unpack_chn_int_reqclose(msg, size, &chn_int_reqclose_tkn, &pk) != MT_SUCCESS)
+      if(unpack_chn_int_reqclose(msg, size, &chn_int_reqclose_tkn, &proto_id) != MT_SUCCESS)
 	return MT_ERROR;
       mt_pk2addr(&pk, &addr);
-      result = handle_chn_int_reqclose(ledger, &chn_int_reqclose_tkn, &addr);
+      result = handle_chn_int_reqclose(&chn_int_reqclose_tkn, desc, &proto_id);
       break;
 
     case MT_NTYPE_CHN_END_CLOSE:;
       chn_end_close_t chn_end_close_tkn;
-      if(unpack_chn_end_close(msg, size, &chn_end_close_tkn, &pk) != MT_SUCCESS)
+      if(unpack_chn_end_close(msg, size, &chn_end_close_tkn, &proto_id) != MT_SUCCESS)
 	return MT_ERROR;
       mt_pk2addr(&pk, &addr);
-      result = handle_chn_end_close(ledger, &chn_end_close_tkn, &addr);
+      result = handle_chn_end_close(&chn_end_close_tkn, desc, &proto_id);
       break;
 
     case MT_NTYPE_CHN_INT_CLOSE:;
       chn_int_close_t chn_int_close_tkn;
-      if(unpack_chn_int_close(msg, size, &chn_int_close_tkn, &pk) != MT_SUCCESS)
+      if(unpack_chn_int_close(msg, size, &chn_int_close_tkn, &proto_id) != MT_SUCCESS)
 	return MT_ERROR;
       mt_pk2addr(&pk, &addr);
-      result = handle_chn_int_close(ledger, &chn_int_close_tkn, &addr);
+      result = handle_chn_int_close(&chn_int_close_tkn, desc, &proto_id);
       break;
 
     case MT_NTYPE_CHN_END_CASHOUT:;
       chn_end_cashout_t chn_end_cashout_tkn;
-      if(unpack_chn_end_cashout(msg, size, &chn_end_cashout_tkn, &pk) != MT_SUCCESS)
+      if(unpack_chn_end_cashout(msg, size, &chn_end_cashout_tkn, &proto_id) != MT_SUCCESS)
 	return MT_ERROR;
       mt_pk2addr(&pk, &addr);
-      result = handle_chn_end_cashout(ledger, &chn_end_cashout_tkn, &addr);
+      result = handle_chn_end_cashout(&chn_end_cashout_tkn, desc, &proto_id);
       break;
 
     case MT_NTYPE_CHN_INT_CASHOUT:;
       chn_int_cashout_t chn_int_cashout_tkn;
-      if(unpack_chn_int_cashout(msg, size, &chn_int_cashout_tkn, &pk) != MT_SUCCESS)
+      if(unpack_chn_int_cashout(msg, size, &chn_int_cashout_tkn, &proto_id) != MT_SUCCESS)
 	return MT_ERROR;
       mt_pk2addr(&pk, &addr);
-      result = handle_chn_int_cashout(ledger, &chn_int_cashout_tkn, &addr);
+      result = handle_chn_int_cashout(&chn_int_cashout_tkn, desc, &proto_id);
       break;
 
     case MT_NTYPE_MAC_LED_QUERY:;
       mac_led_query_t mac_led_query_tkn;
-      if(unpack_mac_led_query(msg, size, &mac_led_query_tkn, &pk) != MT_SUCCESS)
+      if(unpack_mac_led_query(msg, size, &mac_led_query_tkn, &proto_id) != MT_SUCCESS)
 	return MT_ERROR;
       mt_pk2addr(&pk, &addr);
-      result = handle_mac_led_query(ledger, &mac_led_query_tkn, desc);
+      result = handle_mac_led_query(&mac_led_query_tkn, desc, &proto_id);
       break;
 
     case MT_NTYPE_CHN_LED_QUERY:;
       chn_led_query_t chn_led_query_tkn;
-      if(unpack_chn_led_query(msg, size, &chn_led_query_tkn, &pk) != MT_SUCCESS)
+      if(unpack_chn_led_query(msg, size, &chn_led_query_tkn, &proto_id) != MT_SUCCESS)
 	return MT_ERROR;
       mt_pk2addr(&pk, &addr);
-      result = handle_chn_led_query(ledger, &chn_led_query_tkn, desc);
+      result = handle_chn_led_query(&chn_led_query_tkn, desc, &proto_id);
       break;
 
     default:
@@ -204,10 +231,13 @@ int mt_lpay_recv_message(mt_lpay_t* ledger, mt_desc_t desc, mt_ntype_t type, byt
 /**
  * Mints the specified amount of new funds and adds it to auth's account.
  */
-int handle_mac_aut_mint(mt_lpay_t* ledger, mac_aut_mint_t* token, byte (*addr)[MT_SZ_ADDR]){
+int handle_mac_aut_mint(mac_aut_mint_t* token, mt_desc_t* desc, byte (*proto_id)[DIGEST_LEN]){
+  (void)desc;
+  (void)proto_id;
+  byte addr[MT_SZ_ADDR];
 
   // make sure the message is signed by the ledger authority
-  if(memcmp(ledger->auth_addr, addr, MT_SZ_ADDR) != 0)
+  if(memcmp(ledger.auth_addr, addr, MT_SZ_ADDR) != 0)
     return MT_ERROR;
 
   // make sure value isn't negative for some reason
@@ -215,7 +245,7 @@ int handle_mac_aut_mint(mt_lpay_t* ledger, mac_aut_mint_t* token, byte (*addr)[M
     return MT_ERROR;
 
   // address is guaranteed to exist if module was setup with init()
-  mac_led_data_t* data = digestmap_get(ledger->mac_accounts, (char*)ledger->auth_addr);
+  mac_led_data_t* data = digestmap_get(ledger.mac_accounts, (char*)ledger.auth_addr);
   data->balance += token->value;
   return MT_SUCCESS;
 }
@@ -223,31 +253,34 @@ int handle_mac_aut_mint(mt_lpay_t* ledger, mac_aut_mint_t* token, byte (*addr)[M
 /**
  * Handles a transfer of funds between two standard balances.
  */
-int handle_mac_any_trans(mt_lpay_t* ledger, mac_any_trans_t* token, byte (*addr)[MT_SZ_ADDR]){
+int handle_mac_any_trans(mac_any_trans_t* token, mt_desc_t* desc, byte (*proto_id)[DIGEST_LEN]){
+  (void)desc;
+  (void)proto_id;
+  byte addr[MT_SZ_ADDR];
 
   // check that the message originates from the payer
   if(memcmp(addr, token->from, MT_SZ_ADDR) != 0)
     return MT_ERROR;
 
-  mac_led_data_t* data_from = digestmap_get(ledger->mac_accounts, (char*)token->from);
+  mac_led_data_t* data_from = digestmap_get(ledger.mac_accounts, (char*)token->from);
 
   // check that the "from" address exists
   if(data_from == NULL)
     return MT_ERROR;
 
-  mac_led_data_t* data_to = digestmap_get(ledger->mac_accounts, (char*)token->to);
+  mac_led_data_t* data_to = digestmap_get(ledger.mac_accounts, (char*)token->to);
   // if the address doesn't exist then create it
 
   if(data_to == NULL){
     byte* new_addr = malloc(MT_SZ_ADDR);
     memcpy(new_addr, token->to, MT_SZ_ADDR);
     data_to = calloc(1, sizeof(mac_led_data_t));
-    digestmap_set(ledger->mac_accounts, (char*)new_addr, data_to);
+    digestmap_set(ledger.mac_accounts, (char*)new_addr, data_to);
   }
 
   int* bal_from = &(data_from->balance);
   int* bal_to = &(data_to->balance);
-  if(transfer(ledger, bal_from, bal_to, token->val_from, token->val_to, ledger->fee) != MT_SUCCESS)
+  if(transfer(bal_from, bal_to, token->val_from, token->val_to, ledger.fee) != MT_SUCCESS)
     return MT_ERROR;
   return 0;
 }
@@ -258,14 +291,17 @@ int handle_mac_any_trans(mt_lpay_t* ledger, mac_any_trans_t* token, byte (*addr)
  * channel. At this point, the channel is not very useful since the intermediary
  * has not completed the setup, but the funds are still recoverable.
  */
-int handle_chn_end_escrow(mt_lpay_t* ledger, chn_end_escrow_t* token, byte (*addr)[MT_SZ_ADDR]){
+int handle_chn_end_escrow(chn_end_escrow_t* token, mt_desc_t* desc, byte (*proto_id)[DIGEST_LEN]){
+  (void)desc;
+  (void)proto_id;
+  byte addr[MT_SZ_ADDR];
 
   // check that the message originates from the payer
   if(memcmp(addr, token->from, MT_SZ_ADDR) != 0)
     return MT_ERROR;
 
-  mac_led_data_t* data_from = digestmap_get(ledger->mac_accounts, (char*)token->from);
-  chn_led_data_t* data_chn = digestmap_get(ledger->chn_accounts, (char*)token->chn);
+  mac_led_data_t* data_from = digestmap_get(ledger.mac_accounts, (char*)token->from);
+  chn_led_data_t* data_chn = digestmap_get(ledger.chn_accounts, (char*)token->chn);
 
   // check that the from address exists
   if(data_from == NULL)
@@ -277,7 +313,7 @@ int handle_chn_end_escrow(mt_lpay_t* ledger, chn_end_escrow_t* token, byte (*add
     memcpy(new_addr, token->chn, MT_SZ_ADDR);
     data_chn = calloc(1, sizeof(chn_led_data_t));
     data_chn->state = MT_LSTATE_EMPTY;
-    digestmap_set(ledger->chn_accounts, (char*)new_addr, data_chn);
+    digestmap_set(ledger.chn_accounts, (char*)new_addr, data_chn);
   }
 
   // check that we have a new and unused channel address
@@ -288,7 +324,7 @@ int handle_chn_end_escrow(mt_lpay_t* ledger, chn_end_escrow_t* token, byte (*add
   int* bal_to = &(data_chn->end_balance);
 
   // check that the escrow transfer goes through
-  if(transfer(ledger, bal_from, bal_to, token->val_from, token->val_to, ledger->fee) == MT_ERROR){
+  if(transfer(bal_from, bal_to, token->val_from, token->val_to, ledger.fee) == MT_ERROR){
     return MT_ERROR;
   }
 
@@ -304,14 +340,17 @@ int handle_chn_end_escrow(mt_lpay_t* ledger, chn_end_escrow_t* token, byte (*add
  * for micro/nanopayment processing. Funds will not be recoverable until the
  * channel closure protocol is completed by both parties.
  */
-int handle_chn_int_escrow(mt_lpay_t* ledger, chn_int_escrow_t* token, byte (*addr)[MT_SZ_ADDR]){
+int handle_chn_int_escrow(chn_int_escrow_t* token, mt_desc_t* desc, byte (*proto_id)[DIGEST_LEN]){
+  (void)desc;
+  (void)proto_id;
+  byte addr[MT_SZ_ADDR];
 
   // check that the message originates from the payer
   if(memcmp(addr, token->from, MT_SZ_ADDR) != 0)
     return MT_ERROR;
 
-  mac_led_data_t* data_from = digestmap_get(ledger->mac_accounts, (char*)token->from);
-  chn_led_data_t* data_chn = digestmap_get(ledger->chn_accounts, (char*)token->chn);
+  mac_led_data_t* data_from = digestmap_get(ledger.mac_accounts, (char*)token->from);
+  chn_led_data_t* data_chn = digestmap_get(ledger.chn_accounts, (char*)token->chn);
 
   // check that both channels exist
   if(data_from == NULL || data_chn == NULL)
@@ -325,7 +364,7 @@ int handle_chn_int_escrow(mt_lpay_t* ledger, chn_int_escrow_t* token, byte (*add
   int* bal_to = &(data_chn->int_balance);
 
   // check that the escrow transfer goes through
-  if(transfer(ledger, bal_from, bal_to, token->val_from, token->val_to, ledger->fee) == MT_ERROR)
+  if(transfer(bal_from, bal_to, token->val_from, token->val_to, ledger.fee) == MT_ERROR)
     return MT_ERROR;
 
   memcpy(data_chn->int_addr, addr, MT_SZ_ADDR);
@@ -340,9 +379,12 @@ int handle_chn_int_escrow(mt_lpay_t* ledger, chn_int_escrow_t* token, byte (*add
  * the end user must respond with a closure message within the specified time
  * limit or risk losing the entire balance of her funds.
  */
-int handle_chn_int_reqclose(mt_lpay_t* ledger, chn_int_reqclose_t* token, byte (*addr)[MT_SZ_ADDR]){
+int handle_chn_int_reqclose(chn_int_reqclose_t* token, mt_desc_t* desc, byte (*proto_id)[DIGEST_LEN]){
+  (void)desc;
+  (void)proto_id;
+  byte addr[MT_SZ_ADDR];
 
-  chn_led_data_t* data_chn = digestmap_get(ledger->chn_accounts, (char*)token->chn);
+  chn_led_data_t* data_chn = digestmap_get(ledger.chn_accounts, (char*)token->chn);
 
   // check that the channel address exists
   if(data_chn == NULL)
@@ -356,7 +398,7 @@ int handle_chn_int_reqclose(mt_lpay_t* ledger, chn_int_reqclose_t* token, byte (
   if(!(data_chn->state == MT_LSTATE_OPEN))
     return MT_ERROR;
 
-  data_chn->close_epoch = ledger->epoch + ledger->close_window;
+  data_chn->close_epoch = ledger.epoch + ledger.close_window;
   data_chn->state = MT_LSTATE_INT_REQCLOSED;
   return 0;
 }
@@ -366,9 +408,12 @@ int handle_chn_int_reqclose(mt_lpay_t* ledger, chn_int_reqclose_t* token, byte (
  * of the current channel balance. The intermediary now has some specified time
  * limit to refute the claim before the channel can be cashed out.
  */
-int handle_chn_end_close(mt_lpay_t* ledger, chn_end_close_t* token, byte (*addr)[MT_SZ_ADDR]){
+int handle_chn_end_close(chn_end_close_t* token, mt_desc_t* desc, byte (*proto_id)[DIGEST_LEN]){
+  (void)desc;
+  (void)proto_id;
+  byte addr[MT_SZ_ADDR];
 
-  chn_led_data_t* data_chn = digestmap_get(ledger->chn_accounts, (char*)token->chn);
+  chn_led_data_t* data_chn = digestmap_get(ledger.chn_accounts, (char*)token->chn);
 
   // check that the channel address exists
   if(data_chn == NULL)
@@ -383,7 +428,7 @@ int handle_chn_end_close(mt_lpay_t* ledger, chn_end_close_t* token, byte (*addr)
     return MT_ERROR;
 
   data_chn->end_close_token = *token;
-  data_chn->close_epoch = ledger->epoch + ledger->close_window;
+  data_chn->close_epoch = ledger.epoch + ledger.close_window;
   data_chn->state = MT_LSTATE_END_CLOSED;
   return 0;
 }
@@ -393,9 +438,12 @@ int handle_chn_end_close(mt_lpay_t* ledger, chn_end_close_t* token, byte (*addr)
  * channel balances or refute the claim with another view. The network resolves
  * the dispute and outputs the final channel balances.
  */
-int handle_chn_int_close(mt_lpay_t* ledger, chn_int_close_t* token, byte (*addr)[MT_SZ_ADDR]){
+int handle_chn_int_close(chn_int_close_t* token, mt_desc_t* desc, byte (*proto_id)[DIGEST_LEN]){
+  (void)desc;
+  (void)proto_id;
+  byte addr[MT_SZ_ADDR];
 
-  chn_led_data_t* data_chn = digestmap_get(ledger->chn_accounts, (char*)token->chn);
+  chn_led_data_t* data_chn = digestmap_get(ledger.chn_accounts, (char*)token->chn);
 
   // check that the channel address exists and is a channel address
   if(data_chn == NULL)
@@ -419,9 +467,12 @@ int handle_chn_int_close(mt_lpay_t* ledger, chn_int_close_t* token, byte (*addr)
  * done by the end user if the channel has not been initialized by the
  * intermediary or after the channel has/should be closed.
  */
-int handle_chn_end_cashout(mt_lpay_t* ledger, chn_end_cashout_t* token, byte (*addr)[MT_SZ_ADDR]){
+int handle_chn_end_cashout(chn_end_cashout_t* token, mt_desc_t* desc, byte (*proto_id)[DIGEST_LEN]){
+  (void)desc;
+  (void)proto_id;
+  byte addr[MT_SZ_ADDR];
 
-  chn_led_data_t* data_chn = digestmap_get(ledger->chn_accounts, (char*)token->chn);
+  chn_led_data_t* data_chn = digestmap_get(ledger.chn_accounts, (char*)token->chn);
 
   // check that the channel address exists
   if(data_chn == NULL)
@@ -431,26 +482,29 @@ int handle_chn_end_cashout(mt_lpay_t* ledger, chn_end_cashout_t* token, byte (*a
   if(memcmp(addr, data_chn->end_addr, MT_SZ_ADDR))
     return MT_ERROR;
 
-  mac_led_data_t* data_to = digestmap_get(ledger->mac_accounts, (char*)addr);
+  mac_led_data_t* data_to = digestmap_get(ledger.mac_accounts, (char*)addr);
 
   // attempt to close the channel if it isn't already
-  if(close_channel(ledger, data_chn) == MT_ERROR)
+  if(close_channel(data_chn) == MT_ERROR)
     return MT_ERROR;
 
   int* bal_from = &(data_chn->end_balance);
   int* bal_to = &(data_to->balance);
 
   // check that the transfer goes through
-  return transfer(ledger, bal_from, bal_to, token->val_from, token->val_to, ledger->fee);
+  return transfer(bal_from, bal_to, token->val_from, token->val_to, ledger.fee);
 }
 
 /**
  * Operation by the intermediary to cash out of a payment channel. This can only
  * be done after the channel has/should be closed.
  */
-int handle_chn_int_cashout(mt_lpay_t* ledger, chn_int_cashout_t* token, byte (*addr)[MT_SZ_ADDR]){
+int handle_chn_int_cashout(chn_int_cashout_t* token, mt_desc_t* desc, byte (*proto_id)[DIGEST_LEN]){
+  (void)desc;
+  (void)proto_id;
+  byte addr[MT_SZ_ADDR];
 
-  chn_led_data_t* data_chn = digestmap_get(ledger->chn_accounts, (char*)token->chn);
+  chn_led_data_t* data_chn = digestmap_get(ledger.chn_accounts, (char*)token->chn);
 
   // check that the channel address exists
   if(data_chn == NULL)
@@ -460,56 +514,60 @@ int handle_chn_int_cashout(mt_lpay_t* ledger, chn_int_cashout_t* token, byte (*a
   if(memcmp(addr, data_chn->int_addr, MT_SZ_ADDR))
     return MT_ERROR;
 
-  mac_led_data_t* data_to = digestmap_get(ledger->mac_accounts, (char*)addr);
+  mac_led_data_t* data_to = digestmap_get(ledger.mac_accounts, (char*)addr);
 
   // attempt to close the channel if it isn't already
-  if(close_channel(ledger, data_chn) == MT_ERROR)
+  if(close_channel(data_chn) == MT_ERROR)
     return MT_ERROR;
 
   int* bal_from = &(data_chn->int_balance);
   int* bal_to = &(data_to->balance);
 
   // check that the transfer goes through
-  int val_auth = (int)((double)ledger->fee + token->val_to * ledger->tax);
-  return transfer(ledger, bal_from, bal_to, token->val_from, token->val_to, val_auth);
+  int auth_charge = ledger.fee + (token->val_to * ledger.tax) / 100;
+  return transfer(bal_from, bal_to, token->val_from, token->val_to, auth_charge);
 }
 
-int handle_mac_led_query(mt_lpay_t* ledger, mac_led_query_t* token, mt_desc_t desc){
+int handle_mac_led_query(mac_led_query_t* token, mt_desc_t* desc, byte (*proto_id)[DIGEST_LEN]){
+  (void)desc;
+  (void)proto_id;
 
-  mac_led_data_t* mac_ptr = digestmap_get(ledger->mac_accounts, (char*)token->addr);
+  mac_led_data_t* mac_ptr = digestmap_get(ledger.mac_accounts, (char*)token->addr);
 
   // check that address exists
   if(mac_ptr == NULL)
     return MT_ERROR;
 
   byte* msg;
-  int msg_size = pack_mac_led_data(*mac_ptr, &ledger->led_pk, &ledger->led_sk, &msg);
+  int msg_size = pack_mac_led_data(*mac_ptr, proto_id, &msg);
   if(msg_size < 0)
     return MT_ERROR;
 
   (void) desc;
   printf("%d\n", mac_ptr->balance);
   // send the requested data
-  //if(ledger->send_cells(desc, cells, num_cells) != MT_SUCCESS)
+  //if(ledger.send_cells(desc, cells, num_cells) != MT_SUCCESS)
   //  return MT_ERROR;
 
   // signal that we can close the connection
-  //if(ledger->close_conn(desc) != MT_SUCCESS)
+  //if(ledger.close_conn(desc) != MT_SUCCESS)
   //  return MT_ERROR;
 
   return MT_SUCCESS;
 }
 
-int handle_chn_led_query(mt_lpay_t* ledger, chn_led_query_t* token, mt_desc_t desc){
+int handle_chn_led_query(chn_led_query_t* token, mt_desc_t* desc, byte (*proto_id)[DIGEST_LEN]){
+  (void)desc;
+  (void)proto_id;
 
-  chn_led_data_t* chn_ptr = digestmap_get(ledger->chn_accounts, (char*)token->addr);
+  chn_led_data_t* chn_ptr = digestmap_get(ledger.chn_accounts, (char*)token->addr);
 
   // check that address exists
   if(chn_ptr == NULL)
     return MT_ERROR;
 
   byte* msg;
-  int msg_size = pack_chn_led_data(*chn_ptr, &ledger->led_pk, &ledger->led_sk, &msg);
+  int msg_size = pack_chn_led_data(*chn_ptr, proto_id, &msg);
   if(msg_size < 0)
     return MT_ERROR;
 
@@ -518,11 +576,11 @@ int handle_chn_led_query(mt_lpay_t* ledger, chn_led_query_t* token, mt_desc_t de
   printf("%d\n", chn_ptr->int_balance);
 
   // send the requested data to the descriptor
-  //if(ledger->send_cells(desc, cells, num_cells) != MT_SUCCESS)
+  //if(ledger.send_cells(desc, cells, num_cells) != MT_SUCCESS)
   //  return MT_ERROR;
 
   // signal that we can close the connection
-  //if(ledger->close_conn(desc) != MT_SUCCESS)
+  //if(ledger.close_conn(desc) != MT_SUCCESS)
   //  return MT_ERROR;
 
   return MT_SUCCESS;
@@ -537,8 +595,9 @@ int handle_chn_led_query(mt_lpay_t* ledger, chn_led_query_t* token, mt_desc_t de
  * pointers). Ensure that the value difference covers the ledger's specified
  * cost of transaction.
  */
-int transfer(mt_lpay_t* ledger, int* bal_from, int* bal_to, int val_from, int val_to, int val_auth){
-  // check that the payment values make sense
+int transfer(int* bal_from, int* bal_to, int val_from, int val_to, int val_auth){
+
+  // check that values make sense
   if(!(val_from > val_to && val_to > 0))
     return MT_ERROR;
 
@@ -552,7 +611,7 @@ int transfer(mt_lpay_t* ledger, int* bal_from, int* bal_to, int val_from, int va
   *bal_from -= val_from;
   *bal_to += val_to;
 
-  mac_led_data_t* auth_data = digestmap_get(ledger->mac_accounts, (char*)ledger->auth_addr);
+  mac_led_data_t* auth_data = digestmap_get(ledger.mac_accounts, (char*)ledger.auth_addr);
   auth_data->balance += (val_from - val_to);
   return 0;
 }
@@ -562,7 +621,7 @@ int transfer(mt_lpay_t* ledger, int* bal_from, int* bal_to, int val_from, int va
  * possible states of the channel. If channel closure is allowed, then it marks
  * the channel as closed and updates the final balances.
  */
-int close_channel(mt_lpay_t* ledger, chn_led_data_t* data){
+int close_channel(chn_led_data_t* data){
 
   // channel is already closed
   if(data->state == MT_LSTATE_RESOLVED)
@@ -574,12 +633,12 @@ int close_channel(mt_lpay_t* ledger, chn_led_data_t* data){
 
   // one part has closed the channel but not enough time has passed
   if((data->state == MT_LSTATE_INT_REQCLOSED || data->state == MT_LSTATE_END_CLOSED) &&
-     data->close_epoch + ledger->close_window < ledger->epoch)
+     data->close_epoch + ledger.close_window < ledger.epoch)
     return MT_ERROR;
 
   int* end_bal = NULL;
   int* int_bal = NULL;
-  resolve(&ledger->pp, data->end_chn_token, data->int_chn_token,
+  resolve(&ledger.pp, data->end_chn_token, data->int_chn_token,
 	  data->end_close_token, data->int_close_token, end_bal, int_bal);
 
   if(end_bal != NULL && int_bal != NULL){

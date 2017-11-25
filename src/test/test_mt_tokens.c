@@ -24,6 +24,9 @@ static void test_mt_tokens(void *arg)
   mt_crypt_setup(&pp);
   mt_crypt_keygen(&pp, &pk, &sk);
 
+  byte proto_id[DIGEST_LEN];
+  write_random_bytes(proto_id, DIGEST_LEN);
+
   // declare each type of token
   mac_aut_mint_t tk1_mac_aut_mint;
   mac_any_trans_t tk1_mac_any_trans;
@@ -58,15 +61,15 @@ static void test_mt_tokens(void *arg)
   byte* str_chn_int_cashout;
 
   // pack the original tokens into the strings
-  int size_mac_aut_mint =  pack_mac_aut_mint(tk1_mac_aut_mint, &pk, &sk, &str_mac_aut_mint);
-  int size_mac_any_trans =  pack_mac_any_trans(tk1_mac_any_trans, &pk, &sk, &str_mac_any_trans);
-  int size_chn_end_escrow =  pack_chn_end_escrow(tk1_chn_end_escrow, &pk, &sk, &str_chn_end_escrow);
-  int size_chn_int_escrow =  pack_chn_int_escrow(tk1_chn_int_escrow, &pk, &sk, &str_chn_int_escrow);
-  int size_chn_int_reqclose =  pack_chn_int_reqclose(tk1_chn_int_reqclose, &pk, &sk, &str_chn_int_reqclose);
-  int size_chn_end_close =  pack_chn_end_close(tk1_chn_end_close, &pk, &sk, &str_chn_end_close);
-  int size_chn_int_close =  pack_chn_int_close(tk1_chn_int_close, &pk, &sk, &str_chn_int_close);
-  int size_chn_end_cashout =  pack_chn_end_cashout(tk1_chn_end_cashout, &pk, &sk, &str_chn_end_cashout);
-  int size_chn_int_cashout =  pack_chn_int_cashout(tk1_chn_int_cashout, &pk, &sk, &str_chn_int_cashout);
+  int size_mac_aut_mint =  pack_mac_aut_mint(tk1_mac_aut_mint, &proto_id, &str_mac_aut_mint);
+  int size_mac_any_trans =  pack_mac_any_trans(tk1_mac_any_trans, &proto_id, &str_mac_any_trans);
+  int size_chn_end_escrow =  pack_chn_end_escrow(tk1_chn_end_escrow, &proto_id, &str_chn_end_escrow);
+  int size_chn_int_escrow =  pack_chn_int_escrow(tk1_chn_int_escrow, &proto_id, &str_chn_int_escrow);
+  int size_chn_int_reqclose =  pack_chn_int_reqclose(tk1_chn_int_reqclose, &proto_id, &str_chn_int_reqclose);
+  int size_chn_end_close =  pack_chn_end_close(tk1_chn_end_close, &proto_id, &str_chn_end_close);
+  int size_chn_int_close =  pack_chn_int_close(tk1_chn_int_close, &proto_id, &str_chn_int_close);
+  int size_chn_end_cashout =  pack_chn_end_cashout(tk1_chn_end_cashout, &proto_id, &str_chn_end_cashout);
+  int size_chn_int_cashout =  pack_chn_int_cashout(tk1_chn_int_cashout, &proto_id, &str_chn_int_cashout);
 
   // declare each type of token
   mac_aut_mint_t tk2_mac_aut_mint;
@@ -80,15 +83,15 @@ static void test_mt_tokens(void *arg)
   chn_int_cashout_t tk2_chn_int_cashout;
 
   // extract new tokens from the strings
-  unpack_mac_aut_mint(str_mac_aut_mint, size_mac_aut_mint, &tk2_mac_aut_mint, &pk);
-  unpack_mac_any_trans(str_mac_any_trans, size_mac_any_trans, &tk2_mac_any_trans, &pk);
-  unpack_chn_end_escrow(str_chn_end_escrow, size_chn_end_escrow, &tk2_chn_end_escrow, &pk);
-  unpack_chn_int_escrow(str_chn_int_escrow, size_chn_int_escrow, &tk2_chn_int_escrow, &pk);
-  unpack_chn_int_reqclose(str_chn_int_reqclose, size_chn_int_reqclose, &tk2_chn_int_reqclose, &pk);
-  unpack_chn_end_close(str_chn_end_close, size_chn_end_close, &tk2_chn_end_close, &pk);
-  unpack_chn_int_close(str_chn_int_close, size_chn_int_close, &tk2_chn_int_close, &pk);
-  unpack_chn_end_cashout(str_chn_end_cashout, size_chn_end_cashout, &tk2_chn_end_cashout, &pk);
-  unpack_chn_int_cashout(str_chn_int_cashout, size_chn_int_cashout, &tk2_chn_int_cashout, &pk);
+  unpack_mac_aut_mint(str_mac_aut_mint, size_mac_aut_mint, &tk2_mac_aut_mint, &proto_id);
+  unpack_mac_any_trans(str_mac_any_trans, size_mac_any_trans, &tk2_mac_any_trans, &proto_id);
+  unpack_chn_end_escrow(str_chn_end_escrow, size_chn_end_escrow, &tk2_chn_end_escrow, &proto_id);
+  unpack_chn_int_escrow(str_chn_int_escrow, size_chn_int_escrow, &tk2_chn_int_escrow, &proto_id);
+  unpack_chn_int_reqclose(str_chn_int_reqclose, size_chn_int_reqclose, &tk2_chn_int_reqclose, &proto_id);
+  unpack_chn_end_close(str_chn_end_close, size_chn_end_close, &tk2_chn_end_close, &proto_id);
+  unpack_chn_int_close(str_chn_int_close, size_chn_int_close, &tk2_chn_int_close, &proto_id);
+  unpack_chn_end_cashout(str_chn_end_cashout, size_chn_end_cashout, &tk2_chn_end_cashout, &proto_id);
+  unpack_chn_int_cashout(str_chn_int_cashout, size_chn_int_cashout, &tk2_chn_int_cashout, &proto_id);
 
   // tt_assert that the original tokens are identical to the new torkns
   tt_assert(memcmp(&tk1_mac_aut_mint, &tk2_mac_aut_mint, sizeof(mac_aut_mint_t)) == 0);

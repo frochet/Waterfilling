@@ -37,4 +37,15 @@ int mt_cpay_close(mt_desc_t desc);
  */
 int mt_cpay_recv(mt_desc_t desc, mt_ntype_t type, byte* msg, int size);
 
+/************************ Needs to be moved somewhere else *******/
+
+// or
+typedef int (*mt_event_notify_t)(mt_desc_t, int);
+
+// controller
+mt_desc_t* mt_new_intermediary(void);
+
+// common
+void mt_desc2digest(mt_desc_t* desc, byte (*digest_out)[DIGEST_LEN]);
+
 #endif
