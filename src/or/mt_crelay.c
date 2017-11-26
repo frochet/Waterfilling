@@ -5,3 +5,6 @@
 void
 mt_crelay_intermediary_circ_has_closed(origin_circuit_t* ocirc) {
 }
+
+void mt_crelay_intermediary_circ_has_opened(origin_circuit_t* ocirc) {
+}

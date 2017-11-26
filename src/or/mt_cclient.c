@@ -23,7 +23,7 @@ STATIC void run_cclient_housekeeping_event(time_t now);
 
 static void choose_intermediaries(time_t now, smartlist_t *exclude_list);
 
-static void cleanup_intermediary(intermediary_t *intermediary,
+static void intermediary_need_cleanup(intermediary_t *intermediary,
     time_t now);
 
 STATIC void run_cclient_build_circuit_event(time_t now);
@@ -53,7 +53,7 @@ mt_cclient_init(void) {
  * - The intermediary has expired (we need to cashout and rotate => do we care?)
  */
 static void
-cleanup_intermediary(intermediary_t *intermediary, time_t now) {
+intermediary_need_cleanup(intermediary_t *intermediary, time_t now) {
   (void) intermediary;
   (void) now;
 }
@@ -118,7 +118,7 @@ run_cclient_housekeeping_event(time_t now) {
       /* intermediary is not reachable for a reason, checks 
        * what's happening, log some information and rotate
        * the intermediary */
-      cleanup_intermediary(intermediary, now);
+      intermediary_need_cleanup(intermediary, now);
     }
   } SMARTLIST_FOREACH_END(intermediary);
 }
@@ -194,18 +194,33 @@ run_cclient_scheduled_events(time_t now) {
   run_cclient_build_circuit_event(now);
 }
 
+/**
+ * We got notified that a CIRCUIT_PURPOSE_C_INTERMEDIARY has closed
+ *  - Is this a remote close?
+ *  - Is this a local close due to a timeout error or a circuit failure?
+ */
 void mt_cclient_intermediary_circ_has_closed(origin_circuit_t *circ) {
   if (TO_CIRCUIT(circ)->state != CIRCUIT_STATE_OPEN) {
     // means that we did not reach the intermediary point for whatever reason
     // (probably timeout -- retry)
     intermediary_t* intermediary = mt_cclient_get_intermediary_from_ocirc(circ);
     intermediary->circuit_retries++;
+    /* Do we need to cleanup our intermediary? */
+    time_t now = approx_time();
+    intermediary_need_cleanup(intermediary, now);
   } else {
     /* Circuit has been closed - notify the payment module */
 
   }
 }
 
+/**
+ * We got notified that a CIRCUIT_PURPOSE_C_INTERMEDIARY has opened
+ */
+void mt_cclient_intermediary_circ_has_opened(origin_circuit_t *circ) {
+  (void)circ;
+  /*XXX MoneTor - What do we do? notify payment, wait to full establishement of all circuits?*/
+}
 /*************************** Object creation and cleanup *******************************/
 
 
