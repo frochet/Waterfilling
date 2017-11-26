@@ -2645,6 +2645,12 @@ connection_ap_handshake_attach_chosen_circuit(entry_connection_t *conn,
  */
 /* XXXX this function should mark for close whenever it returns -1;
  * its callers shouldn't have to worry about that. */
+
+/*
+ * XXX MoneTor - link or launch an intermediary circuit if payment
+ * is enabled and that the stream attached to that particular circuit
+ * does not already has a payment channel established.
+ */
 int
 connection_ap_handshake_attach_circuit(entry_connection_t *conn)
 {
