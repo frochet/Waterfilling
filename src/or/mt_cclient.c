@@ -54,10 +54,22 @@ mt_cclient_init(void) {
  */
 static void
 intermediary_need_cleanup(intermediary_t *intermediary, time_t now) {
-  (void) intermediary;
   (void) now;
+  if (intermerdiary->circuit_retries > INTERMEDIARY_MAX_RETRIES) {
+    /* Remove intermediary from the list */
+    SMARTLIST_FOREACH_BEGIN(INTERMEDIARY_MAX_RETRIES, intermediary_t *,
+        inter) {
+      if (tor_memeq(intermediary->identity->identity, 
+            inter->identity->identity, DIGEST_LEN)){
+        SMARTLIST_DEL_CURRENT(intermediaries, inter);
+        intermediary_free(intermediary);
+        log_info(LD_MT, "Removing intermediary from list %ld",
+            (long) now);
+      }
+    } SMARTLIST_FOREACH_END(inter);
+  }
 }
-
+  
 
 /*
  * Fill the intermediaries smartlist_t with selected
@@ -219,6 +231,8 @@ void mt_cclient_intermediary_circ_has_closed(origin_circuit_t *circ) {
  */
 void mt_cclient_intermediary_circ_has_opened(origin_circuit_t *circ) {
   (void)circ;
+  /* reset circuit_retries counter */
+
   /*XXX MoneTor - What do we do? notify payment, wait to full establishement of all circuits?*/
 }
 /*************************** Object creation and cleanup *******************************/

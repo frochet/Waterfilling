@@ -22,7 +22,7 @@ typedef enum {
 #define INTERMEDIARY_REACHABLE_NO 0
 #define INTERMEDIARY_REACHABLE_YES 1
 #define INTERMEDIARY_REACHABLE_MAYBE 2
-
+#define INTERMEDIARY_MAX_RETRIES 3
 
 typedef struct intermediary_t {
   intermediary_identity_t* identity;
