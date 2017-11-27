@@ -2676,7 +2676,7 @@ connection_ap_handshake_attach_circuit(entry_connection_t *conn)
            conn->socks_request->port);
     return -1;
   }
-
+ 
   /* We handle "general" (non-onion) connections much more straightforwardly.
    */
   if (!connection_edge_is_rendezvous_stream(ENTRY_TO_EDGE_CONN(conn))) {
@@ -2759,6 +2759,14 @@ connection_ap_handshake_attach_circuit(entry_connection_t *conn)
 
     /* We have found a suitable circuit for our conn. Hurray.  Do
      * the attachment. */
+
+    /*
+     * XXX MoneTor - Attach intermediaries to that circuit
+     */
+    if (get_options()->EnablePayment) {
+
+    }
+
     return connection_ap_handshake_attach_chosen_circuit(conn, circ, NULL);
 
   } else { /* we're a rendezvous conn */

@@ -2880,6 +2880,38 @@ typedef struct {
   } u;
 } onion_handshake_state_t;
 
+
+typedef enum {
+  MIDDLE,
+  EXIT,
+} position_t;
+
+/** Holds information for payment to perform on circuit
+ *  Define also a double linked-list for all nodes within
+ *  the circuit
+ *  Each origin_circuit_t* should own such a structure */
+
+typedef struct pay_path_t {
+
+  /* Intermediary handling current hop */
+  intermediary_identity_t *inter_ident;
+  
+  /* Position type of the current hop */
+  position_t position;
+  /* Used to keep track of number of cells we can send/receive
+   * before launching a next nano-payment*/
+  int window;
+
+  /*Whether or not the payment channel has been established*/
+  unsigned int is_microchannel_established : 1;
+  /*How many times we retry to establish the channel */
+  uint32_t channel_retries;
+
+  struct pay_path_t *next;
+  struct pay_path_t *prev;
+} pay_path_t;
+
+
 /** Holds accounting information for a single step in the layered encryption
  * performed by a circuit.  Used only at the client edge of a circuit. */
 typedef struct crypt_path_t {
@@ -3264,7 +3296,8 @@ typedef struct origin_circuit_t {
   struct hs_ident_circuit_t *hs_ident;
 
   /** Holds intermediary identifier. Works for circuit created by relay
-   *  for circuit created by clients*/
+   *  for circuit created by clients
+   *  Only for intermediary circuits*/
   intermediary_identity_t *inter_ident;
 
   /** Holds the data that the entry guard system uses to track the

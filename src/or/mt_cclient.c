@@ -54,10 +54,9 @@ mt_cclient_init(void) {
  */
 static void
 intermediary_need_cleanup(intermediary_t *intermediary, time_t now) {
-  (void) now;
-  if (intermerdiary->circuit_retries > INTERMEDIARY_MAX_RETRIES) {
+  if (intermediary->circuit_retries > INTERMEDIARY_MAX_RETRIES) {
     /* Remove intermediary from the list */
-    SMARTLIST_FOREACH_BEGIN(INTERMEDIARY_MAX_RETRIES, intermediary_t *,
+    SMARTLIST_FOREACH_BEGIN(intermediaries, intermediary_t *,
         inter) {
       if (tor_memeq(intermediary->identity->identity, 
             inter->identity->identity, DIGEST_LEN)){
@@ -89,7 +88,7 @@ choose_intermediaries(time_t now, smartlist_t *exclude_list) {
   /*Handling extend info here is going to ease my life - great idea of the day*/
   extend_info_t *ei = NULL;
   intermediary_t *intermediary = NULL;
-
+  int count_middle = 0, count_exit = 0;
   /*Normal intermediary flags - We just need uptime*/
   router_crn_flags_t flags = CRN_NEED_UPTIME;
 
@@ -106,10 +105,25 @@ choose_intermediaries(time_t now, smartlist_t *exclude_list) {
   if (!ei) {
     goto err;
   }
+  /* Check how much we have for each position and give this
+   * new intermediary the position value matching the smaller
+   * value */
+  SMARTLIST_FOREACH_BEGIN(intermediaries, intermediary_t *,
+      inter) {
+    if (inter->linked_to == MIDDLE)
+      count_middle++;
+    if (inter->linked_to == EXIT)
+      count_exit++;
+  } SMARTLIST_FOREACH_END(inter);
   /* Create the intermediary object */
-  intermediary = intermediary_new(node, ei, now);
   log_info(LD_MT, "Chose an intermediary: %s at time %ld", extend_info_describe(ei),
       (long) now);
+  intermediary = intermediary_new(node, ei, now);
+  if (count_middle < count_exit)
+    intermediary->linked_to = MIDDLE;
+  else
+    intermediary->linked_to = EXIT;
+  tor_assert(count_middle+counter_exit <= MAX_INTERMEDIARY_CHOSEN);
   smartlist_add(intermediaries, intermediary);
  err:
   extend_info_free(ei);

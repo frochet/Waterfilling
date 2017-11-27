@@ -11,8 +11,10 @@ void mt_cclient_intermediary_circ_has_closed(origin_circuit_t *circ);
 
 void mt_cclient_intermediary_circ_has_opened(origin_circuit_t *circ);
 
+#define MAX_INTERMEDIARY_LINKED_TO_MIDDLE 1
+#define MAX_INTERMEDIARY_LINKED_TO_EXIT 1
+//XXX MoneTor - define following as the sum of the two above
 #define MAX_INTERMEDIARY_CHOSEN 2 // XXX MoneTor - do we need backup intermediaries?
-
 
 
 
