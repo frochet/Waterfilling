@@ -27,6 +27,26 @@ static void test_mt_tokens(void *arg)
   byte proto_id[DIGEST_LEN];
   write_random_bytes(proto_id, DIGEST_LEN);
 
+  /*************************** Sign/Verify Messages ****************************/
+
+  byte* msg = (byte*)"This a random message to be signed";
+  byte* signed_msg;
+
+  int signed_msg_size = mt_create_signed_msg(msg, strlen((char*)msg), &pk, &sk, &signed_msg);
+  tt_assert(signed_msg_size != MT_ERROR);
+
+  byte pk_out[MT_SZ_PK];
+  byte* msg_out;
+  int msg_size = mt_verify_signed_msg(signed_msg, signed_msg_size, &pk_out, &msg_out);
+  tt_assert(msg_size != MT_ERROR);
+  tt_assert(memcmp(pk, pk_out, MT_SZ_PK) == 0);
+  tt_assert(memcmp(msg, msg_out, msg_size) == 0);
+
+  free(signed_msg);
+  free(msg_out);
+
+  /**************************** Pack/Unpack Tokens *****************************/
+
   // declare each type of token
   mac_aut_mint_t tk1_mac_aut_mint;
   mac_any_trans_t tk1_mac_any_trans;
@@ -61,15 +81,15 @@ static void test_mt_tokens(void *arg)
   byte* str_chn_int_cashout;
 
   // pack the original tokens into the strings
-  int size_mac_aut_mint =  pack_mac_aut_mint(tk1_mac_aut_mint, &proto_id, &str_mac_aut_mint);
-  int size_mac_any_trans =  pack_mac_any_trans(tk1_mac_any_trans, &proto_id, &str_mac_any_trans);
-  int size_chn_end_escrow =  pack_chn_end_escrow(tk1_chn_end_escrow, &proto_id, &str_chn_end_escrow);
-  int size_chn_int_escrow =  pack_chn_int_escrow(tk1_chn_int_escrow, &proto_id, &str_chn_int_escrow);
-  int size_chn_int_reqclose =  pack_chn_int_reqclose(tk1_chn_int_reqclose, &proto_id, &str_chn_int_reqclose);
-  int size_chn_end_close =  pack_chn_end_close(tk1_chn_end_close, &proto_id, &str_chn_end_close);
-  int size_chn_int_close =  pack_chn_int_close(tk1_chn_int_close, &proto_id, &str_chn_int_close);
-  int size_chn_end_cashout =  pack_chn_end_cashout(tk1_chn_end_cashout, &proto_id, &str_chn_end_cashout);
-  int size_chn_int_cashout =  pack_chn_int_cashout(tk1_chn_int_cashout, &proto_id, &str_chn_int_cashout);
+  int size_mac_aut_mint =  pack_mac_aut_mint(&tk1_mac_aut_mint, &proto_id, &str_mac_aut_mint);
+  int size_mac_any_trans =  pack_mac_any_trans(&tk1_mac_any_trans, &proto_id, &str_mac_any_trans);
+  int size_chn_end_escrow =  pack_chn_end_escrow(&tk1_chn_end_escrow, &proto_id, &str_chn_end_escrow);
+  int size_chn_int_escrow =  pack_chn_int_escrow(&tk1_chn_int_escrow, &proto_id, &str_chn_int_escrow);
+  int size_chn_int_reqclose =  pack_chn_int_reqclose(&tk1_chn_int_reqclose, &proto_id, &str_chn_int_reqclose);
+  int size_chn_end_close =  pack_chn_end_close(&tk1_chn_end_close, &proto_id, &str_chn_end_close);
+  int size_chn_int_close =  pack_chn_int_close(&tk1_chn_int_close, &proto_id, &str_chn_int_close);
+  int size_chn_end_cashout =  pack_chn_end_cashout(&tk1_chn_end_cashout, &proto_id, &str_chn_end_cashout);
+  int size_chn_int_cashout =  pack_chn_int_cashout(&tk1_chn_int_cashout, &proto_id, &str_chn_int_cashout);
 
   // declare each type of token
   mac_aut_mint_t tk2_mac_aut_mint;

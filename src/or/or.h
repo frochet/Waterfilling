@@ -2895,7 +2895,7 @@ typedef struct pay_path_t {
 
   /* Intermediary handling current hop */
   intermediary_identity_t *inter_ident;
-  
+
   /* Position type of the current hop */
   position_t position;
   /* Used to keep track of number of cells we can send/receive
@@ -5550,7 +5550,7 @@ typedef enum {
   MT_CODE_REQCLOSE,
   MT_CODE_ESTABLISH,
   MT_CODE_SUCCESS,
-  MT_CODE_FAILED,
+  MT_CODE_FAILURE,
 } mt_code_t;
 
 //-------------------- Cryptographic String Sizes (bytes) -------------------//
@@ -5582,6 +5582,8 @@ typedef enum {
   MT_PARTY_CLI,
   MT_PARTY_REL,
   MT_PARTY_INT,
+  MT_PARTY_AUT,
+  MT_PARTY_LED,
 } mt_party_t;
 
 typedef struct {
@@ -5717,12 +5719,13 @@ typedef enum {
   MT_NTYPE_MAC_ANY_TRANS,       // macropayment transaction
   MT_NTYPE_CHN_END_ESCROW,      // end user escrow transaction
   MT_NTYPE_CHN_INT_ESCROW,      // intermediary escrow transaction
-  MT_NTYPE_CHN_LED_ESCROW,      // intermediary response to confirm escrow
   MT_NTYPE_CHN_INT_REQCLOSE,    // intermediary msg to request a user closure
   MT_NTYPE_CHN_END_CLOSE,       // end user microchannel closure message
   MT_NTYPE_CHN_INT_CLOSE,       // intermediary microchannel closure message
   MT_NTYPE_CHN_END_CASHOUT,     // cash out of closed channel
   MT_NTYPE_CHN_INT_CASHOUT,     // cash out of closed channel
+  MT_NTYPE_ANY_LED_CONFIRM,      // intermediary response to confirm escrow
+
 
   // tokens for querying the ledger
   MT_NTYPE_MAC_LED_DATA,        // macropayment ledger data mapped to an address
@@ -5888,7 +5891,7 @@ typedef struct {
 
 typedef struct {
   mt_code_t success;
-} chn_led_escrow_t;
+} any_led_confirm_t;
 
 typedef struct {
   byte chn[MT_SZ_ADDR];

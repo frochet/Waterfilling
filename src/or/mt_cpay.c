@@ -52,7 +52,7 @@ static int init_nan_cli_dpay1(mt_event_notify_t notify, mt_channel_t* chn, mt_de
 static int init_nan_end_close1(mt_event_notify_t notify, mt_channel_t* chn, mt_desc_t desc);
 
 // private handler functions
-static int handle_chn_led_escrow(mt_desc_t desc, chn_led_escrow_t* toekn, byte (*pk)[DIGEST_LEN]);
+static int handle_any_led_confirm(mt_desc_t desc, any_led_confirm_t* toekn, byte (*pk)[DIGEST_LEN]);
 static int handle_chn_int_estab2(mt_desc_t desc, chn_int_estab2_t* token, byte (*pk)[DIGEST_LEN]);
 static int handle_chn_int_estab4(mt_desc_t desc, chn_int_estab4_t* token, byte (*pk)[DIGEST_LEN]);
 static int handle_nan_int_setup2(mt_desc_t desc, nan_int_setup2_t* token, byte (*pk)[DIGEST_LEN]);
@@ -193,11 +193,11 @@ int mt_cpay_recv(mt_desc_t desc, mt_ntype_t type, byte* msg, int size){
   byte proto_id[DIGEST_LEN];
 
   switch(type){
-    case MT_NTYPE_CHN_LED_ESCROW:;
-      chn_led_escrow_t chn_led_escrow_tkn;
-      if(unpack_chn_led_escrow(msg, size, &chn_led_escrow_tkn, &proto_id) != MT_SUCCESS)
+    case MT_NTYPE_ANY_LED_CONFIRM:;
+      any_led_confirm_t any_led_confirm_tkn;
+      if(unpack_any_led_confirm(msg, size, &any_led_confirm_tkn, &proto_id) != MT_SUCCESS)
 	return MT_ERROR;
-      result = handle_chn_led_escrow(desc, &chn_led_escrow_tkn, &proto_id);
+      result = handle_any_led_confirm(desc, &any_led_confirm_tkn, &proto_id);
       break;
     case MT_NTYPE_CHN_INT_ESTAB2:;
       chn_int_estab2_t chn_int_estab2_tkn;
@@ -298,7 +298,7 @@ static int init_chn_end_escrow(mt_event_notify_t notify, mt_channel_t* chn, mt_d
 
   // send escrow message
   byte* msg;
-  int msg_size = pack_chn_end_escrow(token, (byte (*)[DIGEST_LEN])&proto_id, &msg);
+  int msg_size = pack_chn_end_escrow(&token, (byte (*)[DIGEST_LEN])&proto_id, &msg);
   send_message(&desc, MT_NTYPE_CHN_END_ESCROW, msg, msg_size);
 
   return MT_SUCCESS;
@@ -320,7 +320,7 @@ static int init_chn_end_estab1(mt_event_notify_t notify, mt_channel_t* chn, mt_d
 
   // send message
   byte* msg;
-  int msg_size = pack_chn_end_estab1(token, (byte (*)[DIGEST_LEN])&proto_id, &msg);
+  int msg_size = pack_chn_end_estab1(&token, (byte (*)[DIGEST_LEN])&proto_id, &msg);
   send_message(&desc, MT_NTYPE_CHN_END_ESTAB1, msg, msg_size);
 
   return MT_SUCCESS;
@@ -342,7 +342,7 @@ static int init_nan_cli_setup1(mt_event_notify_t notify, mt_channel_t* chn, mt_d
 
   // send message
   byte* msg;
-  int msg_size = pack_nan_cli_setup1(token, (byte (*)[DIGEST_LEN])&proto_id, &msg);
+  int msg_size = pack_nan_cli_setup1(&token, (byte (*)[DIGEST_LEN])&proto_id, &msg);
   send_message(&desc, MT_NTYPE_NAN_CLI_SETUP1, msg, msg_size);
 
   return MT_SUCCESS;
@@ -365,7 +365,7 @@ static int init_nan_cli_estab1(mt_event_notify_t notify, mt_channel_t* chn, mt_d
 
   // send message
   byte* msg;
-  int msg_size = pack_nan_cli_estab1(token, (byte (*)[DIGEST_LEN])&proto_id, &msg);
+  int msg_size = pack_nan_cli_estab1(&token, (byte (*)[DIGEST_LEN])&proto_id, &msg);
   send_message(&desc, MT_NTYPE_NAN_CLI_ESTAB1, msg, msg_size);
 
   return MT_SUCCESS;
@@ -387,7 +387,7 @@ static int init_nan_cli_pay1(mt_event_notify_t notify, mt_channel_t* chn, mt_des
 
   // send message
   byte* msg;
-  int msg_size = pack_nan_cli_pay1(token, (byte (*)[DIGEST_LEN])&proto_id, &msg);
+  int msg_size = pack_nan_cli_pay1(&token, (byte (*)[DIGEST_LEN])&proto_id, &msg);
   send_message(&desc, MT_NTYPE_NAN_CLI_PAY1, msg, msg_size);
 
   return MT_SUCCESS;
@@ -409,7 +409,7 @@ static int init_nan_cli_destab1(mt_event_notify_t notify, mt_channel_t* chn, mt_
 
   // send message
   byte* msg;
-  int msg_size = pack_nan_cli_destab1(token, (byte (*)[DIGEST_LEN])&proto_id, &msg);
+  int msg_size = pack_nan_cli_destab1(&token, (byte (*)[DIGEST_LEN])&proto_id, &msg);
   send_message(&desc, MT_NTYPE_NAN_CLI_DESTAB1, msg, msg_size);
 
   return MT_SUCCESS;
@@ -431,7 +431,7 @@ static int init_nan_cli_dpay1(mt_event_notify_t notify, mt_channel_t* chn, mt_de
 
   // send message
   byte* msg;
-  int msg_size = pack_nan_cli_dpay1(token, (byte (*)[DIGEST_LEN])&proto_id, &msg);
+  int msg_size = pack_nan_cli_dpay1(&token, (byte (*)[DIGEST_LEN])&proto_id, &msg);
   send_message(&desc, MT_NTYPE_NAN_CLI_DPAY1, msg, msg_size);
 
   return MT_SUCCESS;
@@ -453,7 +453,7 @@ static int init_nan_end_close1(mt_event_notify_t notify, mt_channel_t* chn, mt_d
 
   // send message
   byte* msg;
-  int msg_size = pack_nan_end_close1(token, (byte (*)[DIGEST_LEN])&proto_id, &msg);
+  int msg_size = pack_nan_end_close1(&token, (byte (*)[DIGEST_LEN])&proto_id, &msg);
   send_message(&desc, MT_NTYPE_NAN_END_CLOSE1, msg, msg_size);
 
   return MT_SUCCESS;
@@ -462,7 +462,7 @@ static int init_nan_end_close1(mt_event_notify_t notify, mt_channel_t* chn, mt_d
 
 /******************************* Channel Escrow *************************/
 
-static int handle_chn_led_escrow(mt_desc_t desc, chn_led_escrow_t* token, byte (*proto_id)[DIGEST_LEN]){
+static int handle_any_led_confirm(mt_desc_t desc, any_led_confirm_t* token, byte (*proto_id)[DIGEST_LEN]){
   (void)token;
   (void)desc;
 
@@ -497,7 +497,7 @@ static int handle_chn_int_estab2(mt_desc_t desc, chn_int_estab2_t* token, byte (
   // fill response with correct values
 
   byte* resp_msg;
-  int resp_size = pack_chn_end_estab3(response, proto_id, &resp_msg);
+  int resp_size = pack_chn_end_estab3(&response, proto_id, &resp_msg);
   send_message(&desc, MT_NTYPE_CHN_END_ESTAB3, resp_msg, resp_size);
   return MT_SUCCESS;
 }
@@ -537,7 +537,7 @@ static int handle_nan_int_setup2(mt_desc_t desc, nan_int_setup2_t* token, byte (
   // fill response with correct values
 
   byte* resp_msg;
-  int resp_size = pack_nan_int_setup2(response, proto_id, &resp_msg);
+  int resp_size = pack_nan_int_setup2(&response, proto_id, &resp_msg);
   send_message(&desc, MT_NTYPE_NAN_INT_SETUP2, resp_msg, resp_size);
 
   return MT_SUCCESS;
@@ -560,7 +560,7 @@ static int handle_nan_int_setup4(mt_desc_t desc, nan_int_setup4_t* token, byte (
   // fill response with correct values
 
   byte* resp_msg;
-  int resp_size = pack_nan_cli_setup5(response, proto_id, &resp_msg);
+  int resp_size = pack_nan_cli_setup5(&response, proto_id, &resp_msg);
   send_message(&desc, MT_NTYPE_NAN_CLI_SETUP5, resp_msg, resp_size);
 
   return MT_SUCCESS;
@@ -674,7 +674,7 @@ static int handle_nan_int_close2(mt_desc_t desc, nan_int_close2_t* token, byte (
   // fill response with correct values
 
   byte* resp_msg;
-  int resp_size = pack_nan_end_close3(response, proto_id, &resp_msg);
+  int resp_size = pack_nan_end_close3(&response, proto_id, &resp_msg);
   send_message(&desc, MT_NTYPE_NAN_END_CLOSE3, resp_msg, resp_size);
 
   return MT_SUCCESS;
@@ -697,7 +697,7 @@ static int handle_nan_int_close4(mt_desc_t desc, nan_int_close4_t* token, byte (
   // fill response with correct values
 
   byte* resp_msg;
-  int resp_size = pack_nan_end_close5(response, proto_id, &resp_msg);
+  int resp_size = pack_nan_end_close5(&response, proto_id, &resp_msg);
   send_message(&desc, MT_NTYPE_NAN_END_CLOSE5, resp_msg, resp_size);
 
   return MT_SUCCESS;
@@ -720,7 +720,7 @@ static int handle_nan_int_close6(mt_desc_t desc, nan_int_close6_t* token, byte (
   // fill response with correct values
 
   byte* resp_msg;
-  int resp_size = pack_nan_end_close7(response, proto_id, &resp_msg);
+  int resp_size = pack_nan_end_close7(&response, proto_id, &resp_msg);
   send_message(&desc, MT_NTYPE_NAN_END_CLOSE7, resp_msg, resp_size);
 
   return MT_SUCCESS;

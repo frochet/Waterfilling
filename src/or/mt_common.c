@@ -111,8 +111,10 @@ int send_message(mt_desc_t *desc, mt_ntype_t type, byte* msg, int size) {
   (void) type;
   (void) msg;
   (void) size;
+  return 0;
 }
 
 int alert_payment(mt_desc_t *desc) {
   (void) desc;
+  return 0;
 }

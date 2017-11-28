@@ -58,7 +58,7 @@ intermediary_need_cleanup(intermediary_t *intermediary, time_t now) {
     /* Remove intermediary from the list */
     SMARTLIST_FOREACH_BEGIN(intermediaries, intermediary_t *,
         inter) {
-      if (tor_memeq(intermediary->identity->identity, 
+      if (tor_memeq(intermediary->identity->identity,
             inter->identity->identity, DIGEST_LEN)){
         SMARTLIST_DEL_CURRENT(intermediaries, inter);
         intermediary_free(intermediary);
@@ -68,7 +68,7 @@ intermediary_need_cleanup(intermediary_t *intermediary, time_t now) {
     } SMARTLIST_FOREACH_END(inter);
   }
 }
-  
+
 
 /*
  * Fill the intermediaries smartlist_t with selected
@@ -76,7 +76,7 @@ intermediary_need_cleanup(intermediary_t *intermediary, time_t now) {
  *
  * XXX MoneTor - parse the state file to recover previously
  *               intermediaries
- * 
+ *
  * If no intermediaries in the statefile, select new ones
  */
 static void
@@ -123,7 +123,7 @@ choose_intermediaries(time_t now, smartlist_t *exclude_list) {
     intermediary->linked_to = MIDDLE;
   else
     intermediary->linked_to = EXIT;
-  tor_assert(count_middle+counter_exit <= MAX_INTERMEDIARY_CHOSEN);
+  //tor_assert(count_middle+counter_exit <= MAX_INTERMEDIARY_CHOSEN);
   smartlist_add(intermediaries, intermediary);
  err:
   extend_info_free(ei);
@@ -136,12 +136,12 @@ choose_intermediaries(time_t now, smartlist_t *exclude_list) {
  */
 STATIC void
 run_cclient_housekeeping_event(time_t now) {
-  
+
   /* Check intermediary health*/
   SMARTLIST_FOREACH_BEGIN(intermediaries, intermediary_t *,
       intermediary) {
     if (intermediary->is_reachable == INTERMEDIARY_REACHABLE_NO) {
-      /* intermediary is not reachable for a reason, checks 
+      /* intermediary is not reachable for a reason, checks
        * what's happening, log some information and rotate
        * the intermediary */
       intermediary_need_cleanup(intermediary, now);
@@ -192,7 +192,7 @@ run_cclient_build_circuit_event(time_t now) {
           intermediary->identity->identity, DIGEST_LEN);
     }
     //XXX MoneTor - Check circuit healthiness? - check that it is already
-    // done by an other Tor intern function 
+    // done by an other Tor intern function
   } SMARTLIST_FOREACH_END(intermediary);
 }
 
@@ -261,7 +261,7 @@ intermediary_new(const node_t *node, extend_info_t *ei, time_t now) {
   tor_assert(node);
   tor_assert(ei);
   intermediary_t *intermediary = tor_malloc_zero(sizeof(intermediary_t));
-  
+
   memcpy(intermediary->identity, node->identity, DIGEST_LEN);
   strlcpy(intermediary->nickname, node->ri->nickname, sizeof(intermediary->nickname));
   intermediary->is_reachable = INTERMEDIARY_REACHABLE_MAYBE;
@@ -282,4 +282,3 @@ intermediary_free(intermediary_t *intermediary) {
   }
   tor_free(intermediary);
 }
-

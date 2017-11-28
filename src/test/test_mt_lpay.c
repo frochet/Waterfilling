@@ -1,3 +1,5 @@
+#pragma GCC diagnostic ignored "-Wswitch-enum"
+
 #include <string.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -8,7 +10,6 @@
 #include "mt_common.h"
 #include "mt_lpay.h"
 #include "test.h"
-
 
 int send_intercept_1;
 int send_intercept_2;
@@ -37,8 +38,8 @@ int send_msg(mt_desc_t desc, mt_ntype_t type, byte* msg, int size){
       break;
     default:
       tt_assert(1 == 2);
-  }
-  return 0;*/
+      }*/
+  return 0;
 }
 
 int close_conn(mt_desc_t desc);
@@ -47,241 +48,245 @@ int close_conn(mt_desc_t desc){
   return 0;
 }
 
+static int send_ledger(byte (*pk)[MT_SZ_PK], byte (*sk)[MT_SZ_SK], mt_desc_t* desc, mt_ntype_t type, void* tkn){
+
+  byte proto_id[DIGEST_LEN];
+  mt_crypt_rand_bytes(DIGEST_LEN, proto_id);
+
+  byte* packed_msg;
+  int packed_msg_size;
+
+  switch(type){
+    case MT_NTYPE_MAC_AUT_MINT:
+      packed_msg_size = pack_mac_aut_mint((mac_aut_mint_t*)tkn, &proto_id, &packed_msg);
+      break;
+    case MT_NTYPE_MAC_ANY_TRANS:
+      packed_msg_size = pack_mac_any_trans((mac_any_trans_t*)tkn, &proto_id, &packed_msg);
+      break;
+    case MT_NTYPE_CHN_END_ESCROW:
+      packed_msg_size = pack_chn_end_escrow((chn_end_escrow_t*)tkn, &proto_id, &packed_msg);
+      break;
+    case MT_NTYPE_CHN_INT_ESCROW:
+      packed_msg_size = pack_chn_int_escrow((chn_int_escrow_t*)tkn, &proto_id, &packed_msg);
+      break;
+    case MT_NTYPE_CHN_INT_REQCLOSE:
+      packed_msg_size = pack_chn_int_reqclose((chn_int_reqclose_t*)tkn, &proto_id, &packed_msg);
+      break;
+    case MT_NTYPE_CHN_END_CLOSE:
+      packed_msg_size = pack_chn_end_close((chn_end_close_t*)tkn, &proto_id, &packed_msg);
+      break;
+    case MT_NTYPE_CHN_INT_CLOSE:
+      packed_msg_size = pack_chn_int_close((chn_int_close_t*)tkn, &proto_id, &packed_msg);
+      break;
+    case MT_NTYPE_CHN_END_CASHOUT:
+      packed_msg_size = pack_chn_end_cashout((chn_end_cashout_t*)tkn, &proto_id, &packed_msg);
+      break;
+    case MT_NTYPE_CHN_INT_CASHOUT:
+      packed_msg_size = pack_chn_int_cashout((chn_int_cashout_t*)tkn, &proto_id, &packed_msg);
+      break;
+    default:
+      packed_msg_size = MT_ERROR;
+  }
+
+  if(packed_msg_size == MT_ERROR)
+    return MT_ERROR;
+
+  byte* signed_msg;
+  int signed_msg_size = mt_create_signed_msg(packed_msg, packed_msg_size, pk, sk, &signed_msg);
+
+  if(signed_msg_size == MT_ERROR){
+    free(packed_msg);
+    return MT_ERROR;
+  }
+
+  int result = mt_lpay_recv_message(desc, type, signed_msg, signed_msg_size);
+  free(packed_msg);
+  free(signed_msg);
+
+  return result;
+}
+
+
 static void test_mt_lpay(void *arg)
 {
   (void)arg;
 
   /* //----------------------------------- Setup ---------------------------------// */
 
-  /* mt_lpay_t ledger; */
-  /* mt_desc_t desc = {.party = MT_PARTY_CLI}; */
 
-  /* // pretend everything is in cents */
-  /* int fee = 5; */
-  /* double tax = 0.1; */
-  /* int close_window = 10; */
-  /* byte pp[MT_SZ_PP]; */
+  //TODO: read in payment parameters (pp/aut address) from seomwhere
+  byte pp[MT_SZ_PP];   // bogus value; this should be read in from somewhere
+  mt_lpay_init();
 
-  /* mt_crypt_setup(&pp); */
+  // setup aut
+  mt_payment_public_t public = mt_lpay_get_payment_public();
+  mt_desc_t aut_0_desc = {.party = MT_PARTY_AUT};
+  mt_crypt_rand_bytes(MT_SZ_ID, aut_0_desc.id);
 
-  /* // set up roger */
-  /* byte roger_pk[MT_SZ_PK]; */
-  /* byte roger_sk[MT_SZ_SK]; */
-  /* byte roger_addr[MT_SZ_ADDR]; */
-  /* mt_crypt_keygen(&pp, &roger_pk, &roger_sk); */
-  /* mt_pk2addr(&roger_pk, &roger_addr); */
+  // set up end user
+  byte end_1_pk[MT_SZ_PK];
+  byte end_1_sk[MT_SZ_SK];
+  byte end_1_addr[MT_SZ_ADDR];
+  mt_desc_t end_1_desc = {.party = MT_PARTY_CLI};
+  mt_crypt_keygen(&pp, &end_1_pk, &end_1_sk);
+  mt_pk2addr(&end_1_pk, &end_1_addr);
+  mt_crypt_rand_bytes(sizeof(end_1_desc), (byte*)&end_1_desc);
 
-  /* mt_lpay_init(&ledger, &pp, fee, tax, close_window, &roger_pk); */
+  // set up intermediary
+  byte int_1_pk[MT_SZ_PK];
+  byte int_1_sk[MT_SZ_SK];
+  byte int_1_addr[MT_SZ_ADDR];
+  mt_desc_t int_1_desc = {.party = MT_PARTY_INT};
+  mt_crypt_keygen(&pp, &int_1_pk, &int_1_sk);
+  mt_pk2addr(&int_1_pk, &int_1_addr);
+  mt_crypt_rand_bytes(sizeof(int_1_desc), (byte*)&int_1_desc);
 
-  /* // set up end user */
-  /* byte end_pk_1[MT_SZ_PK]; */
-  /* byte end_sk_1[MT_SZ_SK]; */
-  /* byte end_addr_1[MT_SZ_ADDR]; */
-  /* mt_crypt_keygen(&pp, &end_pk_1, &end_sk_1); */
-  /* mt_pk2addr(&end_pk_1, &end_addr_1); */
+  // set up channel
+  byte chn_1_addr[MT_SZ_ADDR];
+  mt_crypt_rand_bytes(MT_SZ_ADDR, chn_1_addr);
 
-  /* // set up intermediary */
-  /* byte int_pk_1[MT_SZ_PK]; */
-  /* byte int_sk_1[MT_SZ_SK]; */
-  /* byte int_addr_1[MT_SZ_ADDR]; */
-  /* mt_crypt_keygen(&pp, &int_pk_1, &int_sk_1); */
-  /* mt_pk2addr(&int_pk_1, &int_addr_1); */
+  // hash chain for nanopayments
+  int n = 1000;
+  byte head[MT_SZ_HASH];
+  byte hc[n][MT_SZ_HASH];
+  mt_crypt_rand_bytes(MT_SZ_HASH, head);
+  mt_hc_create(n, &head, &hc);
+  int k = 58;
 
-  /* // set up channel */
-  /* byte chn_addr[MT_SZ_ADDR]; */
-  /* mt_crypt_rand_bytes(MT_SZ_ADDR, chn_addr); */
+  byte aut_0_addr[MT_SZ_ADDR];
+  mt_pk2addr(&public.auth_pk, &aut_0_addr);
 
-  /* // hash chain for nanopayments */
-  /* int n = 1000; */
-  /* byte head[MT_SZ_HASH]; */
-  /* byte hc[n][MT_SZ_HASH]; */
-  /* mt_crypt_rand_bytes(MT_SZ_HASH, head); */
-  /* mt_hc_create(n, &head, &hc); */
-  /* int k = 58; */
+  char aut_0_hex[MT_SZ_ADDR * 2 + 3] ;
+  char end_1_hex[MT_SZ_ADDR * 2 + 3] ;
+  char int_1_hex[MT_SZ_ADDR * 2 + 3] ;
 
-  /* char roger_hex[MT_SZ_ADDR * 2 + 3] ; */
-  /* char end_hex[MT_SZ_ADDR * 2 + 3] ; */
-  /* char int_hex[MT_SZ_ADDR * 2 + 3] ; */
+  mt_addr2hex(&aut_0_addr, &aut_0_hex);
+  mt_addr2hex(&end_1_addr, &end_1_hex);
+  mt_addr2hex(&int_1_addr, &int_1_hex);
 
-  /* mt_addr2hex(&roger_addr, &roger_hex); */
-  /* mt_addr2hex(&end_addr_1, &end_hex); */
-  /* mt_addr2hex(&int_addr_1, &int_hex); */
+  printf("aut addr %s\n", aut_0_hex);
+  printf("end addr %s\n", end_1_hex);
+  printf("int addr %s\n", int_1_hex);
 
-  /* //printf("rog addr %s\n", roger_hex); */
-  /* //printf("end addr %s\n", end_hex); */
-  /* //printf("int addr %s\n", int_hex); */
+  //expected
+  int exp_aut_0_bal = 0;
+  int exp_end_1_bal = 0;
+  int exp_int_1_bal = 0;
+  int exp_end_1_esc = 0;
+  int exp_int_1_esc = 0;
 
-  /* //expected */
-  /* int exp_roger_bal = 0; */
-  /* int exp_end_1_bal = 0; */
-  /* int exp_int_1_bal = 0; */
-  /* int exp_end_1_esc = 0; */
-  /* int exp_int_1_esc = 0; */
+  //---------------------------------- Mint -----------------------------------//
 
-  /* //---------------------------------- Mint -----------------------------------// */
+  // Mint First Token
+  int mint_val_1 = 1000 * 100;
+  int mint_val_2 = 1500 * 100;
 
-  /* // mint first token */
-  /* int mint_val_1 = 1000 * 100; */
-  /* int mint_val_2 = 1500 * 100; */
+  exp_aut_0_bal = mint_val_1 + mint_val_2;
 
-  /* exp_roger_bal = mint_val_1 + mint_val_2; */
+  // mint first token
+  mac_aut_mint_t mint_1 = {.value = mint_val_1};
+  tt_assert(send_ledger(&public.auth_pk, &public.auth_sk, &aut_0_desc, MT_NTYPE_MAC_AUT_MINT, &mint_1) == MT_SUCCESS);
 
-  /* mac_aut_mint_t mint_1 = {.value = mint_val_1}; */
-  /* byte* mint_msg_1; */
-  /* int mint_msg_1_size = pack_mac_aut_mint(mint_1, &roger_pk, &roger_sk, &mint_msg_1); */
-  /* tt_assert(mt_lpay_recv_message(&ledger, desc, MT_NTYPE_MAC_AUT_MINT, mint_msg_1, mint_msg_1_size) == MT_SUCCESS); */
+  // mint second token
+  mac_aut_mint_t mint_2 = {.value = mint_val_2};
+  tt_assert(send_ledger(&public.auth_pk, &public.auth_sk, &aut_0_desc, MT_NTYPE_MAC_AUT_MINT, &mint_2) == MT_SUCCESS);
 
-  /* // mint second token */
-  /* mac_aut_mint_t mint_2 = {.value = mint_val_2}; */
-  /* byte* mint_msg_2; */
-  /* int mint_msg_2_size = pack_mac_aut_mint(mint_2, &roger_pk, &roger_sk, &mint_msg_2); */
-  /* tt_assert(mt_lpay_recv_message(&ledger, desc, MT_NTYPE_MAC_AUT_MINT, mint_msg_2, mint_msg_2_size) == MT_SUCCESS); */
+  //------------------------------ Transfer -----------------------------------//
 
-  /* //------------------------------ Transfer -----------------------------------// */
+  int end_val = 100 * 100;
+  int int_val = 1000 * 100;
 
-  /* int end_val = 100 * 100; */
-  /* int int_val = 1000 * 100; */
+  exp_end_1_bal += end_val;
+  exp_int_1_bal += int_val;
+  exp_aut_0_bal -= end_val + int_val;
 
-  /* exp_end_1_bal += end_val; */
-  /* exp_int_1_bal += int_val; */
-  /* exp_roger_bal -= end_val + int_val; */
+  // transfer to end user
+  mac_any_trans_t end_trans = {.val_from = end_val + public.fee, .val_to = end_val};
+  memcpy(end_trans.from, aut_0_addr, MT_SZ_ADDR);
+  memcpy(end_trans.to, end_1_addr, MT_SZ_ADDR);
+  tt_assert(send_ledger(&public.auth_pk, &public.auth_sk, &aut_0_desc, MT_NTYPE_MAC_ANY_TRANS, &end_trans) == MT_SUCCESS);
 
-  /* // transfer to end user */
-  /* mac_any_trans_t end_trans = {.val_from = end_val + fee, .val_to = end_val}; */
-  /* memcpy(end_trans.from, roger_addr, MT_SZ_ADDR); */
-  /* memcpy(end_trans.to, end_addr_1, MT_SZ_ADDR); */
-  /* byte* end_trans_str; */
-  /* int end_trans_str_size = pack_mac_any_trans(end_trans, &roger_pk, &roger_sk, &end_trans_str); */
-  /* tt_assert(mt_lpay_recv_message(&ledger, desc, MT_NTYPE_MAC_ANY_TRANS, end_trans_str, end_trans_str_size) == MT_SUCCESS); */
+  // transfer to intermediary
+  mac_any_trans_t int_trans = {.val_from = int_val + public.fee, .val_to = int_val};
+  memcpy(int_trans.from, aut_0_addr, MT_SZ_ADDR);
+  memcpy(int_trans.to, int_1_addr, MT_SZ_ADDR);
+  tt_assert(send_ledger(&public.auth_pk, &public.auth_sk, &aut_0_desc, MT_NTYPE_MAC_ANY_TRANS, &int_trans) == MT_SUCCESS);
 
-  /* // transfer to intermediary */
-  /* mac_any_trans_t int_trans = {.val_from = int_val + fee, .val_to = int_val}; */
-  /* memcpy(int_trans.from, roger_addr, MT_SZ_ADDR); */
-  /* memcpy(int_trans.to, int_addr_1, MT_SZ_ADDR); */
-  /* byte* int_trans_str; */
-  /* int int_trans_str_size = pack_mac_any_trans(int_trans, &roger_pk, &roger_sk, &int_trans_str); */
-  /* tt_assert(mt_lpay_recv_message(&ledger, desc, MT_NTYPE_MAC_ANY_TRANS, int_trans_str, int_trans_str_size) == MT_SUCCESS); */
+  //------------------------------- Post Escrow -------------------------------//
 
-  /* //------------------------------- Post Escrow -------------------------------// */
+  int end_esc_val = 90 * 100;
+  int int_esc_val = 900 * 100;
 
-  /* int end_esc_val = 90 * 100; */
-  /* int int_esc_val = 900 * 100; */
+  exp_end_1_esc += end_esc_val;
+  exp_int_1_esc += int_esc_val;
+  exp_end_1_bal -= end_esc_val + public.fee;
+  exp_int_1_bal -= int_esc_val + public.fee;
+  exp_aut_0_bal += public.fee * 2;
 
-  /* exp_end_1_esc += end_esc_val; */
-  /* exp_int_1_esc += int_esc_val; */
-  /* exp_end_1_bal -= end_esc_val + fee; */
-  /* exp_int_1_bal -= int_esc_val + fee; */
-  /* exp_roger_bal += fee * 2; */
+  // end user escrow
+  chn_end_escrow_t end_esc = {.val_from = end_esc_val + public.fee, .val_to =   end_esc_val};
+  memcpy(end_esc.from, end_1_addr, MT_SZ_ADDR);
+  memcpy(end_esc.chn, chn_1_addr, MT_SZ_ADDR);
+  tt_assert(send_ledger(&end_1_pk, &end_1_sk, &end_1_desc, MT_NTYPE_CHN_END_ESCROW, &end_esc) == MT_SUCCESS);
 
-  /* // end user escrow */
-  /* chn_end_escrow_t end_esc = {.val_from = end_esc_val + fee, .val_to =   end_esc_val}; */
-  /* memcpy(end_esc.from, end_addr_1, MT_SZ_ADDR); */
-  /* memcpy(end_esc.chn, chn_addr, MT_SZ_ADDR); */
-  /* // ignore channel token */
+  // intermediary escrow
+  chn_int_escrow_t int_esc = {.val_from = int_esc_val + public.fee, .val_to = int_esc_val};
+  memcpy(int_esc.from, int_1_addr, MT_SZ_ADDR);
+  memcpy(int_esc.chn, chn_1_addr, MT_SZ_ADDR);
+  tt_assert(send_ledger(&int_1_pk, &int_1_sk, &int_1_desc, MT_NTYPE_CHN_INT_ESCROW, &int_esc) == MT_SUCCESS);
 
-  /* // send to ledger */
-  /* byte* end_esc_str; */
-  /* int end_esc_str_size = pack_chn_end_escrow(end_esc, &end_pk_1, &end_sk_1, &end_esc_str); */
-  /* tt_assert(mt_lpay_recv_message(&ledger, desc, MT_NTYPE_CHN_END_ESCROW, end_esc_str, end_esc_str_size) == MT_SUCCESS); */
+  //------------------------ Intermediary Request Close -----------------------//
 
-  /* // intermediary escrow */
-  /* chn_int_escrow_t int_esc = {.val_from = int_esc_val + fee, .val_to = int_esc_val}; */
-  /* memcpy(int_esc.from, int_addr_1, MT_SZ_ADDR); */
-  /* memcpy(int_esc.chn, chn_addr, MT_SZ_ADDR); */
-  /* // ignore channel token */
+  chn_int_reqclose_t int_reqclose;
+  memcpy(int_reqclose.chn, chn_1_addr, MT_SZ_ADDR);
+  tt_assert(send_ledger(&int_1_pk, &int_1_sk, &int_1_desc, MT_NTYPE_CHN_INT_REQCLOSE, &int_reqclose) == MT_SUCCESS);
 
-  /* // send to ledger */
-  /* byte* int_esc_str; */
-  /* int int_esc_str_size = pack_chn_int_escrow(int_esc, &int_pk_1, &int_sk_1, &int_esc_str); */
-  /* tt_assert(mt_lpay_recv_message(&ledger, desc, MT_NTYPE_CHN_INT_ESCROW, int_esc_str, int_esc_str_size) == MT_SUCCESS); */
 
-  /* //------------------------ Intermediary Request Close -----------------------// */
+  //------------------------------ End User Close -----------------------------//
 
-  /* chn_int_reqclose_t reqclose; */
-  /* memcpy(reqclose.chn, chn_addr, MT_SZ_ADDR); */
-  /* byte* reqclose_str; */
-  /* int reqclose_str_size = pack_chn_int_reqclose(reqclose, &int_pk_1, &int_sk_1, &reqclose_str); */
-  /* tt_assert(mt_lpay_recv_message(&ledger, desc, MT_NTYPE_CHN_INT_REQCLOSE, reqclose_str, reqclose_str_size) == MT_SUCCESS); */
+  chn_end_close_t end_close = {.last_pay_num = k};
+  memcpy(end_close.chn, chn_1_addr, MT_SZ_ADDR);
+  memcpy(end_close.last_hash, hc[k], MT_SZ_HASH);
+  tt_assert(send_ledger(&end_1_pk, &end_1_sk, &end_1_desc, MT_NTYPE_CHN_END_CLOSE, &end_close) == MT_SUCCESS);
 
-  /* //------------------------------ End User Close -----------------------------// */
+  //---------------------------- Intermediary Close ---------------------------//
 
-  /* chn_end_close_t end_close = {.last_pay_num = k}; */
-  /* memcpy(end_close.chn, chn_addr, MT_SZ_ADDR); */
-  /* memcpy(end_close.last_hash, hc[k], MT_SZ_HASH); */
-  /* byte* end_close_str; */
-  /* int end_close_str_size = pack_chn_end_close(end_close, &end_pk_1, &end_sk_1, &end_close_str); */
-  /* tt_assert(mt_lpay_recv_message(&ledger, desc, MT_NTYPE_CHN_END_CLOSE, end_close_str, end_close_str_size) == MT_SUCCESS); */
+  chn_int_close_t int_close = {.close_code = MT_CODE_ACCEPT, .last_pay_num = k};
+  memcpy(int_close.chn, chn_1_addr, MT_SZ_ADDR);
+  memcpy(int_close.last_hash, hc[k], MT_SZ_HASH);
+  tt_assert(send_ledger(&int_1_pk, &int_1_sk, &int_1_desc, MT_NTYPE_CHN_INT_CLOSE, &int_close) == MT_SUCCESS);
 
-  /* //---------------------------- Intermediary Close ---------------------------// */
+  //-------------------------------- Cash Out ---------------------------------//
 
-  /* chn_int_close_t int_close = {.close_code = MT_CODE_ACCEPT, .last_pay_num = k}; */
-  /* memcpy(int_close.chn, chn_addr, MT_SZ_ADDR); */
-  /* memcpy(int_close.last_hash, hc[k], MT_SZ_HASH); */
-  /* byte* int_close_str; */
-  /* int int_close_str_size = pack_chn_int_close(int_close, &int_pk_1, &int_sk_1, &int_close_str); */
-  /* tt_assert(mt_lpay_recv_message(&ledger, desc, MT_NTYPE_CHN_INT_CLOSE, int_close_str, int_close_str_size) == MT_SUCCESS); */
+  int end_cashout_val = 50 * 100;
+  int int_cashout_val = 50 * 100;
 
-  /* //-------------------------------- Cash Out ---------------------------------// */
+  exp_end_1_bal += end_cashout_val;
+  exp_int_1_bal += int_cashout_val;
+  exp_end_1_esc -= end_cashout_val + public.fee;
+  exp_int_1_esc -= (int)((double)int_cashout_val + (double)public.fee + int_cashout_val * public.tax);
+  exp_aut_0_bal += (int)((double)public.fee * 2 + int_cashout_val * public.tax);
 
-  /* int end_cashout_val = 50 * 100; */
-  /* int int_cashout_val = 50 * 100; */
+  // end user cash out
+  chn_end_cashout_t end_cashout = {.val_from = end_cashout_val + public.fee, .val_to = end_cashout_val};
+  memcpy(end_cashout.chn, chn_1_addr, MT_SZ_ADDR);
+  tt_assert(send_ledger(&end_1_pk, &end_1_sk, &end_1_desc, MT_NTYPE_CHN_END_CASHOUT, &end_cashout) == MT_SUCCESS);
 
-  /* exp_end_1_bal += end_cashout_val; */
-  /* exp_int_1_bal += int_cashout_val; */
-  /* exp_end_1_esc -= end_cashout_val + fee; */
-  /* exp_int_1_esc -= (int)((double)int_cashout_val + (double)fee + int_cashout_val * tax); */
-  /* exp_roger_bal += (int)((double)fee * 2 + int_cashout_val * tax); */
 
-  /* // end user cash out */
-  /* chn_end_cashout_t end_cashout = {.val_from = end_cashout_val + fee, .val_to = end_cashout_val}; */
-  /* memcpy(end_cashout.chn, chn_addr, MT_SZ_ADDR); */
-  /* byte* end_cashout_str; */
-  /* int end_cashout_str_size = pack_chn_end_cashout(end_cashout, &end_pk_1, &end_sk_1, &end_cashout_str); */
-  /* tt_assert(mt_lpay_recv_message(&ledger, desc, MT_NTYPE_CHN_END_CASHOUT, end_cashout_str, end_cashout_str_size) == MT_SUCCESS); */
+  // intermediary cash out
+  chn_int_cashout_t int_cashout;
+  int_cashout.val_from = (int)((double)int_cashout_val + (double)public.fee + (int_cashout_val * public.tax));
+  int_cashout.val_to = int_cashout_val;
+  memcpy(int_cashout.chn, chn_1_addr, MT_SZ_ADDR);
+  tt_assert(send_ledger(&int_1_pk, &int_1_sk, &int_1_desc, MT_NTYPE_CHN_INT_CASHOUT, &int_cashout) == MT_SUCCESS);
 
-  /* // intermediary cash out */
-  /* chn_int_cashout_t int_cashout; */
-  /* int_cashout.val_from = (int)((double)int_cashout_val + (double)fee + (int_cashout_val * tax)); */
-  /* int_cashout.val_to = int_cashout_val; */
-  /* memcpy(int_cashout.chn, chn_addr, MT_SZ_ADDR); */
-  /* byte* int_cashout_str; */
-  /* int int_cashout_str_size = pack_chn_int_cashout(int_cashout, &int_pk_1, &int_sk_1, &int_cashout_str); */
-  /* tt_assert(mt_lpay_recv_message(&ledger, desc, MT_NTYPE_CHN_INT_CASHOUT, int_cashout_str, int_cashout_str_size) == MT_SUCCESS); */
+  //------------------------------- Verify Balances ---------------------------//
 
-  /* //---------------------------------- Query ----------------------------------// */
-
-  /* // query roger */
-  /* mac_led_query_t roger_query; */
-  /* byte* roger_query_msg; */
-  /* memcpy(&roger_query.addr, roger_addr, MT_SZ_ADDR); */
-  /* int roger_query_msg_size = pack_mac_led_query(roger_query, &roger_pk, &roger_sk, &roger_query_msg); */
-  /* tt_assert(mt_lpay_recv_message(&ledger, desc, MT_NTYPE_MAC_LED_QUERY, roger_query_msg, roger_query_msg_size) == MT_SUCCESS); */
-  /* //  tt_assert(send_intercept_1 == exp_roger_bal); */
-
-  /* // query end user */
-  /* mac_led_query_t end_query; */
-  /* byte* end_query_msg; */
-  /* memcpy(&end_query.addr, end_addr_1, MT_SZ_ADDR); */
-  /* int end_query_msg_size = pack_mac_led_query(end_query, &roger_pk, &roger_sk, &end_query_msg); */
-  /* tt_assert(mt_lpay_recv_message(&ledger, desc, MT_NTYPE_MAC_LED_QUERY, end_query_msg, end_query_msg_size) == MT_SUCCESS); */
-  /* //tt_assert(send_intercept_1 == exp_end_1_bal); */
-
-  /* // query intermediary */
-  /* mac_led_query_t int_query; */
-  /* byte* int_query_msg; */
-  /* memcpy(&int_query.addr, int_addr_1, MT_SZ_ADDR); */
-  /* int int_query_msg_size = pack_mac_led_query(int_query, &roger_pk, &roger_sk, &int_query_msg); */
-  /* tt_assert(mt_lpay_recv_message(&ledger, desc, MT_NTYPE_MAC_LED_QUERY, int_query_msg, int_query_msg_size) == MT_SUCCESS); */
-  /* //tt_assert(send_intercept_1 == exp_int_1_bal); */
-
-  /* // query channel */
-  /* chn_led_query_t chn_query; */
-  /* byte* chn_query_msg; */
-  /* memcpy(&chn_query.addr, chn_addr, MT_SZ_ADDR); */
-  /* int chn_query_msg_size = pack_chn_led_query(chn_query, &roger_pk, &roger_sk, &chn_query_msg); */
-  /* tt_assert(mt_lpay_recv_message(&ledger, desc, MT_NTYPE_CHN_LED_QUERY, chn_query_msg, chn_query_msg_size) == MT_SUCCESS); */
-  /* //tt_assert(send_intercept_1 == exp_end_1_esc); */
-  /* //tt_assert(send_intercept_2 == exp_int_1_esc); */
+  /* tt_assert(mt_lpay_query_mac_balance(&aut_0_addr) == exp_aut_0_bal); */
+  /* tt_assert(mt_lpay_query_mac_balance(&end_1_addr) == exp_end_1_bal); */
+  /* tt_assert(mt_lpay_query_mac_balance(&int_1_addr) == exp_int_1_bal); */
+  /* tt_assert(mt_lpay_query_end_balance(&chn_1_addr) == exp_end_1_esc); */
+  /* tt_assert(mt_lpay_query_int_balance(&chn_1_addr) == exp_int_1_esc); */
 
  done:;
 }
