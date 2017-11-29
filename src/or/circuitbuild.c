@@ -2242,6 +2242,10 @@ warn_if_last_router_excluded(origin_circuit_t *circ,
       rs = options->ExcludeExitNodesUnion_;
       description = "controller-selected circuit target";
       break;
+    case CIRCUIT_PURPOSE_C_INTERMEDIARY:
+    case CIRCUIT_PURPOSE_R_INTERMEDIARY:
+      description = "chosen intermediary point";
+      break;
     }
 
   if (routerset_contains_extendinfo(rs, exit_ei)) {

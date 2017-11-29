@@ -33,7 +33,15 @@ static void intermediary_free(intermediary_t *intermediary);
 /*List of selected intermediaries */
 static smartlist_t *intermediaries = NULL;
 
-smartlist_t *get_intermediaries(int for_circuit) {
+smartlist_t* get_node_t_smartlist_intermerdiaries(void) {
+  smartlist_t *all_inter_nodes = smartlist_new();
+  SMARTLIST_FOREACH_BEGIN(intermediaries, intermediary_t*, intermediary) {
+    smartlist_add(all_inter_nodes, (void *)node_get_by_id(intermediary->identity->identity));
+  }SMARTLIST_FOREACH_END(intermediary);
+  return all_inter_nodes;
+}
+
+smartlist_t* get_intermediaries(int for_circuit) {
   (void)for_circuit;
   return NULL;
 }
@@ -177,7 +185,9 @@ run_cclient_build_circuit_event(time_t now) {
   /*Do we have enough intermediaries? if not, select new ones */
   /*exclude list is the intermediary list. Do we have any reason to extend this list
     to other relays?*/
-  choose_intermediaries(now, intermediaries);
+  smartlist_t *excludesmartlist = get_node_t_smartlist_intermerdiaries();
+  choose_intermediaries(now, excludesmartlist);
+  smartlist_free(excludesmartlist);
 
   /*For each intermediary in our list, verifies that we have a circuit
    *up and running. If not, build one.*/

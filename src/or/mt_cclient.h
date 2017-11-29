@@ -23,9 +23,12 @@ void mt_cclient_intermediary_circ_has_opened(origin_circuit_t *circ);
  */
 void run_cclient_scheduled_events(time_t now);
 
+
 //handle intermediaries
 //XXX MoneTor maybe all of intermediary-handling
 //    function need to be in a separate file?
+
+smartlist_t* get_node_t_smartlist_intermerdiaries(void);
 
 smartlist_t* get_intermediaries(int for_circuit);
 /**
