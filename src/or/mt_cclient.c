@@ -40,6 +40,7 @@ smartlist_t *get_intermediaries(int for_circuit) {
 
 void
 mt_cclient_init(void) {
+  log_info(LD_MT, "MoneTor: initialization of controler client code");
   tor_assert(!intermediaries); //should never be called twice
   intermediaries = smartlist_new();
 }
@@ -63,7 +64,7 @@ intermediary_need_cleanup(intermediary_t *intermediary, time_t now) {
             inter->identity->identity, DIGEST_LEN)){
         SMARTLIST_DEL_CURRENT(intermediaries, inter);
         intermediary_free(intermediary);
-        log_info(LD_MT, "Removing intermediary from list %ld",
+        log_info(LD_MT, "MoneTor: Removing intermediary from list %ld",
             (long) now);
       }
     } SMARTLIST_FOREACH_END(inter);
@@ -98,7 +99,7 @@ choose_intermediaries(time_t now, smartlist_t *exclude_list) {
   node = router_choose_random_node(exclude_list, get_options()->ExcludeNodes,
       flags);
   
-  log_info(LD_MT, "Chosen relay %s as intermediary", node_describe(node));
+  log_info(LD_MT, "MoneTor: Chosen relay %s as intermediary", node_describe(node));
 
   if (!node) {
     goto err;
@@ -121,7 +122,7 @@ choose_intermediaries(time_t now, smartlist_t *exclude_list) {
       count_exit++;
   } SMARTLIST_FOREACH_END(inter);
   /* Create the intermediary object */
-  log_info(LD_MT, "Chose an intermediary: %s at time %ld", extend_info_describe(ei),
+  log_info(LD_MT, "MoneTor: Chose an intermediary: %s at time %ld", extend_info_describe(ei),
       (long) now);
   intermediary = intermediary_new(node, ei, now);
   if (count_middle < count_exit)
@@ -195,7 +196,7 @@ run_cclient_build_circuit_event(time_t now) {
         continue;
       }
       /*We have circuit building - mark the intermediary*/
-      log_info(LD_MT, "Building intermediary circuit towards %s", 
+      log_info(LD_MT, "MoneTor: Building intermediary circuit towards %s", 
           node_describe(node_get_by_id(intermediary->identity->identity)));
       memcpy(circ->inter_ident->identity,
           intermediary->identity->identity, DIGEST_LEN);
