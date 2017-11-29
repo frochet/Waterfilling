@@ -2545,7 +2545,8 @@ compute_weighted_bandwidths(const smartlist_t *sl,
              rule == WEIGHT_FOR_EXIT ||
              rule == WEIGHT_FOR_GUARD ||
              rule == WEIGHT_FOR_MID ||
-             rule == WEIGHT_FOR_DIR);
+             rule == WEIGHT_FOR_DIR ||
+             rule == WEIGHT_FOR_INTERMEDIARY);
 
   if (smartlist_len(sl) == 0) {
     log_info(LD_CIRC,
