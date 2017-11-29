@@ -99,11 +99,12 @@ choose_intermediaries(time_t now, smartlist_t *exclude_list) {
   node = router_choose_random_node(exclude_list, get_options()->ExcludeNodes,
       flags);
   
-  log_info(LD_MT, "MoneTor: Chosen relay %s as intermediary", node_describe(node));
-
   if (!node) {
+    log_warn(LD_MT, "Something went wrong, we did not select any intermediary");
     goto err;
   }
+  log_info(LD_MT, "MoneTor: Chosen relay %s as intermediary", node_describe(node));
+  
   /* Since we have to provide extend_info for clients to connect as a 4th relay from a 3-hop
    * path, let's extract it now? */
   ei = extend_info_from_node(node, 0);
@@ -301,10 +302,11 @@ intermediary_new(const node_t *node, extend_info_t *ei, time_t now) {
   tor_assert(node);
   tor_assert(ei);
   intermediary_t *intermediary = tor_malloc_zero(sizeof(intermediary_t));
-
+  intermediary->identity = tor_malloc_zero(sizeof(intermediary_t));
   memcpy(intermediary->identity->identity, node->identity, DIGEST_LEN);
   strlcpy(intermediary->nickname, node->ri->nickname, sizeof(intermediary->nickname));
   intermediary->is_reachable = INTERMEDIARY_REACHABLE_MAYBE;
+
   intermediary->chosen_at = now;
   intermediary->ei = ei;
   return intermediary;
