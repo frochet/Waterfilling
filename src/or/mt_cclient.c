@@ -132,10 +132,12 @@ choose_intermediaries(time_t now, smartlist_t *exclude_list) {
     intermediary->linked_to = EXIT;
   //tor_assert(count_middle+counter_exit <= MAX_INTERMEDIARY_CHOSEN);
   smartlist_add(intermediaries, intermediary);
-  log_info(LD_MT, "MoneTor: added ientermediary to list");
+  log_info(LD_MT, "MoneTor: added intermediary to list");
+  return;
  err:
   extend_info_free(ei);
   intermediary_free(intermediary);
+  return;
 }
 
 /* Scheduled event run from the main loop every second.
@@ -186,6 +188,8 @@ run_cclient_build_circuit_event(time_t now) {
     circ = circuit_get_by_intermediary_ident(intermediary->identity);
     /* If no circ, launch one */
     if (!circ) {
+      log_info(LD_MT, "No circ towards intermediary %s",
+          extend_info_describe(intermediary->ei));
       int purpose = CIRCUIT_PURPOSE_C_INTERMEDIARY;
       int flags = CIRCLAUNCH_IS_INTERNAL;
       flags |= CIRCLAUNCH_NEED_UPTIME;
@@ -200,6 +204,7 @@ run_cclient_build_circuit_event(time_t now) {
       /*We have circuit building - mark the intermediary*/
       log_info(LD_MT, "MoneTor: Building intermediary circuit towards %s", 
           node_describe(node_get_by_id(intermediary->identity->identity)));
+      circ->inter_ident = tor_malloc_zero(sizeof(intermediary_identity_t));
       memcpy(circ->inter_ident->identity,
           intermediary->identity->identity, DIGEST_LEN);
     }
@@ -304,7 +309,8 @@ intermediary_new(const node_t *node, extend_info_t *ei, time_t now) {
   intermediary_t *intermediary = tor_malloc_zero(sizeof(intermediary_t));
   intermediary->identity = tor_malloc_zero(sizeof(intermediary_t));
   memcpy(intermediary->identity->identity, node->identity, DIGEST_LEN);
-  strlcpy(intermediary->nickname, node->ri->nickname, sizeof(intermediary->nickname));
+  //XXX MoneTor change nickname to something else, or remove nickname
+  //intermediary->nickname = tor_strdup(node->ri->nickname);
   intermediary->is_reachable = INTERMEDIARY_REACHABLE_MAYBE;
 
   intermediary->chosen_at = now;

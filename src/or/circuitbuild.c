@@ -1702,6 +1702,10 @@ route_len_for_purpose(uint8_t purpose, extend_info_t *exit_ei)
     /* client connecting to introduction point */
   case CIRCUIT_PURPOSE_S_CONNECT_REND:
     /* hidden service connecting to rendezvous point */
+  case CIRCUIT_PURPOSE_C_INTERMEDIARY:
+    /* intermediary circuit launched by clients */
+  case CIRCUIT_PURPOSE_R_INTERMEDIARY:
+    /* intermediary circuit launched by relays */
     known_purpose = 1;
     routelen++;
     break;
