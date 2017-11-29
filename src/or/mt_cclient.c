@@ -54,7 +54,8 @@ mt_cclient_init(void) {
  */
 static void
 intermediary_need_cleanup(intermediary_t *intermediary, time_t now) {
-  if (intermediary->circuit_retries > INTERMEDIARY_MAX_RETRIES) {
+  if (intermediary->circuit_retries > INTERMEDIARY_MAX_RETRIES ||
+      intermediary->is_reachable == INTERMEDIARY_REACHABLE_NO) {
     /* Remove intermediary from the list */
     SMARTLIST_FOREACH_BEGIN(intermediaries, intermediary_t *,
         inter) {
@@ -83,6 +84,7 @@ static void
 choose_intermediaries(time_t now, smartlist_t *exclude_list) {
   if (smartlist_len(intermediaries) == MAX_INTERMEDIARY_CHOSEN)
     return;
+  log_info(LD_MT, "MoneTor: Choosing intermediaries");
   /*We do not have enough node, let's pick some.*/
   const node_t *node;
   /*Handling extend info here is going to ease my life - great idea of the day*/
@@ -91,9 +93,12 @@ choose_intermediaries(time_t now, smartlist_t *exclude_list) {
   int count_middle = 0, count_exit = 0;
   /*Normal intermediary flags - We just need uptime*/
   router_crn_flags_t flags = CRN_NEED_UPTIME;
+  flags |= CRN_NEED_INTERMEDIARY;
 
   node = router_choose_random_node(exclude_list, get_options()->ExcludeNodes,
       flags);
+  
+  log_info(LD_MT, "Chosen relay %s as intermediary", node_describe(node));
 
   if (!node) {
     goto err;
@@ -144,6 +149,8 @@ run_cclient_housekeeping_event(time_t now) {
       /* intermediary is not reachable for a reason, checks
        * what's happening, log some information and rotate
        * the intermediary */
+      log_info(LD_MT, "MoneTor: Intermediary marked as not reachable"
+          " calling cleanup now %ld", (long) now);
       intermediary_need_cleanup(intermediary, now);
     }
   } SMARTLIST_FOREACH_END(intermediary);
@@ -188,6 +195,8 @@ run_cclient_build_circuit_event(time_t now) {
         continue;
       }
       /*We have circuit building - mark the intermediary*/
+      log_info(LD_MT, "Building intermediary circuit towards %s", 
+          node_describe(node_get_by_id(intermediary->identity->identity)));
       memcpy(circ->inter_ident->identity,
           intermediary->identity->identity, DIGEST_LEN);
     }
@@ -214,6 +223,11 @@ intermediary_t* mt_cclient_get_intermediary_from_ocirc(origin_circuit_t *ocirc) 
 
 void
 run_cclient_scheduled_events(time_t now) {
+  /* If we're a authority or a relay,
+   * we don't enable payment */
+  if (authdir_mode(get_options()) ||
+      server_mode(get_options()))
+    return;
   /*Make sure our controller is healthy*/
   run_cclient_housekeeping_event(now);
   /*Make sure our intermediaries are up*/
@@ -226,17 +240,40 @@ run_cclient_scheduled_events(time_t now) {
  *  - Is this a local close due to a timeout error or a circuit failure?
  */
 void mt_cclient_intermediary_circ_has_closed(origin_circuit_t *circ) {
+  intermediary_t* intermediary = NULL;
+  time_t now;
   if (TO_CIRCUIT(circ)->state != CIRCUIT_STATE_OPEN) {
     // means that we did not reach the intermediary point for whatever reason
     // (probably timeout -- retry)
-    intermediary_t* intermediary = mt_cclient_get_intermediary_from_ocirc(circ);
+    intermediary = mt_cclient_get_intermediary_from_ocirc(circ);
     intermediary->circuit_retries++;
-    /* Do we need to cleanup our intermediary? */
-    time_t now = approx_time();
-    intermediary_need_cleanup(intermediary, now);
+    if (intermediary->is_reachable == INTERMEDIARY_REACHABLE_YES)
+      intermediary->is_reachable = INTERMEDIARY_REACHABLE_MAYBE;
+    else if (intermediary->is_reachable == INTERMEDIARY_REACHABLE_MAYBE &&
+        intermediary->circuit_retries > INTERMEDIARY_MAX_RETRIES) {
+      intermediary->is_reachable = INTERMEDIARY_REACHABLE_NO;
+      goto cleanup;
+    }
+
+    /* maybe because extrainfo is not fresh anymore?  XXX change that :s*/
+    node_t* node = node_get_mutable_by_id(intermediary->identity->identity);
+    extend_info_t *ei = extend_info_from_node(node, 0);
+    if (!ei) {
+      intermediary->is_reachable = INTERMEDIARY_REACHABLE_NO;
+      goto cleanup;
+    }
+    extend_info_free(intermediary->ei);
+    intermediary->ei = ei;
   } else {
     /* Circuit has been closed - notify the payment module */
 
+  }
+
+ cleanup:
+  /* Do we need to cleanup our intermediary? */
+  if (intermediary) {
+    now = approx_time();
+    intermediary_need_cleanup(intermediary, now);
   }
 }
 

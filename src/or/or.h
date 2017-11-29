@@ -5456,8 +5456,12 @@ typedef struct dir_server_t {
 /** Possible ways to weight routers when choosing one randomly.  See
  * routerlist_sl_choose_by_bandwidth() for more information.*/
 typedef enum bandwidth_weight_rule_t {
-  NO_WEIGHTING, WEIGHT_FOR_EXIT, WEIGHT_FOR_MID, WEIGHT_FOR_GUARD,
-  WEIGHT_FOR_DIR
+  NO_WEIGHTING,
+  WEIGHT_FOR_EXIT,
+  WEIGHT_FOR_MID,
+  WEIGHT_FOR_GUARD,
+  WEIGHT_FOR_DIR,
+  WEIGHT_FOR_INTERMEDIARY,
 } bandwidth_weight_rule_t;
 
 /** Flags to be passed to control router_choose_random_node() to indicate what
@@ -5477,6 +5481,7 @@ typedef enum {
   /* On clients, only provide nodes with HSRend >= 2 protocol version which
    * is required for hidden service version >= 3. */
   CRN_RENDEZVOUS_V3 = 1<<9,
+  CRN_NEED_INTERMEDIARY = 1<<10,
 } router_crn_flags_t;
 
 /** Return value for router_add_to_routerlist() and dirserv_add_descriptor() */

@@ -1844,13 +1844,16 @@ router_find_exact_exit_enclave(const char *address, uint16_t port)
  */
 int
 node_is_unreliable(const node_t *node, int need_uptime,
-                   int need_capacity, int need_guard)
+                   int need_capacity, int need_guard,
+                   int need_intermediary)
 {
   if (need_uptime && !node->is_stable)
     return 1;
   if (need_capacity && !node->is_fast)
     return 1;
   if (need_guard && !node->is_possible_guard)
+    return 1;
+  if (need_intermediary && !node->is_intermediary)
     return 1;
   return 0;
 }
@@ -1865,7 +1868,7 @@ router_exit_policy_all_nodes_reject(const tor_addr_t *addr, uint16_t port,
 
   SMARTLIST_FOREACH_BEGIN(nodelist_get_list(), const node_t *, node) {
     if (node->is_running &&
-        !node_is_unreliable(node, need_uptime, 0, 0)) {
+        !node_is_unreliable(node, need_uptime, 0, 0, 0)) {
 
       r = compare_tor_addr_to_node_policy(addr, port, node);
 

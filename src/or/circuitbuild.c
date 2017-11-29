@@ -1911,7 +1911,7 @@ choose_good_exit_server_general(int need_uptime, int need_capacity)
       continue; /* not one of our chosen exit nodes */
     }
 
-    if (node_is_unreliable(node, need_uptime, need_capacity, 0)) {
+    if (node_is_unreliable(node, need_uptime, need_capacity, 0, 0)) {
       n_supported[i] = -1;
       continue; /* skip routers that are not suitable.  Don't worry if
                  * this makes us reject all the possible routers: if so,
@@ -2074,7 +2074,7 @@ pick_tor2web_rendezvous_node(router_crn_flags_t flags,
                                         0, 0, 0,
                                         need_desc,
                                         pref_addr,
-                                        direct_conn);
+                                        direct_conn, 0);
 
   /* Filter all_live_nodes to only add live *and* whitelisted RPs to
    * the list whitelisted_live_rps. */
