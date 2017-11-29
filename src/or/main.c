@@ -3069,8 +3069,6 @@ tor_init(int argc, char *argv[])
                       * cheap. */
   /* Initialize the HS subsystem. */
   hs_init();
-  /* Initialize the payment subsystem */
-  mt_init();
   {
   /* We search for the "quiet" option first, since it decides whether we
    * will log anything at all to the command line. */
@@ -3180,6 +3178,9 @@ tor_init(int argc, char *argv[])
   if (tor_init_libevent_rng() < 0) {
     log_warn(LD_NET, "Problem initializing libevent RNG.");
   }
+  
+  /* Initialize the payment subsystem */
+  mt_init();
 
   /* Scan/clean unparseable descroptors; after reading config */
   routerparse_init();
