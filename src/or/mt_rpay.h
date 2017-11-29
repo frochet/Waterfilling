@@ -11,36 +11,25 @@
 #include "mt_tokens.h"
 
 /**
- * Single instance of a relay payment object
- */
-typedef struct {
-
-    byte pp[MT_SZ_PP];
-    byte pk[MT_SZ_PK];
-    byte sk[MT_SZ_SK];
-    byte addr[MT_SZ_ADDR];
-
-    smartlist_t* chns_open;
-    digestmap_t* chns_taken;
-
-} mt_rpay_t;
-
-/**
  * Initialize a relay instance given public parameters, a currency
  * keypair, and a list of channels associated with the keypair.
  */
-int mt_rpay_init(mt_rpay_t* relay, byte (*pp)[MT_SZ_PP], byte (*pk)[MT_SZ_PK], byte (*sk)[MT_SZ_SK],
-		   chn_end_data_t* chn_data, int num_chns);
+int mt_rpay_init(void);
+
+/**
+ * Handle an incoming message. Requires the message sender, type, and size.
+ */
+int mt_rpay_recv(mt_desc_t* desc, mt_ntype_t type, byte* msg, int size);
 
 /**
  * Handle a special establish init message. This is needed because unlike other
  * messages, we need to consider not one but two descriptors
  */
-int mt_cpay_recvestab(mt_desc_t relay, mt_desc_t intermediary, byte* msg, int size);
+int mt_rpay_recv_multidesc(mt_desc_t* client, mt_desc_t* intermediary, mt_ntype_t type, byte* msg, int size);
 
 /**
- * Handle an incoming message. Requires the message sender, type, and size.
+ * Notify the payment module that a descriptor connection is read
  */
-int mt_rpay_recv_message(mt_rpay_t* relay, mt_desc_t desc, mt_ntype_t type, byte* msg, int size);
+int mt_rpay_notify_connect(mt_desc_t* desc);
 
 #endif

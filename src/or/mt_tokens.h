@@ -69,6 +69,8 @@ int pack_nan_int_estab5(nan_int_estab5_t* tkn, byte(*proto_id)[DIGEST_LEN], byte
 int pack_nan_rel_estab6(nan_rel_estab6_t* tkn, byte(*proto_id)[DIGEST_LEN], byte** str_out);
 int pack_nan_cli_pay1(nan_cli_pay1_t* tkn, byte(*proto_id)[DIGEST_LEN], byte** str_out);
 int pack_nan_rel_pay2(nan_rel_pay2_t* tkn, byte(*proto_id)[DIGEST_LEN], byte** str_out);
+int pack_nan_cli_reqclose1(nan_cli_reqclose1_t* token, byte(*proto_id)[DIGEST_LEN], byte** str_out);
+int pack_nan_rel_reqclose2(nan_rel_reqclose2_t* token, byte(*proto_id)[DIGEST_LEN], byte** str_out);
 int pack_nan_cli_destab1(nan_cli_destab1_t* tkn, byte(*proto_id)[DIGEST_LEN], byte** str_out);
 int pack_nan_int_destab2(nan_int_destab2_t* tkn, byte(*proto_id)[DIGEST_LEN], byte** str_out);
 int pack_nan_cli_dpay1(nan_cli_dpay1_t* tkn, byte(*proto_id)[DIGEST_LEN], byte** str_out);
@@ -130,7 +132,9 @@ int unpack_nan_rel_estab4(byte* str, int size, nan_rel_estab4_t* tkn_out, byte(*
 int unpack_nan_int_estab5(byte* str, int size, nan_int_estab5_t* tkn_out,  byte(*id_out)[DIGEST_LEN]);
 int unpack_nan_rel_estab6(byte* str, int size, nan_rel_estab6_t* tkn_out, byte(*id_out)[DIGEST_LEN]);
 int unpack_nan_cli_pay1(byte* str, int size, nan_cli_pay1_t* tkn_out,  byte(*id_out)[DIGEST_LEN]);
-int unpack_nan_rel_pay2(byte* str, int size, nan_rel_pay2_t* tkn_out, byte(*id_out)[DIGEST_LEN]);
+int unpack_nan_rel_pay2(byte* str, int size, nan_rel_pay2_t* tkn_out,  byte(*id_out)[DIGEST_LEN]);
+int unpack_nan_cli_reqclose1(byte* str, int size, nan_cli_reqclose1_t* tkn_out, byte(*id_out)[DIGEST_LEN]);
+int unpack_nan_rel_reqclose2(byte* str, int size, nan_rel_reqclose2_t* tkn_out, byte(*id_out)[DIGEST_LEN]);
 int unpack_nan_cli_destab1(byte* str, int size, nan_cli_destab1_t* tkn_out, byte(*id_out)[DIGEST_LEN]);
 int unpack_nan_int_destab2(byte* str, int size, nan_int_destab2_t* tkn_out, byte(*id_out)[DIGEST_LEN]);
 int unpack_nan_cli_dpay1(byte* str, int size, nan_cli_dpay1_t* tkn_out, byte(*id_out)[DIGEST_LEN]);

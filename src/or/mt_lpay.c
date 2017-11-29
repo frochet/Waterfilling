@@ -1,3 +1,6 @@
+// TODO: don't malloc map keys
+
+
 /**
  * \file mt_pay.c
  * \brief Implement a simple ledger for operating the moneTor payment

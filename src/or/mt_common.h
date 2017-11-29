@@ -90,4 +90,6 @@ int send_message(mt_desc_t *desc, mt_ntype_t type, byte* msg, int size);
 
 int alert_payment(mt_desc_t *desc);
 
+int mt_new_intermediary(mt_desc_t *desc);
+
 #endif

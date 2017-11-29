@@ -20,30 +20,24 @@ int mt_cpay_init(void);
  * Pay the given descriptor directly (instead of through an intermediary) as
  * needed for paying entry guards
  */
-int mt_cpay_directpay(mt_desc_t desc);
+int mt_cpay_directpay(mt_desc_t* desc);
 
 /**
  * Pay the given descriptor using an existing nanopayment channel
  */
-int mt_cpay_pay(mt_desc_t desc);
+int mt_cpay_pay(mt_desc_t* desc);
 
 /**
  * Close a nanopayment channel with the given descriptor
  */
-int mt_cpay_close(mt_desc_t desc);
+int mt_cpay_close(mt_desc_t* desc);
 
 /**
  * Handle an incoming message. Requires the message sender, type, and size.
  */
-int mt_cpay_recv(mt_desc_t desc, mt_ntype_t type, byte* msg, int size);
+int mt_cpay_recv(mt_desc_t* desc, mt_ntype_t type, byte* msg, int size);
 
 /************************ Needs to be moved somewhere else *******/
-
-// or
-typedef int (*mt_event_notify_t)(mt_desc_t, int);
-
-// controller
-mt_desc_t* mt_new_intermediary(void);
 
 // common
 void mt_desc2digest(mt_desc_t* desc, byte (*digest_out)[DIGEST_LEN]);

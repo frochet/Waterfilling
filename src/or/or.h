@@ -5706,8 +5706,12 @@ typedef enum {
   MT_NTYPE_NAN_REL_ESTAB6,      // to client
 
   // nanopayment pay protocol messages
-  MT_NTYPE_NAN_CLI_PAY1,	  // to relay
+  MT_NTYPE_NAN_CLI_PAY1,	// to relay
   MT_NTYPE_NAN_REL_PAY2,        // to client
+
+  // special protocol for a client to request nanopayment closure
+  MT_NTYPE_NAN_CLI_REQCLOSE1,    // to relay
+  MT_NTYPE_NAN_REL_REQCLOSE2,   // to client
 
   // nanopayment close protocol messages
   MT_NTYPE_NAN_END_CLOSE1,      // to intermediary
@@ -6069,22 +6073,6 @@ typedef struct {
 } nan_int_setup6_t;
 
 typedef struct {
-  byte preimage[MT_SZ_HASH];
-} nan_cli_destab1_t;
-
-typedef struct {
-  mt_code_t success;
-} nan_int_destab2_t;
-
-typedef struct {
-  byte preimage[MT_SZ_HASH];
-} nan_cli_dpay1_t;
-
-typedef struct {
-  mt_code_t success;
-} nan_int_dpay2_t;
-
-typedef struct {
   nan_any_chntok_t chntok;
 } nan_cli_estab1_t;
 
@@ -6120,6 +6108,30 @@ typedef struct {
 typedef struct {
   mt_code_t success;
 } nan_rel_pay2_t;
+
+typedef struct {
+  mt_code_t reqclose;
+} nan_cli_reqclose1_t;
+
+typedef struct {
+  mt_code_t success;
+} nan_rel_reqclose2_t;
+
+typedef struct {
+  byte preimage[MT_SZ_HASH];
+} nan_cli_destab1_t;
+
+typedef struct {
+  mt_code_t success;
+} nan_int_destab2_t;
+
+typedef struct {
+  byte preimage[MT_SZ_HASH];
+} nan_cli_dpay1_t;
+
+typedef struct {
+  mt_code_t success;
+} nan_int_dpay2_t;
 
 typedef struct {
   byte wpk[MT_SZ_PK];
@@ -6160,5 +6172,16 @@ typedef struct {
   mt_code_t success;
   byte sig[MT_SZ_SIG];
 } nan_int_close8_t;
+
+
+/***************************************************************/
+
+typedef int (*mt_event_notify_t)(mt_desc_t*, int);
+
+typedef struct {
+  mt_event_notify_t callback;
+  int time_started;
+} mt_request_t;
+
 
 #endif /* !defined(TOR_OR_H) */
