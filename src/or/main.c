@@ -3293,6 +3293,10 @@ tor_free_all(int postfork)
   bridges_free_all();
   consdiffmgr_free_all();
   hs_free_all();
+  /*
+   * XXX MoneTor - todo calling mt_cclient_free_all()
+   * and others
+   */
   if (!postfork) {
     config_free_all();
     or_state_free_all();
