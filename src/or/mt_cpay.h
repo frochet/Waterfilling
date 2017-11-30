@@ -37,9 +37,4 @@ int mt_cpay_close(mt_desc_t* desc);
  */
 int mt_cpay_recv(mt_desc_t* desc, mt_ntype_t type, byte* msg, int size);
 
-/************************ Needs to be moved somewhere else *******/
-
-// common
-void mt_desc2digest(mt_desc_t* desc, byte (*digest_out)[DIGEST_LEN]);
-
 #endif

@@ -151,69 +151,69 @@ int mt_lpay_recv_message(mt_desc_t* desc, mt_ntype_t type, byte* msg, int size){
 
   mt_pk2addr(&pk, &addr);
 
-  byte proto_id[DIGEST_LEN];
+  byte pid[DIGEST_LEN];
   int result;
 
   switch(type){
     case MT_NTYPE_MAC_AUT_MINT:;
       mac_aut_mint_t mac_aut_mint_tkn;
-      if(unpack_mac_aut_mint(raw_msg, raw_size, &mac_aut_mint_tkn, &proto_id) != MT_SUCCESS)
+      if(unpack_mac_aut_mint(raw_msg, raw_size, &mac_aut_mint_tkn, &pid) != MT_SUCCESS)
 	return MT_ERROR;
       result = handle_mac_aut_mint(&mac_aut_mint_tkn, &addr);
       break;
 
     case MT_NTYPE_MAC_ANY_TRANS:;
       mac_any_trans_t mac_any_trans_tkn;
-      if(unpack_mac_any_trans(raw_msg, raw_size, &mac_any_trans_tkn, &proto_id) != MT_SUCCESS)
+      if(unpack_mac_any_trans(raw_msg, raw_size, &mac_any_trans_tkn, &pid) != MT_SUCCESS)
 	return MT_ERROR;
       result = handle_mac_any_trans(&mac_any_trans_tkn, &addr);
       break;
 
     case MT_NTYPE_CHN_END_ESCROW:;
       chn_end_escrow_t chn_end_escrow_tkn;
-      if(unpack_chn_end_escrow(raw_msg, raw_size, &chn_end_escrow_tkn, &proto_id) != MT_SUCCESS)
+      if(unpack_chn_end_escrow(raw_msg, raw_size, &chn_end_escrow_tkn, &pid) != MT_SUCCESS)
 	return MT_ERROR;
       result = handle_chn_end_escrow(&chn_end_escrow_tkn, &addr);
       break;
 
     case MT_NTYPE_CHN_INT_ESCROW:;
       chn_int_escrow_t chn_int_escrow_tkn;
-      if(unpack_chn_int_escrow(raw_msg, raw_size, &chn_int_escrow_tkn, &proto_id) != MT_SUCCESS)
+      if(unpack_chn_int_escrow(raw_msg, raw_size, &chn_int_escrow_tkn, &pid) != MT_SUCCESS)
 	return MT_ERROR;
       result = handle_chn_int_escrow(&chn_int_escrow_tkn, &addr);
       break;
 
     case MT_NTYPE_CHN_INT_REQCLOSE:;
       chn_int_reqclose_t chn_int_reqclose_tkn;
-      if(unpack_chn_int_reqclose(raw_msg, raw_size, &chn_int_reqclose_tkn, &proto_id) != MT_SUCCESS)
+      if(unpack_chn_int_reqclose(raw_msg, raw_size, &chn_int_reqclose_tkn, &pid) != MT_SUCCESS)
 	return MT_ERROR;
       result = handle_chn_int_reqclose(&chn_int_reqclose_tkn, &addr);
       break;
 
     case MT_NTYPE_CHN_END_CLOSE:;
       chn_end_close_t chn_end_close_tkn;
-      if(unpack_chn_end_close(raw_msg, raw_size, &chn_end_close_tkn, &proto_id) != MT_SUCCESS)
+      if(unpack_chn_end_close(raw_msg, raw_size, &chn_end_close_tkn, &pid) != MT_SUCCESS)
 	return MT_ERROR;
       result = handle_chn_end_close(&chn_end_close_tkn, &addr);
       break;
 
     case MT_NTYPE_CHN_INT_CLOSE:;
       chn_int_close_t chn_int_close_tkn;
-      if(unpack_chn_int_close(raw_msg, raw_size, &chn_int_close_tkn, &proto_id) != MT_SUCCESS)
+      if(unpack_chn_int_close(raw_msg, raw_size, &chn_int_close_tkn, &pid) != MT_SUCCESS)
 	return MT_ERROR;
       result = handle_chn_int_close(&chn_int_close_tkn, &addr);
       break;
 
     case MT_NTYPE_CHN_END_CASHOUT:;
       chn_end_cashout_t chn_end_cashout_tkn;
-      if(unpack_chn_end_cashout(raw_msg, raw_size, &chn_end_cashout_tkn, &proto_id) != MT_SUCCESS)
+      if(unpack_chn_end_cashout(raw_msg, raw_size, &chn_end_cashout_tkn, &pid) != MT_SUCCESS)
 	return MT_ERROR;
       result = handle_chn_end_cashout(&chn_end_cashout_tkn, &addr);
       break;
 
     case MT_NTYPE_CHN_INT_CASHOUT:;
       chn_int_cashout_t chn_int_cashout_tkn;
-      if(unpack_chn_int_cashout(raw_msg, raw_size, &chn_int_cashout_tkn, &proto_id) != MT_SUCCESS)
+      if(unpack_chn_int_cashout(raw_msg, raw_size, &chn_int_cashout_tkn, &pid) != MT_SUCCESS)
 	return MT_ERROR;
       result = handle_chn_int_cashout(&chn_int_cashout_tkn, &addr);
       break;
@@ -227,7 +227,7 @@ int mt_lpay_recv_message(mt_desc_t* desc, mt_ntype_t type, byte* msg, int size){
   /* any_led_confirm_t response; */
   /* response.success = (result == MT_SUCCESS) ? MT_CODE_SUCCESS : MT_CODE_FAILURE; */
   /* byte* response_msg; */
-  /* int response_size = pack_any_led_confirm(&response, &proto_id, &response_msg); */
+  /* int response_size = pack_any_led_confirm(&response, &pid, &response_msg); */
   //  send_message(desc, MT_NTYPE_ANY_LED_CONFIRM, response_msg, response_size);
 
   free(raw_msg);

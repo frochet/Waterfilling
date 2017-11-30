@@ -5656,7 +5656,6 @@ typedef enum {
   MT_LTYPE_CHN_END_REFUND,      // end user nanopayment refund token
 
   MT_LTYPE_CHN_END_DATA,        // info to maintain channel for end user
-  MT_LTYPE_CHN_INT_DATA,        // info to maintain channel for intermediary
 
 } mt_ltype_t;
 
@@ -5752,8 +5751,7 @@ typedef struct {
 
 typedef struct {
   // public keys -> revocation tokens
-  //    GHashTable* state;
-  int spam;
+  digestmap_t* state;
 } chn_int_state_t;
 
 typedef struct {
@@ -5763,8 +5761,7 @@ typedef struct {
 
 typedef struct {
   // nanochannel tokens -> nanopayment states
-  //GHashTable* state;
-  int spam;
+  digestmap_t* state;
 } nan_int_state_t;
 
 typedef struct {
@@ -5798,7 +5795,7 @@ typedef struct {
 
 typedef struct {
   int balance;
-  byte esk_pk[MT_SZ_PK];
+  byte pk[MT_SZ_PK];
 } chn_int_chntok_t;
 
 typedef struct {
@@ -5831,6 +5828,7 @@ typedef struct {
 } mac_end_data_t;
 
 typedef struct {
+  byte pp[MT_SZ_PP];
   byte pk[MT_SZ_PK];
   byte sk[MT_SZ_SK];
   int balance;
@@ -5844,16 +5842,6 @@ typedef struct {
   nan_end_secret_t nan_secret;
   chn_end_refund_t refund;
 } chn_end_data_t;
-
-typedef struct {
-  byte pk[MT_SZ_PK];
-  byte sk[MT_SZ_SK];
-  int balance;
-
-  chn_int_state_t chn_state;
-  nan_int_state_t nan_state;
-  chn_int_chntok_t chn_token;
-} chn_int_data_t;
 
 //----------------------------- Network Tokens --------------------------//
 

@@ -44,6 +44,11 @@ typedef struct intermediary_t {
 int mt_pk2addr(byte (*pk)[MT_SZ_PK], byte (*addr_out)[MT_SZ_ADDR]);
 
 /**
+ * Convert a moneTor descriptor into a digest for digestmap_t
+ */
+void mt_desc2digest(mt_desc_t* desc, byte (*digest_out)[DIGEST_LEN]);
+
+/**
  * Convert an mt address into a printable hexidecimal c-string
  */
 int mt_addr2hex(byte (*addr)[MT_SZ_ADDR], char (*hex_out)[MT_SZ_ADDR * 2 + 3]);
