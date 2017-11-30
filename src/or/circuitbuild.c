@@ -1702,6 +1702,10 @@ route_len_for_purpose(uint8_t purpose, extend_info_t *exit_ei)
     /* client connecting to introduction point */
   case CIRCUIT_PURPOSE_S_CONNECT_REND:
     /* hidden service connecting to rendezvous point */
+  case CIRCUIT_PURPOSE_C_INTERMEDIARY:
+    /* intermediary circuit launched by clients */
+  case CIRCUIT_PURPOSE_R_INTERMEDIARY:
+    /* intermediary circuit launched by relays */
     known_purpose = 1;
     routelen++;
     break;
@@ -2237,6 +2241,10 @@ warn_if_last_router_excluded(origin_circuit_t *circ,
     case CIRCUIT_PURPOSE_CONTROLLER:
       rs = options->ExcludeExitNodesUnion_;
       description = "controller-selected circuit target";
+      break;
+    case CIRCUIT_PURPOSE_C_INTERMEDIARY:
+    case CIRCUIT_PURPOSE_R_INTERMEDIARY:
+      description = "chosen intermediary point";
       break;
     }
 
