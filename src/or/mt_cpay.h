@@ -17,15 +17,15 @@
 int mt_cpay_init(void);
 
 /**
+ * Pay the given descriptor using an existing nanopayment channel
+ */
+int mt_cpay_pay(mt_desc_t* desc);
+
+/**
  * Pay the given descriptor directly (instead of through an intermediary) as
  * needed for paying entry guards
  */
 int mt_cpay_directpay(mt_desc_t* desc);
-
-/**
- * Pay the given descriptor using an existing nanopayment channel
- */
-int mt_cpay_pay(mt_desc_t* desc);
 
 /**
  * Close a nanopayment channel with the given descriptor

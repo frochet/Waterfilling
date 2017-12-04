@@ -1,16 +1,33 @@
 #pragma GCC diagnostic ignored "-Wswitch-enum"
+#pragma GCC diagnostic ignored "-Wunused-function"
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
 
 #include "or.h"
+#include "workqueue.h"
+#include "cpuworker.h"
 #include "mt_common.h"
 #include "mt_cpay.h"
+
+typedef int (*mt_user_notify_t)(mt_desc_t*);
+
+typedef enum {
+  MT_ZKP_STATE_NONE,
+  MT_ZKP_STATE_STARTED,
+  MT_ZKP_STATE_READY,
+} mt_zkp_state_t;
 
 typedef struct {
   mt_desc_t rdesc;
   mt_desc_t idesc;
   chn_end_data_t data;
 
-  mt_event_notify_t callback;
+  mt_user_notify_t callback;
   mt_desc_t callback_desc;
+
+  mt_zkp_state_t zkp_state;
 } mt_channel_t;
 
 /**
@@ -23,6 +40,8 @@ typedef struct {
   byte sk[MT_SZ_SK];
   byte addr[MT_SZ_ADDR];
 
+  mt_desc_t ledger;
+
   smartlist_t* chns_setup;
   smartlist_t* chns_estab;
   smartlist_t* nans_setup;
@@ -33,15 +52,15 @@ typedef struct {
 } mt_cpay_t;
 
 // private initializer functions
-static int init_chn_end_escrow(mt_event_notify_t notify, mt_channel_t* chn, mt_desc_t* desc);
-static int init_chn_end_estab1(mt_event_notify_t notify, mt_channel_t* chn, mt_desc_t* desc);
-static int init_nan_cli_setup1(mt_event_notify_t notify, mt_channel_t* chn, mt_desc_t* desc);
-static int init_nan_cli_estab1(mt_event_notify_t notify, mt_channel_t* chn, mt_desc_t* desc);
-static int init_nan_cli_pay1(mt_event_notify_t notify, mt_channel_t* chn, mt_desc_t* desc);
-static int init_nan_cli_destab1(mt_event_notify_t notify, mt_channel_t* chn, mt_desc_t* desc);
-static int init_nan_cli_dpay1(mt_event_notify_t notify, mt_channel_t* chn,  mt_desc_t* desc);
-static int init_nan_cli_reqclose1(mt_event_notify_t notify, mt_channel_t* chn, mt_desc_t* desc);
-static int init_nan_end_close1(mt_event_notify_t notify, mt_channel_t* chn, mt_desc_t* desc);
+static int init_chn_end_setup(mt_user_notify_t notify, mt_channel_t* chn, mt_desc_t* desc);
+static int init_chn_end_estab1(mt_user_notify_t notify, mt_channel_t* chn, mt_desc_t* desc);
+static int init_nan_cli_setup1(mt_user_notify_t notify, mt_channel_t* chn, mt_desc_t* desc);
+static int init_nan_cli_estab1(mt_user_notify_t notify, mt_channel_t* chn, mt_desc_t* desc);
+static int init_nan_cli_pay1(mt_user_notify_t notify, mt_channel_t* chn, mt_desc_t* desc);
+static int init_nan_cli_destab1(mt_user_notify_t notify, mt_channel_t* chn, mt_desc_t* desc);
+static int init_nan_cli_dpay1(mt_user_notify_t notify, mt_channel_t* chn,  mt_desc_t* desc);
+static int init_nan_cli_reqclose1(mt_user_notify_t notify, mt_channel_t* chn, mt_desc_t* desc);
+static int init_nan_end_close1(mt_user_notify_t notify, mt_channel_t* chn, mt_desc_t* desc);
 
 // private handler functions
 static int handle_any_led_confirm(mt_desc_t* desc, any_led_confirm_t* token, byte (*pid)[DIGEST_LEN]);
@@ -61,30 +80,55 @@ static int handle_nan_int_close6(mt_desc_t* desc, nan_int_close6_t* token, byte 
 static int handle_nan_int_close8(mt_desc_t* desc, nan_int_close8_t* token, byte (*pid)[DIGEST_LEN]);
 
 // private helper functions
-static int mt_cpay_pay_help(mt_desc_t* desc, int success);
-static int mt_cpay_directpay_help(mt_desc_t* desc, int success);
-static int mt_cpay_close_help(mt_desc_t* desc, int success);
-
 static int compare_chn_end_data(const void** a, const void** b);
 
-static int mt_pay_notify(mt_desc_t* desc, int success);
-static int mt_directpay_notify(mt_desc_t* desc, int success);
-static int mt_close_notify(mt_desc_t* desc, int success);
+static workqueue_reply_t wallet_make(void* thread, void* arg);
+static void wallet_reply(void* arg);
+
+static int mt_pay_notify(mt_desc_t* desc);
+static int mt_directpay_notify(mt_desc_t* desc);
+static int mt_close_notify(mt_desc_t* desc);
 
 static mt_cpay_t client;
 
 int mt_cpay_init(void){
 
-  // TODO: load in keys
+  // TODO: get this to workx
+  // cpu_init();
 
   byte pp[MT_SZ_PP];
   byte pk[MT_SZ_PK];
   byte sk[MT_SZ_SK];
+  mt_desc_t ledger;
+
+  /********************************************************************/
+  //TODO replace with torrc
+
+  FILE* fp;
+
+  fp = fopen("mt_config_temp/pp", "rb");
+  tor_assert(fread(pp, 1, MT_SZ_PP, fp) == MT_SZ_PP);
+  fclose(fp);
+
+  fp = fopen("mt_config_temp/cli_pk", "rb");
+  tor_assert(fread(pk, 1, MT_SZ_PK, fp) == MT_SZ_PK);
+  fclose(fp);
+
+  fp = fopen("mt_config_temp/cli_sk", "rb");
+  tor_assert(fread(sk, 1, MT_SZ_SK, fp) == MT_SZ_SK);
+  fclose(fp);
+
+  fp = fopen("mt_config_temp/led_desc", "rb");
+  tor_assert(fread(&ledger, 1, sizeof(mt_desc_t), fp) == sizeof(mt_desc_t));
+  fclose(fp);
+
+  /********************************************************************/
 
   // copy in values crypto fields
   memcpy(client.pp, pp, MT_SZ_PP);
   memcpy(client.pk, pk, MT_SZ_PK);
   memcpy(client.sk, sk, MT_SZ_SK);
+  client.ledger = ledger;
 
   // initialize channel containers
   client.chns_setup = smartlist_new();
@@ -95,16 +139,10 @@ int mt_cpay_init(void){
   client.chns_transition = digestmap_new();
 
   // TODO generate new channels
-
   return MT_SUCCESS;
 }
 
 int mt_cpay_pay(mt_desc_t* desc){
-  return mt_cpay_pay_help(desc, MT_SUCCESS);
-}
-
-int mt_cpay_pay_help(mt_desc_t* desc, int success){
-  (void)success;
 
   mt_channel_t* chn;
   byte digest[DIGEST_LEN];
@@ -116,26 +154,21 @@ int mt_cpay_pay_help(mt_desc_t* desc, int success){
 
   if(((chn = digestmap_get(client.nans_estab, (char*)digest)) != NULL) &&
      chn->data.nan_state.num_payments == chn->data.nan_token.num_payments)
-    return init_nan_end_close1(mt_cpay_pay_help, chn, desc);
+    return init_nan_end_close1(mt_cpay_pay, chn, desc);
 
   if((chn = smartlist_pop_last(client.nans_setup)) != NULL)
-    return init_nan_cli_estab1(mt_cpay_pay_help, chn, desc);
+    return init_nan_cli_estab1(mt_cpay_pay, chn, desc);
 
   if((chn = smartlist_pop_last(client.chns_estab)) != NULL)
-    return init_nan_cli_setup1(mt_cpay_pay_help, chn, desc);
+    return init_nan_cli_setup1(mt_cpay_pay, chn, desc);
 
   if((chn = smartlist_pop_last(client.chns_setup)) != NULL)
-    return init_chn_end_estab1(mt_cpay_pay_help, chn, desc);
+    return init_chn_end_estab1(mt_cpay_pay, chn, desc);
 
-  return init_chn_end_escrow(mt_cpay_pay_help, NULL, desc);
+  return init_chn_end_setup(mt_cpay_pay, NULL, desc);
 }
 
 int mt_cpay_directpay(mt_desc_t* desc){
-  return mt_cpay_directpay_help(desc, MT_SUCCESS);
-}
-
-int mt_cpay_directpay_help(mt_desc_t* desc, int success){
-  (void)success;
 
   mt_channel_t* chn;
   byte digest[DIGEST_LEN];
@@ -147,26 +180,21 @@ int mt_cpay_directpay_help(mt_desc_t* desc, int success){
 
   if(((chn = digestmap_get(client.nans_estab, (char*)digest)) != NULL) &&
      chn->data.nan_state.num_payments == chn->data.nan_token.num_payments)
-    return init_nan_end_close1(mt_cpay_directpay_help, chn, desc);
+    return init_nan_end_close1(mt_cpay_directpay, chn, desc);
 
   if((chn = smartlist_pop_last(client.nans_setup)) != NULL)
-    return init_nan_cli_destab1(mt_cpay_directpay_help, chn, desc);
+    return init_nan_cli_destab1(mt_cpay_directpay, chn, desc);
 
   if((chn = smartlist_pop_last(client.chns_estab)) != NULL)
-    return init_nan_cli_setup1(mt_cpay_directpay_help, chn, desc);
+    return init_nan_cli_setup1(mt_cpay_directpay, chn, desc);
 
   if((chn = smartlist_pop_last(client.chns_setup)) != NULL)
-    return init_chn_end_estab1(mt_cpay_directpay_help, chn, desc);
+    return init_chn_end_estab1(mt_cpay_directpay, chn, desc);
 
-  return init_chn_end_escrow(mt_cpay_directpay_help, NULL, desc);
+  return init_chn_end_setup(mt_cpay_directpay, NULL, desc);
 }
 
 int mt_cpay_close(mt_desc_t* desc){
-  return mt_cpay_close_help(desc, MT_SUCCESS);
-}
-
-int mt_cpay_close_help(mt_desc_t* desc, int success){
-  (void) success;
 
   mt_channel_t* chn;
   byte digest[DIGEST_LEN];
@@ -176,7 +204,7 @@ int mt_cpay_close_help(mt_desc_t* desc, int success){
     return init_nan_end_close1(mt_close_notify, chn, desc);
 
   if((chn = digestmap_remove(client.nans_estab, (char*)digest)) != NULL)
-    return init_nan_cli_reqclose1(mt_cpay_close_help, chn, desc);
+    return init_nan_cli_reqclose1(mt_cpay_close, chn, desc);
 
   log_debug(LD_MT, "descriptor is in an incorrect state to perform the requested action");
   return MT_ERROR;
@@ -302,7 +330,7 @@ int mt_cpay_recv(mt_desc_t* desc, mt_ntype_t type, byte* msg, int size){
 
 /**************************** Initialize Protocols **********************/
 
-static int init_chn_end_escrow(mt_event_notify_t notify, mt_channel_t* chn, mt_desc_t* desc){
+static int init_chn_end_setup(mt_user_notify_t notify, mt_channel_t* chn, mt_desc_t* desc){
 
   mt_desc_t intermediary;
   if(mt_new_intermediary(&intermediary) != MT_SUCCESS)
@@ -312,39 +340,38 @@ static int init_chn_end_escrow(mt_event_notify_t notify, mt_channel_t* chn, mt_d
   chn = tor_calloc(1, sizeof(mt_channel_t));
   memcpy(&chn->idesc, &intermediary, sizeof(mt_desc_t));
   memcpy(chn->data.pk, client.pk, MT_SZ_PK);
-  memcpy(chn->data.sk, client.pk, MT_SZ_PK);
+  memcpy(chn->data.sk, client.sk, MT_SZ_SK);
 
   // TODO finish initializing channel
 
   byte pid[DIGEST_LEN];
-  mt_crypt_rand_bytes(DIGEST_LEN, pid);
+  mt_crypt_rand(DIGEST_LEN, pid);
   digestmap_set(client.chns_transition, (char*)pid, chn);
   chn->callback = notify;
   chn->callback_desc = *desc;
 
   // initialize escrow token
-  chn_end_escrow_t token;
+  chn_end_setup_t token;
 
   // TODO finish making escrow token
 
   // send escrow message
   byte* msg;
-  int msg_size = pack_chn_end_escrow(&token, (byte (*)[DIGEST_LEN])&pid, &msg);
-  send_message(desc, MT_NTYPE_CHN_END_ESCROW, msg, msg_size);
-
-  return MT_SUCCESS;
+  int msg_size = pack_chn_end_setup(&token, (byte (*)[DIGEST_LEN])&pid, &msg);
+  return mt_send_message(&client.ledger, MT_NTYPE_CHN_END_SETUP, msg, msg_size);
 }
 
-static int init_chn_end_estab1(mt_event_notify_t notify, mt_channel_t* chn, mt_desc_t* desc){
+static int init_chn_end_estab1(mt_user_notify_t notify, mt_channel_t* chn, mt_desc_t* desc){
 
   // add new protocol to chns_transition
   byte pid[DIGEST_LEN];
-  mt_crypt_rand_bytes(DIGEST_LEN, pid);
+  mt_crypt_rand(DIGEST_LEN, pid);
   digestmap_set(client.chns_transition, (char*)pid, chn);
   chn->callback = notify;
   chn->callback_desc = *desc;
 
-  // intiate token
+  // intiate token in workerqueue
+
   chn_end_estab1_t token;
 
   // TODO finish making token;
@@ -352,16 +379,16 @@ static int init_chn_end_estab1(mt_event_notify_t notify, mt_channel_t* chn, mt_d
   // send message
   byte* msg;
   int msg_size = pack_chn_end_estab1(&token, (byte (*)[DIGEST_LEN])&pid, &msg);
-  send_message(desc, MT_NTYPE_CHN_END_ESTAB1, msg, msg_size);
+  mt_send_message(desc, MT_NTYPE_CHN_END_ESTAB1, msg, msg_size);
 
   return MT_SUCCESS;
 }
 
-static int init_nan_cli_setup1(mt_event_notify_t notify, mt_channel_t* chn, mt_desc_t* desc){
+static int init_nan_cli_setup1(mt_user_notify_t notify, mt_channel_t* chn, mt_desc_t* desc){
 
   // add new protocol to chns_transition
   byte pid[DIGEST_LEN];
-  mt_crypt_rand_bytes(DIGEST_LEN, pid);
+  mt_crypt_rand(DIGEST_LEN, pid);
   digestmap_set(client.chns_transition, (char*)pid, chn);
   chn->callback = notify;
   chn->callback_desc = *desc;
@@ -369,22 +396,36 @@ static int init_nan_cli_setup1(mt_event_notify_t notify, mt_channel_t* chn, mt_d
   // intiate token
   nan_cli_setup1_t token;
 
-  // TODO finish making setup;
+  // intiate token in workerqueue
+
+  // if we have not started making the token then start making it
+  if(chn->zkp_state == MT_ZKP_STATE_NONE){
+    mt_desc_t* arg = malloc(sizeof(mt_desc_t));
+    memcpy(arg, desc, sizeof(mt_desc_t));
+
+    // fn is going to call commit wallet
+    // reply_fn is going to call notify
+
+    workqueue_entry_t* entry = cpuworker_queue_work(WQ_PRI_HIGH, wallet_make, wallet_reply, arg);
+    if(entry == NULL)
+      return MT_ERROR;
+    return MT_SUCCESS;
+  }
 
   // send message
   byte* msg;
   int msg_size = pack_nan_cli_setup1(&token, (byte (*)[DIGEST_LEN])&pid, &msg);
-  send_message(desc, MT_NTYPE_NAN_CLI_SETUP1, msg, msg_size);
+  mt_send_message(desc, MT_NTYPE_NAN_CLI_SETUP1, msg, msg_size);
 
   return MT_SUCCESS;
 
 }
 
-static int init_nan_cli_estab1(mt_event_notify_t notify, mt_channel_t* chn, mt_desc_t* desc){
+static int init_nan_cli_estab1(mt_user_notify_t notify, mt_channel_t* chn, mt_desc_t* desc){
 
   // add new protocol to chns_transition
   byte pid[DIGEST_LEN];
-  mt_crypt_rand_bytes(DIGEST_LEN, pid);
+  mt_crypt_rand(DIGEST_LEN, pid);
   digestmap_set(client.chns_transition, (char*)pid, chn);
   chn->callback = notify;
   // intiate token
@@ -395,19 +436,21 @@ static int init_nan_cli_estab1(mt_event_notify_t notify, mt_channel_t* chn, mt_d
   // send message
   byte* msg;
   int msg_size = pack_nan_cli_estab1(&token, (byte (*)[DIGEST_LEN])&pid, &msg);
-  send_message(desc, MT_NTYPE_NAN_CLI_ESTAB1, msg, msg_size);
+  mt_send_message(desc, MT_NTYPE_NAN_CLI_ESTAB1, msg, msg_size);
 
   return MT_SUCCESS;
 }
 
-static int init_nan_cli_pay1(mt_event_notify_t notify, mt_channel_t* chn, mt_desc_t* desc){
+static int init_nan_cli_pay1(mt_user_notify_t notify, mt_channel_t* chn, mt_desc_t* desc){
 
   // add new protocol to chns_transition
   byte pid[DIGEST_LEN];
-  mt_crypt_rand_bytes(DIGEST_LEN, pid);
+  mt_crypt_rand(DIGEST_LEN, pid);
   digestmap_set(client.chns_transition, (char*)pid, chn);
   chn->callback = notify;
+
   // intiate token
+
   nan_cli_pay1_t token;
 
   // TODO finish making setup;
@@ -415,16 +458,16 @@ static int init_nan_cli_pay1(mt_event_notify_t notify, mt_channel_t* chn, mt_des
   // send message
   byte* msg;
   int msg_size = pack_nan_cli_pay1(&token, (byte (*)[DIGEST_LEN])&pid, &msg);
-  send_message(desc, MT_NTYPE_NAN_CLI_PAY1, msg, msg_size);
+  mt_send_message(desc, MT_NTYPE_NAN_CLI_PAY1, msg, msg_size);
 
   return MT_SUCCESS;
 }
 
-static int init_nan_cli_destab1(mt_event_notify_t notify, mt_channel_t* chn, mt_desc_t* desc){
+static int init_nan_cli_destab1(mt_user_notify_t notify, mt_channel_t* chn, mt_desc_t* desc){
 
   // add new protocol to chns_transition
   byte pid[DIGEST_LEN];
-  mt_crypt_rand_bytes(DIGEST_LEN, pid);
+  mt_crypt_rand(DIGEST_LEN, pid);
   digestmap_set(client.chns_transition, (char*)pid, chn);
   chn->callback = notify;
   // intiate token
@@ -435,16 +478,16 @@ static int init_nan_cli_destab1(mt_event_notify_t notify, mt_channel_t* chn, mt_
   // send message
   byte* msg;
   int msg_size = pack_nan_cli_destab1(&token, (byte (*)[DIGEST_LEN])&pid, &msg);
-  send_message(desc, MT_NTYPE_NAN_CLI_DESTAB1, msg, msg_size);
+  mt_send_message(desc, MT_NTYPE_NAN_CLI_DESTAB1, msg, msg_size);
 
   return MT_SUCCESS;
 }
 
-static int init_nan_cli_dpay1(mt_event_notify_t notify, mt_channel_t* chn, mt_desc_t* desc){
+static int init_nan_cli_dpay1(mt_user_notify_t notify, mt_channel_t* chn, mt_desc_t* desc){
 
   // add new protocol to chns_transition
   byte pid[DIGEST_LEN];
-  mt_crypt_rand_bytes(DIGEST_LEN, pid);
+  mt_crypt_rand(DIGEST_LEN, pid);
   digestmap_set(client.chns_transition, (char*)pid, chn);
   chn->callback = notify;
   // intiate token
@@ -455,16 +498,16 @@ static int init_nan_cli_dpay1(mt_event_notify_t notify, mt_channel_t* chn, mt_de
   // send message
   byte* msg;
   int msg_size = pack_nan_cli_dpay1(&token, (byte (*)[DIGEST_LEN])&pid, &msg);
-  send_message(desc, MT_NTYPE_NAN_CLI_DPAY1, msg, msg_size);
+  mt_send_message(desc, MT_NTYPE_NAN_CLI_DPAY1, msg, msg_size);
 
   return MT_SUCCESS;
 }
 
-static int init_nan_cli_reqclose1(mt_event_notify_t notify, mt_channel_t* chn,  mt_desc_t* desc){
+static int init_nan_cli_reqclose1(mt_user_notify_t notify, mt_channel_t* chn,  mt_desc_t* desc){
 
   // add new protocol to chns_transition
   byte pid[DIGEST_LEN];
-  mt_crypt_rand_bytes(DIGEST_LEN, pid);
+  mt_crypt_rand(DIGEST_LEN, pid);
   digestmap_set(client.chns_transition, (char*)pid, chn);
   chn->callback = notify;
   chn->callback_desc = *desc;
@@ -477,16 +520,16 @@ static int init_nan_cli_reqclose1(mt_event_notify_t notify, mt_channel_t* chn,  
   // send message
   byte* msg;
   int msg_size = pack_nan_cli_reqclose1(&token, (byte (*)[DIGEST_LEN])&pid, &msg);
-  send_message(desc, MT_NTYPE_NAN_CLI_REQCLOSE1, msg, msg_size);
+  mt_send_message(desc, MT_NTYPE_NAN_CLI_REQCLOSE1, msg, msg_size);
 
   return MT_SUCCESS;
 }
 
-static int init_nan_end_close1(mt_event_notify_t notify, mt_channel_t* chn, mt_desc_t* desc){
+static int init_nan_end_close1(mt_user_notify_t notify, mt_channel_t* chn, mt_desc_t* desc){
 
   // add new protocol to chns_transition
   byte pid[DIGEST_LEN];
-  mt_crypt_rand_bytes(DIGEST_LEN, pid);
+  mt_crypt_rand(DIGEST_LEN, pid);
   digestmap_set(client.chns_transition, (char*)pid, chn);
   chn->callback = notify;
   // intiate token
@@ -497,7 +540,7 @@ static int init_nan_end_close1(mt_event_notify_t notify, mt_channel_t* chn, mt_d
   // send message
   byte* msg;
   int msg_size = pack_nan_end_close1(&token, (byte (*)[DIGEST_LEN])&pid, &msg);
-  send_message(desc, MT_NTYPE_NAN_END_CLOSE1, msg, msg_size);
+  mt_send_message(desc, MT_NTYPE_NAN_END_CLOSE1, msg, msg_size);
 
   return MT_SUCCESS;
 }
@@ -521,7 +564,7 @@ static int handle_any_led_confirm(mt_desc_t* desc, any_led_confirm_t* token, byt
   smartlist_add(client.chns_setup, chn);
 
   if(chn->callback != NULL)
-    chn->callback(&chn->callback_desc, MT_SUCCESS);
+    chn->callback(&chn->callback_desc);
   return MT_SUCCESS;
 }
 
@@ -545,7 +588,7 @@ static int handle_chn_int_estab2(mt_desc_t* desc, chn_int_estab2_t* token, byte 
 
   byte* resp_msg;
   int resp_size = pack_chn_end_estab3(&response, pid, &resp_msg);
-  send_message(desc, MT_NTYPE_CHN_END_ESTAB3, resp_msg, resp_size);
+  mt_send_message(desc, MT_NTYPE_CHN_END_ESTAB3, resp_msg, resp_size);
   return MT_SUCCESS;
 }
 
@@ -564,7 +607,7 @@ static int handle_chn_int_estab4(mt_desc_t* desc, chn_int_estab4_t* token, byte 
 
   // check validity of incoming message
   if(chn->callback != NULL)
-    chn->callback(&chn->callback_desc, MT_SUCCESS);
+    chn->callback(&chn->callback_desc);
   return MT_SUCCESS;
 }
 
@@ -588,7 +631,7 @@ static int handle_nan_int_setup2(mt_desc_t* desc, nan_int_setup2_t* token, byte 
 
   byte* resp_msg;
   int resp_size = pack_nan_int_setup2(&response, pid, &resp_msg);
-  send_message(desc, MT_NTYPE_NAN_INT_SETUP2, resp_msg, resp_size);
+  mt_send_message(desc, MT_NTYPE_NAN_INT_SETUP2, resp_msg, resp_size);
 
   return MT_SUCCESS;
 }
@@ -611,7 +654,7 @@ static int handle_nan_int_setup4(mt_desc_t* desc, nan_int_setup4_t* token, byte 
 
   byte* resp_msg;
   int resp_size = pack_nan_cli_setup5(&response, pid, &resp_msg);
-  send_message(desc, MT_NTYPE_NAN_CLI_SETUP5, resp_msg, resp_size);
+  mt_send_message(desc, MT_NTYPE_NAN_CLI_SETUP5, resp_msg, resp_size);
 
   return MT_SUCCESS;
 }
@@ -633,7 +676,7 @@ static int handle_nan_int_setup6(mt_desc_t* desc, nan_int_setup6_t* token, byte 
 
   // check validity incoming message
   if(chn->callback != NULL)
-    chn->callback(&chn->callback_desc, MT_SUCCESS);
+    chn->callback(&chn->callback_desc);
   return MT_SUCCESS;
 }
 
@@ -656,7 +699,7 @@ static int handle_nan_rel_estab6(mt_desc_t* desc, nan_rel_estab6_t* token, byte 
 
   // check validity incoming message
   if(chn->callback != NULL)
-    chn->callback(&chn->callback_desc, MT_SUCCESS);
+    chn->callback(&chn->callback_desc);
   return MT_SUCCESS;
 }
 
@@ -676,6 +719,7 @@ static int handle_nan_rel_pay2(mt_desc_t* desc, nan_rel_pay2_t* token, byte (*pi
   mt_desc2digest(desc, &digest);
   digestmap_remove(client.chns_transition, (char*)*pid);
   digestmap_set(client.nans_estab, (char*)desc, chn);
+  return MT_SUCCESS;
 }
 
 /************************ Nano Direct Establish *************************/
@@ -697,12 +741,12 @@ static int handle_nan_int_destab2(mt_desc_t* desc, nan_int_destab2_t* token, byt
 
   // check validity incoming message
   if(chn->callback != NULL)
-    chn->callback(&chn->callback_desc, MT_SUCCESS);
+    chn->callback(&chn->callback_desc);
   return MT_SUCCESS;
 
   // check validity incoming message
   if(chn->callback != NULL)
-    chn->callback(&chn->callback_desc, MT_SUCCESS);
+    chn->callback(&chn->callback_desc);
   return MT_SUCCESS;
 }
 
@@ -725,7 +769,7 @@ static int handle_nan_int_dpay2(mt_desc_t* desc, nan_int_dpay2_t* token, byte (*
 
   // check validity incoming message
   if(chn->callback != NULL)
-    chn->callback(&chn->callback_desc, MT_SUCCESS);
+    chn->callback(&chn->callback_desc);
   return MT_SUCCESS;
 }
 
@@ -748,7 +792,7 @@ static int handle_nan_rel_reqclose2(mt_desc_t* desc, nan_rel_reqclose2_t* token,
 
   // check validity incoming message
   if(chn->callback != NULL)
-    chn->callback(&chn->callback_desc, MT_SUCCESS);
+    chn->callback(&chn->callback_desc);
   return MT_SUCCESS;
 }
 
@@ -772,7 +816,7 @@ static int handle_nan_int_close2(mt_desc_t* desc, nan_int_close2_t* token, byte 
 
   byte* resp_msg;
   int resp_size = pack_nan_end_close3(&response, pid, &resp_msg);
-  send_message(desc, MT_NTYPE_NAN_END_CLOSE3, resp_msg, resp_size);
+  mt_send_message(desc, MT_NTYPE_NAN_END_CLOSE3, resp_msg, resp_size);
 
   return MT_SUCCESS;
 }
@@ -795,7 +839,7 @@ static int handle_nan_int_close4(mt_desc_t* desc, nan_int_close4_t* token, byte 
 
   byte* resp_msg;
   int resp_size = pack_nan_end_close5(&response, pid, &resp_msg);
-  send_message(desc, MT_NTYPE_NAN_END_CLOSE5, resp_msg, resp_size);
+  mt_send_message(desc, MT_NTYPE_NAN_END_CLOSE5, resp_msg, resp_size);
 
   return MT_SUCCESS;
 }
@@ -818,7 +862,7 @@ static int handle_nan_int_close6(mt_desc_t* desc, nan_int_close6_t* token, byte 
 
   byte* resp_msg;
   int resp_size = pack_nan_end_close7(&response, pid, &resp_msg);
-  send_message(desc, MT_NTYPE_NAN_END_CLOSE7, resp_msg, resp_size);
+  mt_send_message(desc, MT_NTYPE_NAN_END_CLOSE7, resp_msg, resp_size);
 
   return MT_SUCCESS;
 }
@@ -841,7 +885,7 @@ static int handle_nan_int_close8(mt_desc_t* desc, nan_int_close8_t* token, byte 
   digestmap_set(client.nans_estab, (char*)desc, chn);
 
   if(chn->callback != NULL)
-    chn->callback(&chn->callback_desc, MT_SUCCESS);
+    chn->callback(&chn->callback_desc);
   return MT_SUCCESS;
 }
 
@@ -858,21 +902,33 @@ static int compare_chn_end_data(const void** a, const void** b){
   return MT_SUCCESS;
 }
 
-static int mt_pay_notify(mt_desc_t* desc, int success){
+static workqueue_reply_t wallet_make(void* thread, void* arg){
+  //unpack wallet to components and call make wallet
+  (void)thread;
+  (void)arg;
+
+  workqueue_reply_t reply = WQ_RPL_REPLY;
+  return reply;
+}
+
+static void wallet_reply(void* arg){
+  (void)arg;
+  //extract callback from arg and call it
+}
+
+static int mt_pay_notify(mt_desc_t* desc){
   (void)desc;
-  (void)success;
   return 0;
 }
 
-static int mt_directpay_notify(mt_desc_t* desc, int success){
+static int mt_directpay_notify(mt_desc_t* desc){
   (void)desc;
-  (void)success;
   return 0;
 
 }
-static int mt_close_notify(mt_desc_t* desc, int success){
+
+static int mt_close_notify(mt_desc_t* desc){
   (void)desc;
-  (void)success;
 
   smartlist_sort(client.nans_setup, compare_chn_end_data);
   return 0;

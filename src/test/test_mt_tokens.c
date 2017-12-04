@@ -50,8 +50,8 @@ static void test_mt_tokens(void *arg)
   // declare each type of token
   mac_aut_mint_t tk1_mac_aut_mint;
   mac_any_trans_t tk1_mac_any_trans;
-  chn_end_escrow_t tk1_chn_end_escrow;
-  chn_int_escrow_t tk1_chn_int_escrow;
+  chn_end_setup_t tk1_chn_end_setup;
+  chn_int_setup_t tk1_chn_int_setup;
   chn_int_reqclose_t tk1_chn_int_reqclose;
   chn_end_close_t tk1_chn_end_close;
   chn_int_close_t tk1_chn_int_close;
@@ -61,8 +61,8 @@ static void test_mt_tokens(void *arg)
   // fill the tokens with random info so we don't get any trivial blank tokens
   write_random_bytes(&tk1_mac_aut_mint, sizeof(mac_aut_mint_t));
   write_random_bytes(&tk1_mac_any_trans, sizeof(mac_any_trans_t));
-  write_random_bytes(&tk1_chn_end_escrow, sizeof(chn_end_escrow_t));
-  write_random_bytes(&tk1_chn_int_escrow, sizeof(chn_int_escrow_t));
+  write_random_bytes(&tk1_chn_end_setup, sizeof(chn_end_setup_t));
+  write_random_bytes(&tk1_chn_int_setup, sizeof(chn_int_setup_t));
   write_random_bytes(&tk1_chn_int_reqclose, sizeof(chn_int_reqclose_t));
   write_random_bytes(&tk1_chn_end_close, sizeof(chn_end_close_t));
   write_random_bytes(&tk1_chn_int_close, sizeof(chn_int_close_t));
@@ -72,8 +72,8 @@ static void test_mt_tokens(void *arg)
   // string pointers that will point to the network sendable strings
   byte* str_mac_aut_mint;
   byte* str_mac_any_trans;
-  byte* str_chn_end_escrow;
-  byte* str_chn_int_escrow;
+  byte* str_chn_end_setup;
+  byte* str_chn_int_setup;
   byte* str_chn_int_reqclose;
   byte* str_chn_end_close;
   byte* str_chn_int_close;
@@ -83,8 +83,8 @@ static void test_mt_tokens(void *arg)
   // pack the original tokens into the strings
   int size_mac_aut_mint =  pack_mac_aut_mint(&tk1_mac_aut_mint, &proto_id, &str_mac_aut_mint);
   int size_mac_any_trans =  pack_mac_any_trans(&tk1_mac_any_trans, &proto_id, &str_mac_any_trans);
-  int size_chn_end_escrow =  pack_chn_end_escrow(&tk1_chn_end_escrow, &proto_id, &str_chn_end_escrow);
-  int size_chn_int_escrow =  pack_chn_int_escrow(&tk1_chn_int_escrow, &proto_id, &str_chn_int_escrow);
+  int size_chn_end_setup =  pack_chn_end_setup(&tk1_chn_end_setup, &proto_id, &str_chn_end_setup);
+  int size_chn_int_setup =  pack_chn_int_setup(&tk1_chn_int_setup, &proto_id, &str_chn_int_setup);
   int size_chn_int_reqclose =  pack_chn_int_reqclose(&tk1_chn_int_reqclose, &proto_id, &str_chn_int_reqclose);
   int size_chn_end_close =  pack_chn_end_close(&tk1_chn_end_close, &proto_id, &str_chn_end_close);
   int size_chn_int_close =  pack_chn_int_close(&tk1_chn_int_close, &proto_id, &str_chn_int_close);
@@ -94,8 +94,8 @@ static void test_mt_tokens(void *arg)
   // declare each type of token
   mac_aut_mint_t tk2_mac_aut_mint;
   mac_any_trans_t tk2_mac_any_trans;
-  chn_end_escrow_t tk2_chn_end_escrow;
-  chn_int_escrow_t tk2_chn_int_escrow;
+  chn_end_setup_t tk2_chn_end_setup;
+  chn_int_setup_t tk2_chn_int_setup;
   chn_int_reqclose_t tk2_chn_int_reqclose;
   chn_end_close_t tk2_chn_end_close;
   chn_int_close_t tk2_chn_int_close;
@@ -105,8 +105,8 @@ static void test_mt_tokens(void *arg)
   // extract new tokens from the strings
   unpack_mac_aut_mint(str_mac_aut_mint, size_mac_aut_mint, &tk2_mac_aut_mint, &proto_id);
   unpack_mac_any_trans(str_mac_any_trans, size_mac_any_trans, &tk2_mac_any_trans, &proto_id);
-  unpack_chn_end_escrow(str_chn_end_escrow, size_chn_end_escrow, &tk2_chn_end_escrow, &proto_id);
-  unpack_chn_int_escrow(str_chn_int_escrow, size_chn_int_escrow, &tk2_chn_int_escrow, &proto_id);
+  unpack_chn_end_setup(str_chn_end_setup, size_chn_end_setup, &tk2_chn_end_setup, &proto_id);
+  unpack_chn_int_setup(str_chn_int_setup, size_chn_int_setup, &tk2_chn_int_setup, &proto_id);
   unpack_chn_int_reqclose(str_chn_int_reqclose, size_chn_int_reqclose, &tk2_chn_int_reqclose, &proto_id);
   unpack_chn_end_close(str_chn_end_close, size_chn_end_close, &tk2_chn_end_close, &proto_id);
   unpack_chn_int_close(str_chn_int_close, size_chn_int_close, &tk2_chn_int_close, &proto_id);
@@ -116,8 +116,8 @@ static void test_mt_tokens(void *arg)
   // tt_assert that the original tokens are identical to the new torkns
   tt_assert(memcmp(&tk1_mac_aut_mint, &tk2_mac_aut_mint, sizeof(mac_aut_mint_t)) == 0);
   tt_assert(memcmp(&tk1_mac_any_trans, &tk2_mac_any_trans, sizeof(mac_any_trans_t)) == 0);
-  tt_assert(memcmp(&tk1_chn_end_escrow, &tk2_chn_end_escrow, sizeof(chn_end_escrow_t)) == 0);
-  tt_assert(memcmp(&tk1_chn_int_escrow, &tk2_chn_int_escrow, sizeof(chn_int_escrow_t)) == 0);
+  tt_assert(memcmp(&tk1_chn_end_setup, &tk2_chn_end_setup, sizeof(chn_end_setup_t)) == 0);
+  tt_assert(memcmp(&tk1_chn_int_setup, &tk2_chn_int_setup, sizeof(chn_int_setup_t)) == 0);
   tt_assert(memcmp(&tk1_chn_int_reqclose, &tk2_chn_int_reqclose, sizeof(chn_int_reqclose_t)) == 0);
   tt_assert(memcmp(&tk1_chn_end_close, &tk2_chn_end_close, sizeof(chn_end_close_t)) == 0);
   tt_assert(memcmp(&tk1_chn_int_close, &tk2_chn_int_close, sizeof(chn_int_close_t)) == 0);
@@ -127,8 +127,8 @@ static void test_mt_tokens(void *arg)
  done:
   tor_free(str_mac_aut_mint);
   tor_free(str_mac_any_trans);
-  tor_free(str_chn_end_escrow);
-  tor_free(str_chn_int_escrow);
+  tor_free(str_chn_end_setup);
+  tor_free(str_chn_int_setup);
   tor_free(str_chn_int_reqclose);
   tor_free(str_chn_end_close);
   tor_free(str_chn_int_close);

@@ -64,12 +64,12 @@ int pack_mac_any_trans(mac_any_trans_t* token, byte(*pid)[DIGEST_LEN], byte** st
     return pack_token(MT_NTYPE_MAC_ANY_TRANS, token, sizeof(*token), pid, str_out);
 }
 
-int pack_chn_end_escrow(chn_end_escrow_t* token, byte(*pid)[DIGEST_LEN], byte** str_out){
-    return pack_token(MT_NTYPE_CHN_END_ESCROW, token, sizeof(*token), pid, str_out);
+int pack_chn_end_setup(chn_end_setup_t* token, byte(*pid)[DIGEST_LEN], byte** str_out){
+    return pack_token(MT_NTYPE_CHN_END_SETUP, token, sizeof(*token), pid, str_out);
 }
 
-int pack_chn_int_escrow(chn_int_escrow_t* token, byte(*pid)[DIGEST_LEN], byte** str_out){
-    return pack_token(MT_NTYPE_CHN_INT_ESCROW, token, sizeof(*token), pid, str_out);
+int pack_chn_int_setup(chn_int_setup_t* token, byte(*pid)[DIGEST_LEN], byte** str_out){
+    return pack_token(MT_NTYPE_CHN_INT_SETUP, token, sizeof(*token), pid, str_out);
 }
 
 int pack_any_led_confirm(any_led_confirm_t* token, byte(*pid)[DIGEST_LEN], byte** str_out){
@@ -286,16 +286,16 @@ int unpack_mac_any_trans(byte* str, int size, mac_any_trans_t* tkn_out, byte(*pi
   return unpack_token(MT_NTYPE_MAC_ANY_TRANS, str, sizeof(*tkn_out), tkn_out, pid_out);
 }
 
-int unpack_chn_end_escrow(byte* str, int size, chn_end_escrow_t* tkn_out, byte(*pid_out)[DIGEST_LEN]){
+int unpack_chn_end_setup(byte* str, int size, chn_end_setup_t* tkn_out, byte(*pid_out)[DIGEST_LEN]){
   if(size != sizeof(mt_ntype_t) + sizeof(*tkn_out) + DIGEST_LEN)
     return MT_ERROR;
-  return unpack_token(MT_NTYPE_CHN_END_ESCROW, str, sizeof(*tkn_out), tkn_out, pid_out);
+  return unpack_token(MT_NTYPE_CHN_END_SETUP, str, sizeof(*tkn_out), tkn_out, pid_out);
 }
 
-int unpack_chn_int_escrow(byte* str, int size, chn_int_escrow_t* tkn_out, byte(*pid_out)[DIGEST_LEN]){
+int unpack_chn_int_setup(byte* str, int size, chn_int_setup_t* tkn_out, byte(*pid_out)[DIGEST_LEN]){
   if(size != sizeof(mt_ntype_t) + sizeof(*tkn_out) + DIGEST_LEN)
     return MT_ERROR;
-  return unpack_token(MT_NTYPE_CHN_INT_ESCROW, str, sizeof(*tkn_out), tkn_out, pid_out);
+  return unpack_token(MT_NTYPE_CHN_INT_SETUP, str, sizeof(*tkn_out), tkn_out, pid_out);
 }
 
 int unpack_any_led_confirm(byte* str, int size, any_led_confirm_t* tkn_out, byte(*pid_out)[DIGEST_LEN]){
@@ -587,6 +587,12 @@ int unpack_nan_end_close7(byte* str, int size, nan_end_close7_t* tkn_out, byte(*
   if(size != sizeof(mt_ntype_t) + sizeof(*tkn_out) + DIGEST_LEN)
     return MT_ERROR;
   return unpack_token(MT_NTYPE_NAN_END_CLOSE7, str, sizeof(*tkn_out), tkn_out, pid_out);
+}
+
+int unpack_nan_int_close8(byte* str, int size, nan_int_close8_t* tkn_out, byte(*pid_out)[DIGEST_LEN]){
+  if(size != sizeof(mt_ntype_t) + sizeof(*tkn_out) + DIGEST_LEN)
+    return MT_ERROR;
+  return unpack_token(MT_NTYPE_NAN_INT_CLOSE8, str, sizeof(*tkn_out), tkn_out, pid_out);
 }
 
 //------------------------------ Helper Functions ---------------------------//

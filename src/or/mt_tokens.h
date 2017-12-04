@@ -29,8 +29,8 @@ int mt_verify_signed_msg(byte* signed_msg, int size, byte(*pk_out)[MT_SZ_PK],  b
  */
 int pack_mac_aut_mint(mac_aut_mint_t* tkn, byte(*pid)[DIGEST_LEN], byte** str_out);
 int pack_mac_any_trans(mac_any_trans_t* tkn, byte(*pid)[DIGEST_LEN], byte** str_out);
-int pack_chn_end_escrow(chn_end_escrow_t* tkn, byte(*pid)[DIGEST_LEN], byte** str_out);
-int pack_chn_int_escrow(chn_int_escrow_t* tkn, byte(*pid)[DIGEST_LEN],  byte** str_out);
+int pack_chn_end_setup(chn_end_setup_t* tkn, byte(*pid)[DIGEST_LEN], byte** str_out);
+int pack_chn_int_setup(chn_int_setup_t* tkn, byte(*pid)[DIGEST_LEN],  byte** str_out);
 int pack_any_led_confirm(any_led_confirm_t* tkn, byte(*pid)[DIGEST_LEN], byte** str_out);
 int pack_chn_int_reqclose(chn_int_reqclose_t* tkn, byte(*pid)[DIGEST_LEN], byte** str_out);
 int pack_chn_end_close(chn_end_close_t* tkn, byte(*pid)[DIGEST_LEN], byte** str_out);
@@ -93,8 +93,8 @@ int pack_nan_int_close8(nan_int_close8_t* tkn, byte(*pid)[DIGEST_LEN], byte** st
  */
 int unpack_mac_aut_mint(byte* str, int size, mac_aut_mint_t* tkn_out, byte(*pid_out)[DIGEST_LEN]);
 int unpack_mac_any_trans(byte* str, int size, mac_any_trans_t* tkn_out, byte(*pid_out)[DIGEST_LEN]);
-int unpack_chn_end_escrow(byte* str, int size, chn_end_escrow_t* tkn_out, byte(*pid_out)[DIGEST_LEN]);
-int unpack_chn_int_escrow(byte* str, int size, chn_int_escrow_t* tkn_out,  byte(*pid_out)[DIGEST_LEN]);
+int unpack_chn_end_setup(byte* str, int size, chn_end_setup_t* tkn_out, byte(*pid_out)[DIGEST_LEN]);
+int unpack_chn_int_setup(byte* str, int size, chn_int_setup_t* tkn_out,  byte(*pid_out)[DIGEST_LEN]);
 int unpack_any_led_confirm(byte* str, int size, any_led_confirm_t* tkn_out, byte(*pid_out)[DIGEST_LEN]);
 int unpack_chn_int_reqclose(byte* str, int size, chn_int_reqclose_t* tkn_out, byte(*pid_out)[DIGEST_LEN]);
 int unpack_chn_end_close(byte* str, int size, chn_end_close_t* tkn_out, byte(*pid_out)[DIGEST_LEN]);

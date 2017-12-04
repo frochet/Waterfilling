@@ -40,8 +40,8 @@ static void test_mt_crypto(void *arg)
   byte rand1[rand_size];
   byte rand2[rand_size];
 
-  mt_crypt_rand_bytes(rand_size, rand1);
-  mt_crypt_rand_bytes(rand_size, rand2);
+  mt_crypt_rand(rand_size, rand1);
+  mt_crypt_rand(rand_size, rand2);
 
   // check that random numbers are different from eachother
   tt_assert(memcpy(rand1, rand2, rand_size) != 0);
@@ -102,8 +102,8 @@ static void test_mt_crypto(void *arg)
   byte com_1_2[MT_SZ_COM];
   byte com_2_2[MT_SZ_COM];
 
-  mt_crypt_rand_bytes(MT_SZ_HASH, rand_com_1);
-  mt_crypt_rand_bytes(MT_SZ_HASH, rand_com_2);
+  mt_crypt_rand(MT_SZ_HASH, rand_com_1);
+  mt_crypt_rand(MT_SZ_HASH, rand_com_2);
 
   mt_com_commit(msg_1, msg_1_size, &rand_com_1, &com_1_1);
   mt_com_commit(msg_2, msg_2_size, &rand_com_1, &com_2_1);
@@ -157,7 +157,7 @@ static void test_mt_crypto(void *arg)
 
   mt_zkp_prove(&pp, msg_1, msg_1_size, &proof_1);
   mt_zkp_prove(&pp, msg_2, msg_2_size, &proof_2);
-  mt_crypt_rand_bytes(MT_SZ_ZKP, proof_3);
+  mt_crypt_rand(MT_SZ_ZKP, proof_3);
 
   // check that correct proofs are correct
   tt_assert(mt_zkp_verify(&pp, &proof_1) == MT_SUCCESS);

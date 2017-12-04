@@ -54,7 +54,7 @@ static void test_mt_common(void *arg)
     byte head[MT_SZ_HASH];
     byte hc[1000][MT_SZ_HASH];
 
-    mt_crypt_rand_bytes(MT_SZ_HASH, head);
+    mt_crypt_rand(MT_SZ_HASH, head);
     mt_hc_create(hc_size, &head, &hc);
 
     // make sure correct hashes are correct

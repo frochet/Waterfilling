@@ -51,7 +51,7 @@ int close_conn(mt_desc_t desc){
 static int send_ledger(byte (*pk)[MT_SZ_PK], byte (*sk)[MT_SZ_SK], mt_desc_t* desc, mt_ntype_t type, void* tkn){
 
   byte proto_id[DIGEST_LEN];
-  mt_crypt_rand_bytes(DIGEST_LEN, proto_id);
+  mt_crypt_rand(DIGEST_LEN, proto_id);
 
   byte* packed_msg;
   int packed_msg_size;
@@ -63,11 +63,11 @@ static int send_ledger(byte (*pk)[MT_SZ_PK], byte (*sk)[MT_SZ_SK], mt_desc_t* de
     case MT_NTYPE_MAC_ANY_TRANS:
       packed_msg_size = pack_mac_any_trans((mac_any_trans_t*)tkn, &proto_id, &packed_msg);
       break;
-    case MT_NTYPE_CHN_END_ESCROW:
-      packed_msg_size = pack_chn_end_escrow((chn_end_escrow_t*)tkn, &proto_id, &packed_msg);
+    case MT_NTYPE_CHN_END_SETUP:
+      packed_msg_size = pack_chn_end_setup((chn_end_setup_t*)tkn, &proto_id, &packed_msg);
       break;
-    case MT_NTYPE_CHN_INT_ESCROW:
-      packed_msg_size = pack_chn_int_escrow((chn_int_escrow_t*)tkn, &proto_id, &packed_msg);
+    case MT_NTYPE_CHN_INT_SETUP:
+      packed_msg_size = pack_chn_int_setup((chn_int_setup_t*)tkn, &proto_id, &packed_msg);
       break;
     case MT_NTYPE_CHN_INT_REQCLOSE:
       packed_msg_size = pack_chn_int_reqclose((chn_int_reqclose_t*)tkn, &proto_id, &packed_msg);
@@ -99,7 +99,7 @@ static int send_ledger(byte (*pk)[MT_SZ_PK], byte (*sk)[MT_SZ_SK], mt_desc_t* de
     return MT_ERROR;
   }
 
-  int result = mt_lpay_recv_message(desc, type, signed_msg, signed_msg_size);
+  int result = mt_lpay_recv(desc, type, signed_msg, signed_msg_size);
   free(packed_msg);
   free(signed_msg);
 
@@ -111,17 +111,39 @@ static void test_mt_lpay(void *arg)
 {
   (void)arg;
 
-  /* //----------------------------------- Setup ---------------------------------// */
-
-
-  //TODO: read in payment parameters (pp/aut address) from seomwhere
-  byte pp[MT_SZ_PP];   // bogus value; this should be read in from somewhere
-  mt_lpay_init();
+  //----------------------------------- Setup ---------------------------------//
 
   // setup aut
+  byte pp[MT_SZ_PP];
+  byte aut_0_pk[MT_SZ_PK];
+  byte aut_0_sk[MT_SZ_SK];
+  mt_desc_t aut_0_desc;
+
+  /********************************************************************/
+  //TODO replace with torrc
+
+  FILE* fp;
+
+  fp = fopen("mt_config_temp/pp", "rb");
+  tor_assert(fread(pp, 1, MT_SZ_PP, fp) == MT_SZ_PP);
+  fclose(fp);
+
+  fp = fopen("mt_config_temp/aut_pk", "rb");
+  tor_assert(fread(aut_0_pk, 1, MT_SZ_PK, fp) == MT_SZ_PK);
+  fclose(fp);
+
+  fp = fopen("mt_config_temp/aut_sk", "rb");
+  tor_assert(fread(aut_0_sk, 1, MT_SZ_SK, fp) == MT_SZ_SK);
+  fclose(fp);
+
+  fp = fopen("mt_config_temp/aut_desc", "rb");
+  tor_assert(fread(&aut_0_desc, 1, sizeof(mt_desc_t), fp) == sizeof(mt_desc_t));
+  fclose(fp);
+
+  /********************************************************************/
+
+  mt_lpay_init();
   mt_payment_public_t public = mt_lpay_get_payment_public();
-  mt_desc_t aut_0_desc = {.party = MT_PARTY_AUT};
-  mt_crypt_rand_bytes(MT_SZ_ID, aut_0_desc.id);
 
   // set up end user
   byte end_1_pk[MT_SZ_PK];
@@ -130,7 +152,7 @@ static void test_mt_lpay(void *arg)
   mt_desc_t end_1_desc = {.party = MT_PARTY_CLI};
   mt_crypt_keygen(&pp, &end_1_pk, &end_1_sk);
   mt_pk2addr(&end_1_pk, &end_1_addr);
-  mt_crypt_rand_bytes(sizeof(end_1_desc), (byte*)&end_1_desc);
+  mt_crypt_rand(sizeof(end_1_desc), (byte*)&end_1_desc);
 
   // set up intermediary
   byte int_1_pk[MT_SZ_PK];
@@ -139,22 +161,22 @@ static void test_mt_lpay(void *arg)
   mt_desc_t int_1_desc = {.party = MT_PARTY_INT};
   mt_crypt_keygen(&pp, &int_1_pk, &int_1_sk);
   mt_pk2addr(&int_1_pk, &int_1_addr);
-  mt_crypt_rand_bytes(sizeof(int_1_desc), (byte*)&int_1_desc);
+  mt_crypt_rand(sizeof(int_1_desc), (byte*)&int_1_desc);
 
   // set up channel
   byte chn_1_addr[MT_SZ_ADDR];
-  mt_crypt_rand_bytes(MT_SZ_ADDR, chn_1_addr);
+  mt_crypt_rand(MT_SZ_ADDR, chn_1_addr);
 
   // hash chain for nanopayments
   int n = 1000;
   byte head[MT_SZ_HASH];
   byte hc[n][MT_SZ_HASH];
-  mt_crypt_rand_bytes(MT_SZ_HASH, head);
+  mt_crypt_rand(MT_SZ_HASH, head);
   mt_hc_create(n, &head, &hc);
   int k = 58;
 
   byte aut_0_addr[MT_SZ_ADDR];
-  mt_pk2addr(&public.auth_pk, &aut_0_addr);
+  mt_pk2addr(&aut_0_pk, &aut_0_addr);
 
   char aut_0_hex[MT_SZ_ADDR * 2 + 3] ;
   char end_1_hex[MT_SZ_ADDR * 2 + 3] ;
@@ -164,9 +186,9 @@ static void test_mt_lpay(void *arg)
   mt_addr2hex(&end_1_addr, &end_1_hex);
   mt_addr2hex(&int_1_addr, &int_1_hex);
 
-  printf("aut addr %s\n", aut_0_hex);
-  printf("end addr %s\n", end_1_hex);
-  printf("int addr %s\n", int_1_hex);
+  //printf("aut addr %s\n", aut_0_hex);
+  //printf("end addr %s\n", end_1_hex);
+  //printf("int addr %s\n", int_1_hex);
 
   //expected
   int exp_aut_0_bal = 0;
@@ -185,11 +207,11 @@ static void test_mt_lpay(void *arg)
 
   // mint first token
   mac_aut_mint_t mint_1 = {.value = mint_val_1};
-  tt_assert(send_ledger(&public.auth_pk, &public.auth_sk, &aut_0_desc, MT_NTYPE_MAC_AUT_MINT, &mint_1) == MT_SUCCESS);
+  tt_assert(send_ledger(&aut_0_pk, &aut_0_sk, &aut_0_desc, MT_NTYPE_MAC_AUT_MINT, &mint_1) == MT_SUCCESS);
 
   // mint second token
   mac_aut_mint_t mint_2 = {.value = mint_val_2};
-  tt_assert(send_ledger(&public.auth_pk, &public.auth_sk, &aut_0_desc, MT_NTYPE_MAC_AUT_MINT, &mint_2) == MT_SUCCESS);
+  tt_assert(send_ledger(&aut_0_pk, &aut_0_sk, &aut_0_desc, MT_NTYPE_MAC_AUT_MINT, &mint_2) == MT_SUCCESS);
 
   //------------------------------ Transfer -----------------------------------//
 
@@ -204,13 +226,13 @@ static void test_mt_lpay(void *arg)
   mac_any_trans_t end_trans = {.val_from = end_val + public.fee, .val_to = end_val};
   memcpy(end_trans.from, aut_0_addr, MT_SZ_ADDR);
   memcpy(end_trans.to, end_1_addr, MT_SZ_ADDR);
-  tt_assert(send_ledger(&public.auth_pk, &public.auth_sk, &aut_0_desc, MT_NTYPE_MAC_ANY_TRANS, &end_trans) == MT_SUCCESS);
+  tt_assert(send_ledger(&aut_0_pk, &aut_0_sk, &aut_0_desc, MT_NTYPE_MAC_ANY_TRANS, &end_trans) == MT_SUCCESS);
 
   // transfer to intermediary
   mac_any_trans_t int_trans = {.val_from = int_val + public.fee, .val_to = int_val};
   memcpy(int_trans.from, aut_0_addr, MT_SZ_ADDR);
   memcpy(int_trans.to, int_1_addr, MT_SZ_ADDR);
-  tt_assert(send_ledger(&public.auth_pk, &public.auth_sk, &aut_0_desc, MT_NTYPE_MAC_ANY_TRANS, &int_trans) == MT_SUCCESS);
+  tt_assert(send_ledger(&aut_0_pk, &aut_0_sk, &aut_0_desc, MT_NTYPE_MAC_ANY_TRANS, &int_trans) == MT_SUCCESS);
 
   //------------------------------- Post Escrow -------------------------------//
 
@@ -224,16 +246,16 @@ static void test_mt_lpay(void *arg)
   exp_aut_0_bal += public.fee * 2;
 
   // end user escrow
-  chn_end_escrow_t end_esc = {.val_from = end_esc_val + public.fee, .val_to =   end_esc_val};
+  chn_end_setup_t end_esc = {.val_from = end_esc_val + public.fee, .val_to =   end_esc_val};
   memcpy(end_esc.from, end_1_addr, MT_SZ_ADDR);
   memcpy(end_esc.chn, chn_1_addr, MT_SZ_ADDR);
-  tt_assert(send_ledger(&end_1_pk, &end_1_sk, &end_1_desc, MT_NTYPE_CHN_END_ESCROW, &end_esc) == MT_SUCCESS);
+  tt_assert(send_ledger(&end_1_pk, &end_1_sk, &end_1_desc, MT_NTYPE_CHN_END_SETUP, &end_esc) == MT_SUCCESS);
 
   // intermediary escrow
-  chn_int_escrow_t int_esc = {.val_from = int_esc_val + public.fee, .val_to = int_esc_val};
+  chn_int_setup_t int_esc = {.val_from = int_esc_val + public.fee, .val_to = int_esc_val};
   memcpy(int_esc.from, int_1_addr, MT_SZ_ADDR);
   memcpy(int_esc.chn, chn_1_addr, MT_SZ_ADDR);
-  tt_assert(send_ledger(&int_1_pk, &int_1_sk, &int_1_desc, MT_NTYPE_CHN_INT_ESCROW, &int_esc) == MT_SUCCESS);
+  tt_assert(send_ledger(&int_1_pk, &int_1_sk, &int_1_desc, MT_NTYPE_CHN_INT_SETUP, &int_esc) == MT_SUCCESS);
 
   //------------------------ Intermediary Request Close -----------------------//
 
@@ -289,6 +311,7 @@ static void test_mt_lpay(void *arg)
   /* tt_assert(mt_lpay_query_int_balance(&chn_1_addr) == exp_int_1_esc); */
 
  done:;
+  tt_assert(mt_lpay_clear() == MT_SUCCESS);
 }
 
 struct testcase_t mt_lpay_tests[] = {

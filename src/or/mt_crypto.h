@@ -27,7 +27,7 @@ int mt_crypt_keygen(byte (*pp)[MT_SZ_PP], byte (*pk_out)[MT_SZ_PK], byte (*sk_ou
  * Fill the given byte string with cryptographically secure random
  * bytes of the given size.
  */
-int mt_crypt_rand_bytes(int size, byte* rand_out);
+int mt_crypt_rand(int size, byte* rand_out);
 
 /**
  * Generate a SHA256 hash digest of the given byte string message

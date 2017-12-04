@@ -64,6 +64,8 @@ int mt_hc_create(int size, byte (*head)[MT_SZ_HASH], byte (*hc_out)[][MT_SZ_HASH
  */
 int mt_hc_verify(byte (*tail)[MT_SZ_HASH], byte (*preimage)[MT_SZ_HASH], int k);
 
+int mt_commit_wallet(byte (*pp)[MT_SZ_PP], byte (*pk)[MT_SZ_PK], chn_end_secret_t* chn, int epislon);
+
 /** Canibalize a general circuit => extends it to
  *  the intermediary point described by ei
  *
@@ -91,10 +93,10 @@ void monetor_run_scheduled_events(time_t now);
 
 /************ Tor - Payment event interface *********************/
 
-int send_message(mt_desc_t *desc, mt_ntype_t type, byte* msg, int size);
+MOCK_DECL(int, mt_send_message, (mt_desc_t *desc, mt_ntype_t type, byte* msg, int size));
 
-int alert_payment(mt_desc_t *desc);
+MOCK_DECL(int, mt_alert_payment, (mt_desc_t *desc));
 
-int mt_new_intermediary(mt_desc_t *desc);
+MOCK_DECL(int, mt_new_intermediary, (mt_desc_t *desc));
 
 #endif

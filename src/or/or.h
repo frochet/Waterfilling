@@ -5725,8 +5725,8 @@ typedef enum {
   // tokens for posting to the ledger
   MT_NTYPE_MAC_AUT_MINT,        // message by tor authority to mint coins
   MT_NTYPE_MAC_ANY_TRANS,       // macropayment transaction
-  MT_NTYPE_CHN_END_ESCROW,      // end user escrow transaction
-  MT_NTYPE_CHN_INT_ESCROW,      // intermediary escrow transaction
+  MT_NTYPE_CHN_END_SETUP,       // end user escrow transaction
+  MT_NTYPE_CHN_INT_SETUP,       // intermediary escrow transaction
   MT_NTYPE_CHN_INT_REQCLOSE,    // intermediary msg to request a user closure
   MT_NTYPE_CHN_END_CLOSE,       // end user microchannel closure message
   MT_NTYPE_CHN_INT_CLOSE,       // intermediary microchannel closure message
@@ -5873,7 +5873,7 @@ typedef struct {
 
   byte pk[MT_SZ_PK];
   byte sig[MT_SZ_SIG];
-} chn_end_escrow_t;
+} chn_end_setup_t;
 
 typedef struct {
   int val_from;
@@ -5884,7 +5884,7 @@ typedef struct {
 
   byte pk[MT_SZ_PK];
   byte sig[MT_SZ_SIG];
-} chn_int_escrow_t;
+} chn_int_setup_t;
 
 typedef struct {
   mt_code_t success;
@@ -6160,16 +6160,5 @@ typedef struct {
   mt_code_t success;
   byte sig[MT_SZ_SIG];
 } nan_int_close8_t;
-
-
-/***************************************************************/
-
-typedef int (*mt_event_notify_t)(mt_desc_t*, int);
-
-typedef struct {
-  mt_event_notify_t callback;
-  int time_started;
-} mt_request_t;
-
 
 #endif /* !defined(TOR_OR_H) */

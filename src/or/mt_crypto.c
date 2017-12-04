@@ -81,7 +81,7 @@ void micro_sleep(int microsecs){
  * Called at system setup to obtain public parameters
  */
 int mt_crypt_setup(byte (*pp_out)[MT_SZ_PP]){
-  return mt_crypt_rand_bytes(MT_SZ_PP, *pp_out);
+  return mt_crypt_rand(MT_SZ_PP, *pp_out);
 }
 
 /**
@@ -133,7 +133,7 @@ int mt_crypt_keygen(byte (*pp)[MT_SZ_PP], byte (*pk_out)[MT_SZ_PK], byte  (*sk_o
 /**
  * Write the specified number of random bytes to the provided buffer
  */
-int mt_crypt_rand_bytes(int size, byte* rand_out){
+int mt_crypt_rand(int size, byte* rand_out){
   if(RAND_bytes(rand_out, size) != 1){
     if(RAND_pseudo_bytes(rand_out, size) != 1){
       return MT_ERROR;
@@ -228,7 +228,7 @@ int mt_com_commit(byte* msgs, int msg_size, byte (*rand)[MT_SZ_HASH], byte (*com
 
   // commitment in the final scheme may be larger than hash; pad the difference
   memcpy(*com_out, digest, MT_SZ_HASH);
-  if(mt_crypt_rand_bytes(MT_SZ_COM - MT_SZ_HASH, (*com_out) + MT_SZ_HASH) !=  MT_SUCCESS)
+  if(mt_crypt_rand(MT_SZ_COM - MT_SZ_HASH, (*com_out) + MT_SZ_HASH) !=  MT_SUCCESS)
     return MT_ERROR;
 
   micro_sleep(MT_DELAY_COM_COMMIT);
@@ -266,7 +266,7 @@ int mt_bsig_blind(byte *msg, int msg_size, byte (*pk)[MT_SZ_PK], byte (*blinded_
   for(int i = 0; i < MT_SZ_BL; i++)
     (*blinded_out)[i] = bsig_fake_blinder[i % MT_SZ_HASH] ^ digest[i % MT_SZ_HASH];
 
-  if(mt_crypt_rand_bytes(MT_SZ_UBLR, *unblinder_out) != MT_SUCCESS)
+  if(mt_crypt_rand(MT_SZ_UBLR, *unblinder_out) != MT_SUCCESS)
     return MT_ERROR;
 
   micro_sleep(MT_DELAY_BSIG_BLIND);
@@ -327,7 +327,7 @@ int mt_zkp_prove(byte (*pp)[MT_SZ_PP], byte* inputs, int input_size, byte (*zkp_
   memcpy(*zkp_out, *pp, MT_SZ_HASH / 2);
   memcpy((*zkp_out) + MT_SZ_HASH / 2, digest, MT_SZ_HASH / 2);
 
-  if(mt_crypt_rand_bytes(MT_SZ_ZKP - MT_SZ_HASH, (*zkp_out) + MT_SZ_HASH) !=  MT_SUCCESS)
+  if(mt_crypt_rand(MT_SZ_ZKP - MT_SZ_HASH, (*zkp_out) + MT_SZ_HASH) !=  MT_SUCCESS)
     return MT_ERROR;
 
   micro_sleep(MT_DELAY_ZKP_PROVE);

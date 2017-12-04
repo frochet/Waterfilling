@@ -1,8 +1,22 @@
 #pragma GCC diagnostic ignored "-Wswitch-enum"
 
 #include "or.h"
+#include "workqueue.h"
 #include "mt_common.h"
 #include "mt_ipay.h"
+
+typedef struct {
+  mt_desc_t* desc;
+  mt_ntype_t type;
+  byte* msg;
+  int size;
+} mt_recv_args_t;
+
+typedef enum {
+  MT_ZKP_STATE_NONE,
+  MT_ZKP_STATE_STARTED,
+  MT_ZKP_STATE_READY,
+} mt_zkp_state_t;
 
 typedef struct {
   byte chn[MT_SZ_ADDR];
@@ -10,8 +24,7 @@ typedef struct {
   mt_desc_t end_desc;
   chn_int_chntok_t chn_token;
 
-  mt_event_notify_t callback;
-  mt_desc_t callback_desc;
+  mt_recv_args_t cb_args;
 } mt_channel_t;
 
 /**
@@ -22,6 +35,8 @@ typedef struct {
   byte pk[MT_SZ_PK];
   byte sk[MT_SZ_SK];
   byte addr[MT_SZ_ADDR];
+
+  mt_desc_t ledger;
 
   chn_int_state_t chn_state;
   nan_int_state_t nan_state;
@@ -34,7 +49,7 @@ typedef struct {
 
 
 // private initializer functions
-static int init_chn_end_escrow(mt_event_notify_t notify, mt_channel_t* chn, mt_desc_t* desc);
+static int init_chn_int_setup(mt_recv_args_t* args, mt_channel_t* chn, mt_desc_t* desc);
 
 // local handler functions
 static int handle_any_led_confirm(mt_desc_t* desc, any_led_confirm_t* token, byte (*pid)[DIGEST_LEN]);
@@ -62,11 +77,37 @@ int mt_ipay_init(void){
   byte pp[MT_SZ_PP];
   byte pk[MT_SZ_PK];
   byte sk[MT_SZ_SK];
+  mt_desc_t ledger;
+
+  /********************************************************************/
+  //TODO replace with torrc
+
+  FILE* fp;
+
+  fp = fopen("mt_config_temp/pp", "rb");
+  tor_assert(fread(pp, 1, MT_SZ_PP, fp) == MT_SZ_PP);
+  fclose(fp);
+
+  fp = fopen("mt_config_temp/int_pk", "rb");
+  tor_assert(fread(pk, 1, MT_SZ_PK, fp) == MT_SZ_PK);
+  fclose(fp);
+
+  fp = fopen("mt_config_temp/int_sk", "rb");
+  tor_assert(fread(sk, 1, MT_SZ_SK, fp) == MT_SZ_SK);
+  fclose(fp);
+
+  fp = fopen("mt_config_temp/led_desc", "rb");
+  tor_assert(fread(&ledger, 1, sizeof(mt_desc_t), fp) == sizeof(mt_desc_t));
+  fclose(fp);
+
+  /********************************************************************/
+
 
   // copy macro-level crypto fields
   memcpy(intermediary.pp, pp, MT_SZ_PP);
   memcpy(intermediary.pk, pk, MT_SZ_PK);
   memcpy(intermediary.sk, sk, MT_SZ_SK);
+  intermediary.ledger = ledger;
 
   // initialize channel containers
   intermediary.chns_setup = digestmap_new();
@@ -196,8 +237,8 @@ int mt_ipay_recv(mt_desc_t* desc, mt_ntype_t type, byte* msg, int size){
 
 /**************************** Initialize Protocols **********************/
 
-static int init_chn_end_escrow(mt_event_notify_t notify, mt_channel_t* chn, mt_desc_t* desc){
-  (void)notify;
+static int init_chn_int_setup(mt_recv_args_t* args, mt_channel_t* chn, mt_desc_t* desc){
+  (void)args;
   (void)chn;
   (void)desc;
   return MT_SUCCESS;
@@ -219,7 +260,7 @@ static int handle_chn_end_estab1(mt_desc_t* desc, chn_end_estab1_t* token, byte 
   (void)token;
   (void)pid;
 
-  init_chn_end_escrow(NULL, NULL, desc); // just to get rid of warning for now
+  init_chn_int_setup(NULL, NULL, desc); // just to get rid of warning for now
   return MT_SUCCESS;
 }
 

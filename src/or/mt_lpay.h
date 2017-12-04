@@ -21,10 +21,7 @@ typedef struct {
   int fee;
   int tax;
   int window;
-  byte auth_pk[MT_SZ_PK];
-
-  // TODO: TEMPORARY FOR TESTING PURPOSES
-  byte auth_sk[MT_SZ_SK];
+  byte aut_pk[MT_SZ_PK];
 
   byte led_pk[MT_SZ_PK];
 } mt_payment_public_t;
@@ -41,12 +38,18 @@ int mt_lpay_init(void);
 /**
  * Handle an incoming message. Requires the message sender, type, and size.
  */
-int mt_lpay_recv_message(mt_desc_t* desc, mt_ntype_t type, byte* msg, int size);
+int mt_lpay_recv(mt_desc_t* desc, mt_ntype_t type, byte* msg, int size);
 
 /**
  * Retrieve public parameters that define the ledger
  */
 mt_payment_public_t mt_lpay_get_payment_public(void);
+
+/********************** Instance Management ***********************/
+
+int mt_lpay_clear(void);
+int mt_lpay_export(byte** ledger);
+int mt_lpay_import(byte* ledger);
 
 /*********************** Testing Functions ************************/
 

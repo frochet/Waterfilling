@@ -25,6 +25,20 @@ int mt_pk2addr(byte (*pk)[MT_SZ_PK], byte (*addr_out)[MT_SZ_ADDR]){
 }
 
 /**
+ * Converts an mt_desc_t into an address for use in digestmaps. The output is
+ * a hash of the mt_desc_t contents truncated to 20 bytes
+ */
+void mt_desc2digest(mt_desc_t* desc, byte (*digest_out)[DIGEST_LEN]){
+  byte hash[MT_SZ_HASH];
+  byte input[MT_SZ_ID + sizeof(desc->party)];
+  memcpy(desc->id, input, MT_SZ_ID);
+  memcpy(&desc->party, input + MT_SZ_ID, sizeof(desc->party));
+  mt_crypt_hash(input, sizeof(desc), &hash);
+  memcpy(*digest_out, hash, DIGEST_LEN);
+}
+
+
+/**
  * Converts an address in byte-string form to a more human-readable hexadecimal
  * string. The format is in the style of Ethereum as it leads with the '0x'
  */
@@ -91,7 +105,7 @@ void mt_init(void){
   log_info(LD_MT, "MoneTor: Initializing the payment system");
   mt_cclient_init();
   /* Todo call intermediary, relay and ledger init? */
-  
+
 }
 
 /**
@@ -107,7 +121,7 @@ int mt_check_enough_fund(void) {
  * TODO : - check healthiness of intermediary circuit, consider cacshout?, etc?
  */
 void monetor_run_scheduled_events(time_t now) {
-  
+
   /*run scheduled cclient event - avoid to do this on authority*/
   run_cclient_scheduled_events(now);
 
@@ -115,7 +129,7 @@ void monetor_run_scheduled_events(time_t now) {
 
 }
 
-int send_message(mt_desc_t *desc, mt_ntype_t type, byte* msg, int size) {
+MOCK_IMPL(int, mt_send_message, (mt_desc_t *desc, mt_ntype_t type, byte* msg, int size)) {
   (void) desc;
   (void) type;
   (void) msg;
@@ -123,7 +137,12 @@ int send_message(mt_desc_t *desc, mt_ntype_t type, byte* msg, int size) {
   return 0;
 }
 
-int alert_payment(mt_desc_t *desc) {
+MOCK_IMPL(int, mt_alert_payment, (mt_desc_t *desc)) {
+  (void) desc;
+  return 0;
+}
+
+MOCK_IMPL(int, mt_new_intermediary, (mt_desc_t *desc)){
   (void) desc;
   return 0;
 }
