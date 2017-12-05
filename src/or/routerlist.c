@@ -2812,9 +2812,6 @@ router_choose_random_node(smartlist_t *excludedsmartlist,
   const int rendezvous_v3 = (flags & CRN_RENDEZVOUS_V3) != 0;
   const int need_intermediary = (flags & CRN_NEED_INTERMEDIARY) != 0;
   
-  /**
-   * XXX MoneTor - choose random intro
-   */
   smartlist_t *sl=smartlist_new(),
     *excludednodes=smartlist_new();
   const node_t *choice = NULL;

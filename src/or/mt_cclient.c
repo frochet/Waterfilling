@@ -65,6 +65,11 @@ static void
 intermediary_need_cleanup(intermediary_t *intermediary, time_t now) {
   if (intermediary->circuit_retries > INTERMEDIARY_MAX_RETRIES ||
       intermediary->is_reachable == INTERMEDIARY_REACHABLE_NO) {
+
+    /* Get all general circuit linked to this intermediary and
+     * mark the payment as closed */
+    // XXX MoneTor todo
+
     /* Remove intermediary from the list */
     SMARTLIST_FOREACH_BEGIN(intermediaries, intermediary_t *,
         inter) {

@@ -2895,6 +2895,14 @@ typedef struct pay_path_t {
 
   /* Intermediary handling current hop */
   intermediary_identity_t *inter_ident;
+  
+  /* payment marked for close 
+   * This may happen if :
+   *  - something went wrong with the establishement
+   *  - if the intermediary inter_ident is not reachable
+   *    anymore
+   * */
+  unsigned int p_marked_for_close : 1;
 
   /* Position type of the current hop */
   position_t position;

@@ -1840,7 +1840,8 @@ router_find_exact_exit_enclave(const char *address, uint16_t port)
  * If <b>need_uptime</b> is non-zero, we require a minimum uptime.
  * If <b>need_capacity</b> is non-zero, we require a minimum advertised
  * bandwidth.
- * If <b>need_guard</b>, we require that the router is a possible entry guard.
+ * If <b>need_guard</b>, we require that the router is a possible entry guard
+ * but not an intermediary.
  */
 int
 node_is_unreliable(const node_t *node, int need_uptime,
@@ -1851,7 +1852,7 @@ node_is_unreliable(const node_t *node, int need_uptime,
     return 1;
   if (need_capacity && !node->is_fast)
     return 1;
-  if (need_guard && !node->is_possible_guard)
+  if (need_guard && (!node->is_possible_guard || node->is_intermediary))
     return 1;
   if (need_intermediary && !node->is_intermediary)
     return 1;

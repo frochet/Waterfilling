@@ -1319,16 +1319,10 @@ circuit_predict_and_launch_new(void)
       return;
   }
 
-  /** XXX MoneTor
-   * Build Intermediary circuit if we need to
-   *
-   * -  done
-   */
-
   if (needs_mt_circuits(now, num_uptime_internal)) {
     flags = CIRCLAUNCH_NEED_UPTIME;
     flags |= CIRCLAUNCH_IS_INTERNAL;
-    log_info(LD_CIRC,
+    log_info(LD_CIRC|LD_MT,
         "Have %d clean uptime-internal clean circs, need"
         " another MoneTor circuit.", num_uptime_internal);
     circuit_launch(CIRCUIT_PURPOSE_C_GENERAL, flags);
