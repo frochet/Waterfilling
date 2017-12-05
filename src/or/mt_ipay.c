@@ -37,6 +37,7 @@ typedef struct {
   byte addr[MT_SZ_ADDR];
 
   mt_desc_t ledger;
+  int fee;
 
   chn_int_state_t chn_state;
   nan_int_state_t nan_state;
@@ -60,7 +61,6 @@ static int handle_nan_cli_setup3(mt_desc_t* desc, nan_cli_setup3_t* token, byte 
 static int handle_nan_cli_setup5(mt_desc_t* desc, nan_cli_setup5_t* token, byte (*pid)[DIGEST_LEN]);
 static int handle_nan_rel_estab2(mt_desc_t* desc, nan_rel_estab2_t* token, byte (*pid)[DIGEST_LEN]);
 static int handle_nan_rel_estab4(mt_desc_t* desc, nan_rel_estab4_t* token, byte (*pid)[DIGEST_LEN]);
-static int handle_nan_int_estab5(mt_desc_t* desc, nan_int_estab5_t* token, byte (*pid)[DIGEST_LEN]);
 static int handle_nan_cli_destab1(mt_desc_t* desc, nan_cli_destab1_t* token, byte (*pid)[DIGEST_LEN]);
 static int handle_nan_cli_dpay1(mt_desc_t* desc, nan_cli_dpay1_t* token, byte (*pid)[DIGEST_LEN]);
 static int handle_nan_end_close1(mt_desc_t* desc, nan_end_close1_t* token, byte (*pid)[DIGEST_LEN]);
@@ -78,6 +78,7 @@ int mt_ipay_init(void){
   byte pk[MT_SZ_PK];
   byte sk[MT_SZ_SK];
   mt_desc_t ledger;
+  int fee;
 
   /********************************************************************/
   //TODO replace with torrc
@@ -100,6 +101,10 @@ int mt_ipay_init(void){
   tor_assert(fread(&ledger, 1, sizeof(mt_desc_t), fp) == sizeof(mt_desc_t));
   fclose(fp);
 
+  fp = fopen("mt_config_temp/fee", "rb");
+  tor_assert(fread(&fee, 1, sizeof(fee), fp) == sizeof(fee));
+  fclose(fp);
+
   /********************************************************************/
 
 
@@ -109,6 +114,7 @@ int mt_ipay_init(void){
   memcpy(intermediary.sk, sk, MT_SZ_SK);
   mt_pk2addr(&intermediary.pk, &intermediary.addr);
   intermediary.ledger = ledger;
+  intermediary.fee = fee;
 
   // initialize channel containers
   intermediary.chns_setup = digestmap_new();
@@ -180,13 +186,6 @@ int mt_ipay_recv(mt_desc_t* desc, mt_ntype_t type, byte* msg, int size){
       result = handle_nan_rel_estab4(desc, &nan_rel_estab4_tkn, &pid);
       break;
 
-    case MT_NTYPE_NAN_INT_ESTAB5:;
-      nan_int_estab5_t nan_int_estab5_tkn;
-      if(unpack_nan_int_estab5(msg, size, &nan_int_estab5_tkn, &pid) != MT_SUCCESS)
-	return MT_ERROR;
-      result = handle_nan_int_estab5(desc, &nan_int_estab5_tkn, &pid);
-      break;
-
     case MT_NTYPE_NAN_CLI_DESTAB1:;
       nan_cli_destab1_t nan_cli_destab1_tkn;
       if(unpack_nan_cli_destab1(msg, size, &nan_cli_destab1_tkn, &pid) != MT_SUCCESS)
@@ -253,8 +252,8 @@ static int init_chn_int_setup(mt_recv_args_t* args, byte (*chn_addr)[MT_SZ_ADDR]
 
   // initialize setup token
   chn_int_setup_t token;
-  token.val_from = 50;
-  token.val_to = 50;   //TODO get fees
+  token.val_from = 50 + intermediary.fee;
+  token.val_to = 50;
   memcpy(token.from, intermediary.addr, MT_SZ_ADDR);
   memcpy(token.chn, chn->addr, MT_SZ_ADDR);
   // ignore channel token for now
@@ -396,24 +395,27 @@ static int handle_nan_cli_setup5(mt_desc_t* desc, nan_cli_setup5_t* token, byte 
 /**************************** Nano Establish ****************************/
 
 static int handle_nan_rel_estab2(mt_desc_t* desc, nan_rel_estab2_t* token, byte (*pid)[DIGEST_LEN]){
-  (void)desc;
-  (void)token;
-  (void)pid;
-  return MT_SUCCESS;
+  // verify token validity
+
+  nan_int_estab3_t reply;
+
+  // fill out token
+
+  byte* packed_reply;
+  int packed_reply_size = pack_nan_int_estab3(&reply, pid, &packed_reply);
+  return mt_send_message(desc, MT_NTYPE_NAN_INT_ESTAB3, packed_reply, packed_reply_size);
 }
 
 static int handle_nan_rel_estab4(mt_desc_t* desc, nan_rel_estab4_t* token, byte (*pid)[DIGEST_LEN]){
-  (void)desc;
-  (void)token;
-  (void)pid;
-  return MT_SUCCESS;
-}
+  // verify token validity
 
-static int handle_nan_int_estab5(mt_desc_t* desc, nan_int_estab5_t* token, byte (*pid)[DIGEST_LEN]){
-  (void)desc;
-  (void)token;
-  (void)pid;
-  return MT_SUCCESS;
+  nan_int_estab5_t reply;
+
+  // fill out token
+
+  byte* packed_reply;
+  int packed_reply_size = pack_nan_int_estab5(&reply, pid, &packed_reply);
+  return mt_send_message(desc, MT_NTYPE_NAN_INT_ESTAB5, packed_reply, packed_reply_size);
 }
 
 /************************ Nano Direct Establish *************************/

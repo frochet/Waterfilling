@@ -249,7 +249,7 @@ int mt_lpay_recv(mt_desc_t* desc, mt_ntype_t type, byte* msg, int size){
   byte* response_msg;
   int response_size = pack_any_led_confirm(&response, &pid, &response_msg);
 
-  mt_send_message(desc, MT_NTYPE_ANY_LED_CONFIRM, response_msg, response_size);
+  result = mt_send_message(desc, MT_NTYPE_ANY_LED_CONFIRM, response_msg, response_size);
 
   free(raw_msg);
   free(response_msg);

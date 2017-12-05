@@ -43,6 +43,7 @@ typedef struct {
   byte addr[MT_SZ_ADDR];
 
   mt_desc_t ledger;
+  int fee;
 
   smartlist_t* chns_setup;
   smartlist_t* chns_estab;
@@ -102,6 +103,7 @@ int mt_cpay_init(void){
   byte pk[MT_SZ_PK];
   byte sk[MT_SZ_SK];
   mt_desc_t ledger;
+  int fee;
 
   /********************************************************************/
   //TODO replace with torrc
@@ -124,6 +126,10 @@ int mt_cpay_init(void){
   tor_assert(fread(&ledger, 1, sizeof(mt_desc_t), fp) == sizeof(mt_desc_t));
   fclose(fp);
 
+  fp = fopen("mt_config_temp/fee", "rb");
+  tor_assert(fread(&fee, 1, sizeof(fee), fp) == sizeof(fee));
+  fclose(fp);
+
   /********************************************************************/
 
   // copy in values crypto fields
@@ -131,6 +137,7 @@ int mt_cpay_init(void){
   memcpy(client.pk, pk, MT_SZ_PK);
   memcpy(client.sk, sk, MT_SZ_SK);
   client.ledger = ledger;
+  client.fee = fee;
 
   // initialize channel containers
   client.chns_setup = smartlist_new();
@@ -150,13 +157,10 @@ int mt_cpay_pay(mt_desc_t* desc){
   byte digest[DIGEST_LEN];
   mt_desc2digest(desc, &digest);
 
-  if(((chn = digestmap_get(client.nans_estab, (char*)digest)) != NULL) &&
-     chn->data.nan_state.num_payments < chn->data.nan_token.num_payments)
-    return init_nan_cli_pay1(mt_pay_notify, chn, desc);
+  // TODO: if out of payments then close channel
 
-  if(((chn = digestmap_get(client.nans_estab, (char*)digest)) != NULL) &&
-     chn->data.nan_state.num_payments == chn->data.nan_token.num_payments)
-    return init_nan_end_close1(mt_cpay_pay, chn, desc);
+  if((chn = digestmap_get(client.nans_estab, (char*)digest)) != NULL)
+    return init_nan_cli_pay1(mt_cpay_pay, chn, desc);
 
   if((chn = smartlist_pop_last(client.nans_setup)) != NULL)
     return init_nan_cli_estab1(mt_cpay_pay, chn, desc);
@@ -330,7 +334,7 @@ int mt_cpay_recv(mt_desc_t* desc, mt_ntype_t type, byte* msg, int size){
   return result;
 }
 
-/**************************** Initialize Protocols **********************/
+/******************************* Channel Setup **************************/
 
 static int init_chn_end_setup(mt_user_notify_t notify, mt_channel_t* chn, mt_desc_t* desc){
 
@@ -357,8 +361,8 @@ static int init_chn_end_setup(mt_user_notify_t notify, mt_channel_t* chn, mt_des
 
   // initialize setup token
   chn_end_setup_t token;
-  token.val_from = 50;
-  token.val_to = 50; //TODO get fees
+  token.val_from = 50 + client.fee;
+  token.val_to = 50;
   memcpy(token.from, client.addr, MT_SZ_ADDR);
   memcpy(token.chn, chn->data.addr, MT_SZ_ADDR);
   // skip chn_token for now
@@ -371,6 +375,28 @@ static int init_chn_end_setup(mt_user_notify_t notify, mt_channel_t* chn, mt_des
 					     &chn->data.pk, &chn->data.sk, &signed_msg);
   return mt_send_message(&client.ledger, MT_NTYPE_CHN_END_SETUP, signed_msg, signed_msg_size);
 }
+
+static int handle_any_led_confirm(mt_desc_t* desc, any_led_confirm_t* token, byte (*pid)[DIGEST_LEN]){
+  (void)token;
+  (void)desc;
+
+  mt_channel_t* chn = digestmap_get(client.chns_transition, (char*)*pid);
+  if(chn == NULL){
+    log_debug(LD_MT, "protocol id not recognized");
+    return MT_ERROR;
+  }
+
+  // check validity of incoming message
+
+  digestmap_remove(client.chns_transition, (char*)*pid);
+  smartlist_add(client.chns_setup, chn);
+
+  if(chn->callback != NULL)
+    return chn->callback(&chn->callback_desc);
+  return MT_SUCCESS;
+}
+
+/****************************** Channel Establish ***********************/
 
 static int init_chn_end_estab1(mt_user_notify_t notify, mt_channel_t* chn, mt_desc_t* desc){
 
@@ -394,191 +420,6 @@ static int init_chn_end_estab1(mt_user_notify_t notify, mt_channel_t* chn, mt_de
 
   return MT_SUCCESS;
 }
-
-static int init_nan_cli_setup1(mt_user_notify_t notify, mt_channel_t* chn, mt_desc_t* desc){
-
-  // add new protocol to chns_transition
-  byte pid[DIGEST_LEN];
-  mt_crypt_rand(DIGEST_LEN, pid);
-  digestmap_set(client.chns_transition, (char*)pid, chn);
-  chn->callback = notify;
-  chn->callback_desc = *desc;
-
-  // intiate token
-  nan_cli_setup1_t token;
-
-  // intiate token in workerqueue
-
-  // need to figure out this zkp generating business
-  /* // if we have not started making the token then start making it */
-  /* if(chn->zkp_state == MT_ZKP_STATE_NONE){ */
-  /*   mt_desc_t* arg = malloc(sizeof(mt_desc_t)); */
-  /*   memcpy(arg, desc, sizeof(mt_desc_t)); */
-
-  /*   // fn is going to call commit wallet */
-  /*   // reply_fn is going to call notify */
-  /*   printf("got here\n"); */
-  /*   workqueue_entry_t* entry = cpuworker_queue_work(WQ_PRI_HIGH, wallet_make, wallet_reply, arg); */
-  /*   printf("but not here\n"); */
-  /*   if(entry == NULL) */
-  /*     return MT_ERROR; */
-  /*   return MT_SUCCESS; */
-  /* } */
-
-  // send message
-  byte* msg;
-  int msg_size = pack_nan_cli_setup1(&token, (byte (*)[DIGEST_LEN])&pid, &msg);
-  mt_send_message(&chn->idesc, MT_NTYPE_NAN_CLI_SETUP1, msg, msg_size);
-
-  return MT_SUCCESS;
-}
-
-static int init_nan_cli_estab1(mt_user_notify_t notify, mt_channel_t* chn, mt_desc_t* desc){
-
-  // add new protocol to chns_transition
-  byte pid[DIGEST_LEN];
-  mt_crypt_rand(DIGEST_LEN, pid);
-  digestmap_set(client.chns_transition, (char*)pid, chn);
-  chn->callback = notify;
-  // intiate token
-  nan_cli_estab1_t token;
-
-  // TODO finish making setup;
-
-  // send message
-  byte* msg;
-  int msg_size = pack_nan_cli_estab1(&token, (byte (*)[DIGEST_LEN])&pid, &msg);
-  return mt_send_message_multidesc(desc, &chn->idesc, MT_NTYPE_NAN_CLI_ESTAB1, msg, msg_size);
-}
-
-static int init_nan_cli_pay1(mt_user_notify_t notify, mt_channel_t* chn, mt_desc_t* desc){
-
-  // add new protocol to chns_transition
-  byte pid[DIGEST_LEN];
-  mt_crypt_rand(DIGEST_LEN, pid);
-  digestmap_set(client.chns_transition, (char*)pid, chn);
-  chn->callback = notify;
-
-  // intiate token
-
-  nan_cli_pay1_t token;
-
-  // TODO finish making setup;
-
-  // send message
-  byte* msg;
-  int msg_size = pack_nan_cli_pay1(&token, (byte (*)[DIGEST_LEN])&pid, &msg);
-  mt_send_message(desc, MT_NTYPE_NAN_CLI_PAY1, msg, msg_size);
-
-  return MT_SUCCESS;
-}
-
-static int init_nan_cli_destab1(mt_user_notify_t notify, mt_channel_t* chn, mt_desc_t* desc){
-
-  // add new protocol to chns_transition
-  byte pid[DIGEST_LEN];
-  mt_crypt_rand(DIGEST_LEN, pid);
-  digestmap_set(client.chns_transition, (char*)pid, chn);
-  chn->callback = notify;
-  // intiate token
-  nan_cli_destab1_t token;
-
-  // TODO finish making setup;
-
-  // send message
-  byte* msg;
-  int msg_size = pack_nan_cli_destab1(&token, (byte (*)[DIGEST_LEN])&pid, &msg);
-  mt_send_message(desc, MT_NTYPE_NAN_CLI_DESTAB1, msg, msg_size);
-
-  return MT_SUCCESS;
-}
-
-static int init_nan_cli_dpay1(mt_user_notify_t notify, mt_channel_t* chn, mt_desc_t* desc){
-
-  // add new protocol to chns_transition
-  byte pid[DIGEST_LEN];
-  mt_crypt_rand(DIGEST_LEN, pid);
-  digestmap_set(client.chns_transition, (char*)pid, chn);
-  chn->callback = notify;
-  // intiate token
-  nan_cli_dpay1_t token;
-
-  // TODO finish making setup;
-
-  // send message
-  byte* msg;
-  int msg_size = pack_nan_cli_dpay1(&token, (byte (*)[DIGEST_LEN])&pid, &msg);
-  mt_send_message(desc, MT_NTYPE_NAN_CLI_DPAY1, msg, msg_size);
-
-  return MT_SUCCESS;
-}
-
-static int init_nan_cli_reqclose1(mt_user_notify_t notify, mt_channel_t* chn,  mt_desc_t* desc){
-
-  // add new protocol to chns_transition
-  byte pid[DIGEST_LEN];
-  mt_crypt_rand(DIGEST_LEN, pid);
-  digestmap_set(client.chns_transition, (char*)pid, chn);
-  chn->callback = notify;
-  chn->callback_desc = *desc;
-
-  // intiate token
-  nan_cli_reqclose1_t token;
-
-  // TODO finish making token;
-
-  // send message
-  byte* msg;
-  int msg_size = pack_nan_cli_reqclose1(&token, (byte (*)[DIGEST_LEN])&pid, &msg);
-  mt_send_message(desc, MT_NTYPE_NAN_CLI_REQCLOSE1, msg, msg_size);
-
-  return MT_SUCCESS;
-}
-
-static int init_nan_end_close1(mt_user_notify_t notify, mt_channel_t* chn, mt_desc_t* desc){
-
-  // add new protocol to chns_transition
-  byte pid[DIGEST_LEN];
-  mt_crypt_rand(DIGEST_LEN, pid);
-  digestmap_set(client.chns_transition, (char*)pid, chn);
-  chn->callback = notify;
-  // intiate token
-  nan_end_close1_t token;
-
-  // TODO finish making token;
-
-  // send message
-  byte* msg;
-  int msg_size = pack_nan_end_close1(&token, (byte (*)[DIGEST_LEN])&pid, &msg);
-  mt_send_message(desc, MT_NTYPE_NAN_END_CLOSE1, msg, msg_size);
-
-  return MT_SUCCESS;
-}
-
-
-/******************************* Channel Escrow *************************/
-
-static int handle_any_led_confirm(mt_desc_t* desc, any_led_confirm_t* token, byte (*pid)[DIGEST_LEN]){
-  (void)token;
-  (void)desc;
-
-  mt_channel_t* chn = digestmap_get(client.chns_transition, (char*)*pid);
-  if(chn == NULL){
-    log_debug(LD_MT, "protocol id not recognized");
-    return MT_ERROR;
-  }
-
-  // check validity of incoming message
-
-  digestmap_remove(client.chns_transition, (char*)*pid);
-  smartlist_add(client.chns_setup, chn);
-
-  if(chn->callback != NULL)
-    return chn->callback(&chn->callback_desc);
-  return MT_SUCCESS;
-}
-
-/****************************** Channel Establish ***********************/
 
 static int handle_chn_int_estab2(mt_desc_t* desc, chn_int_estab2_t* token, byte (*pid)[DIGEST_LEN]){
   (void)token;
@@ -622,6 +463,44 @@ static int handle_chn_int_estab4(mt_desc_t* desc, chn_int_estab4_t* token, byte 
 }
 
 /******************************** Nano Setup ****************************/
+
+static int init_nan_cli_setup1(mt_user_notify_t notify, mt_channel_t* chn, mt_desc_t* desc){
+
+  // add new protocol to chns_transition
+  byte pid[DIGEST_LEN];
+  mt_crypt_rand(DIGEST_LEN, pid);
+  digestmap_set(client.chns_transition, (char*)pid, chn);
+  chn->callback = notify;
+  chn->callback_desc = *desc;
+
+  // intiate token
+  nan_cli_setup1_t token;
+
+  // intiate token in workerqueue
+
+  // need to figure out this zkp generating business
+  /* // if we have not started making the token then start making it */
+  /* if(chn->zkp_state == MT_ZKP_STATE_NONE){ */
+  /*   mt_desc_t* arg = malloc(sizeof(mt_desc_t)); */
+  /*   memcpy(arg, desc, sizeof(mt_desc_t)); */
+
+  /*   // fn is going to call commit wallet */
+  /*   // reply_fn is going to call notify */
+  /*   printf("got here\n"); */
+  /*   workqueue_entry_t* entry = cpuworker_queue_work(WQ_PRI_HIGH, wallet_make, wallet_reply, arg); */
+  /*   printf("but not here\n"); */
+  /*   if(entry == NULL) */
+  /*     return MT_ERROR; */
+  /*   return MT_SUCCESS; */
+  /* } */
+
+  // send message
+  byte* msg;
+  int msg_size = pack_nan_cli_setup1(&token, (byte (*)[DIGEST_LEN])&pid, &msg);
+  mt_send_message(&chn->idesc, MT_NTYPE_NAN_CLI_SETUP1, msg, msg_size);
+
+  return MT_SUCCESS;
+}
 
 static int handle_nan_int_setup2(mt_desc_t* desc, nan_int_setup2_t* token, byte (*pid)[DIGEST_LEN]){
   (void)token;
@@ -688,6 +567,24 @@ static int handle_nan_int_setup6(mt_desc_t* desc, nan_int_setup6_t* token, byte 
 
 /**************************** Nano Establish ****************************/
 
+static int init_nan_cli_estab1(mt_user_notify_t notify, mt_channel_t* chn, mt_desc_t* desc){
+
+  // add new protocol to chns_transition
+  byte pid[DIGEST_LEN];
+  mt_crypt_rand(DIGEST_LEN, pid);
+  digestmap_set(client.chns_transition, (char*)pid, chn);
+  chn->callback = notify;
+  // intiate token
+  nan_cli_estab1_t token;
+
+  // TODO finish making setup;
+
+  // send message
+  byte* msg;
+  int msg_size = pack_nan_cli_estab1(&token, &pid, &msg);
+  return mt_send_message_multidesc(desc, &chn->idesc, MT_NTYPE_NAN_CLI_ESTAB1, msg, msg_size);
+}
+
 static int handle_nan_rel_estab6(mt_desc_t* desc, nan_rel_estab6_t* token, byte (*pid)[DIGEST_LEN]){
   (void)token;
   (void)desc;
@@ -698,18 +595,39 @@ static int handle_nan_rel_estab6(mt_desc_t* desc, nan_rel_estab6_t* token, byte 
     return MT_ERROR;
   }
 
+  // check validity incoming message
   byte digest[DIGEST_LEN];
   mt_desc2digest(desc, &digest);
   digestmap_remove(client.chns_transition, (char*)*pid);
   digestmap_set(client.nans_estab, (char*)digest, chn);
 
-  // check validity incoming message
-  if(chn->callback != NULL)
+  if(chn->callback != NULL){
     chn->callback(&chn->callback_desc);
+  }
   return MT_SUCCESS;
 }
 
 /******************************* Nano Pay *******************************/
+
+static int init_nan_cli_pay1(mt_user_notify_t notify, mt_channel_t* chn, mt_desc_t* desc){
+
+  // add new protocol to chns_transition
+  byte pid[DIGEST_LEN];
+  mt_crypt_rand(DIGEST_LEN, pid);
+  digestmap_set(client.chns_transition, (char*)pid, chn);
+  chn->callback = notify;
+
+  // intiate token
+
+  nan_cli_pay1_t token;
+
+  // TODO finish making setup;
+
+  // send message
+  byte* msg;
+  int msg_size = pack_nan_cli_pay1(&token, (byte (*)[DIGEST_LEN])&pid, &msg);
+  return mt_send_message(desc, MT_NTYPE_NAN_CLI_PAY1, msg, msg_size);
+}
 
 static int handle_nan_rel_pay2(mt_desc_t* desc, nan_rel_pay2_t* token, byte (*pid)[DIGEST_LEN]){
   (void)token;
@@ -729,6 +647,26 @@ static int handle_nan_rel_pay2(mt_desc_t* desc, nan_rel_pay2_t* token, byte (*pi
 }
 
 /************************ Nano Direct Establish *************************/
+
+static int init_nan_cli_destab1(mt_user_notify_t notify, mt_channel_t* chn, mt_desc_t* desc){
+
+  // add new protocol to chns_transition
+  byte pid[DIGEST_LEN];
+  mt_crypt_rand(DIGEST_LEN, pid);
+  digestmap_set(client.chns_transition, (char*)pid, chn);
+  chn->callback = notify;
+  // intiate token
+  nan_cli_destab1_t token;
+
+  // TODO finish making setup;
+
+  // send message
+  byte* msg;
+  int msg_size = pack_nan_cli_destab1(&token, (byte (*)[DIGEST_LEN])&pid, &msg);
+  mt_send_message(desc, MT_NTYPE_NAN_CLI_DESTAB1, msg, msg_size);
+
+  return MT_SUCCESS;
+}
 
 static int handle_nan_int_destab2(mt_desc_t* desc, nan_int_destab2_t* token, byte (*pid)[DIGEST_LEN]){
   (void)token;
@@ -758,6 +696,26 @@ static int handle_nan_int_destab2(mt_desc_t* desc, nan_int_destab2_t* token, byt
 
 /**************************** Nano Direct Pay ***************************/
 
+static int init_nan_cli_dpay1(mt_user_notify_t notify, mt_channel_t* chn, mt_desc_t* desc){
+
+  // add new protocol to chns_transition
+  byte pid[DIGEST_LEN];
+  mt_crypt_rand(DIGEST_LEN, pid);
+  digestmap_set(client.chns_transition, (char*)pid, chn);
+  chn->callback = notify;
+  // intiate token
+  nan_cli_dpay1_t token;
+
+  // TODO finish making setup;
+
+  // send message
+  byte* msg;
+  int msg_size = pack_nan_cli_dpay1(&token, (byte (*)[DIGEST_LEN])&pid, &msg);
+  mt_send_message(desc, MT_NTYPE_NAN_CLI_DPAY1, msg, msg_size);
+
+  return MT_SUCCESS;
+}
+
 static int handle_nan_int_dpay2(mt_desc_t* desc, nan_int_dpay2_t* token, byte (*pid)[DIGEST_LEN]){
   (void)token;
   (void)desc;
@@ -781,6 +739,28 @@ static int handle_nan_int_dpay2(mt_desc_t* desc, nan_int_dpay2_t* token, byte (*
 
 /****************************** Nano Req Close **************************/
 
+static int init_nan_cli_reqclose1(mt_user_notify_t notify, mt_channel_t* chn,  mt_desc_t* desc){
+
+  // add new protocol to chns_transition
+  byte pid[DIGEST_LEN];
+  mt_crypt_rand(DIGEST_LEN, pid);
+  digestmap_set(client.chns_transition, (char*)pid, chn);
+  chn->callback = notify;
+  chn->callback_desc = *desc;
+
+  // intiate token
+  nan_cli_reqclose1_t token;
+
+  // TODO finish making token;
+
+  // send message
+  byte* msg;
+  int msg_size = pack_nan_cli_reqclose1(&token, (byte (*)[DIGEST_LEN])&pid, &msg);
+  mt_send_message(desc, MT_NTYPE_NAN_CLI_REQCLOSE1, msg, msg_size);
+
+  return MT_SUCCESS;
+}
+
 static int handle_nan_rel_reqclose2(mt_desc_t* desc, nan_rel_reqclose2_t* token, byte (*pid)[DIGEST_LEN]){
   (void)token;
   (void)desc;
@@ -803,6 +783,26 @@ static int handle_nan_rel_reqclose2(mt_desc_t* desc, nan_rel_reqclose2_t* token,
 }
 
 /******************************* Nano Close *****************************/
+
+static int init_nan_end_close1(mt_user_notify_t notify, mt_channel_t* chn, mt_desc_t* desc){
+
+  // add new protocol to chns_transition
+  byte pid[DIGEST_LEN];
+  mt_crypt_rand(DIGEST_LEN, pid);
+  digestmap_set(client.chns_transition, (char*)pid, chn);
+  chn->callback = notify;
+  // intiate token
+  nan_end_close1_t token;
+
+  // TODO finish making token;
+
+  // send message
+  byte* msg;
+  int msg_size = pack_nan_end_close1(&token, (byte (*)[DIGEST_LEN])&pid, &msg);
+  mt_send_message(desc, MT_NTYPE_NAN_END_CLOSE1, msg, msg_size);
+
+  return MT_SUCCESS;
+}
 
 static int handle_nan_int_close2(mt_desc_t* desc, nan_int_close2_t* token, byte (*pid)[DIGEST_LEN]){
   (void)token;

@@ -258,7 +258,6 @@ static int mock_send_message_multidesc(mt_desc_t *desc1, mt_desc_t* desc2, mt_nt
   }
 }
 
-
 static int mock_alert_payment(mt_desc_t* desc){
   (void)desc;
   printf("payment successful\n");
@@ -320,6 +319,7 @@ static void test_mt_paysimple(void *arg){
   mt_crypt_keygen(&pp, &cli_pk, &cli_sk);
   mt_crypt_keygen(&pp, &rel_pk, &rel_sk);
   mt_crypt_keygen(&pp, &int_pk, &int_sk);
+
   uint32_t ids = 0;
   led_desc.id = ids++;
   cli_desc.id = ids++;
@@ -369,6 +369,8 @@ static void test_mt_paysimple(void *arg){
   tt_assert(mt_rpay_init() == MT_SUCCESS);
 
   mt_payment_public_t public = mt_lpay_get_payment_public();
+  write_file("mt_config_temp/fee", &public.fee, sizeof(public.fee));
+
 
   int result;
 
@@ -451,6 +453,11 @@ static void test_mt_paysimple(void *arg){
   // pay relay
   memcpy(&cur_desc, &cli_desc, sizeof(mt_desc_t));
   tt_assert(mt_cpay_pay(&rel_desc) == MT_SUCCESS);
+
+  for(int i = 0; i < 9; i++){
+    printf("\n");
+    tt_assert(mt_cpay_pay(&rel_desc) == MT_SUCCESS);
+  }
 
   // close channel
 
