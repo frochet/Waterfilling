@@ -2758,7 +2758,10 @@ connection_ap_handshake_attach_circuit(entry_connection_t *conn)
      * XXX MoneTor - Attach intermediaries to that circuit
      */
     if (get_options()->EnablePayment) {
-
+      if (!circ->ppath) {
+          circ->ppath = circuit_init_ppath();
+          mt_cclient_launch_payment(circ);
+      }
     }
 
     return connection_ap_handshake_attach_chosen_circuit(conn, circ, NULL);

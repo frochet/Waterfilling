@@ -810,6 +810,19 @@ typedef struct intermediary_identity_t {
   char identity[DIGEST_LEN];
 } intermediary_identity_t;
 
+typedef enum {
+  MT_PARTY_CLI,
+  MT_PARTY_REL,
+  MT_PARTY_INT,
+  MT_PARTY_AUT,
+  MT_PARTY_LED,
+} mt_party_t;
+
+typedef struct {
+  uint32_t id;
+  mt_party_t party;
+} mt_desc_t;
+
 /** Client authorization type that a hidden service performs. */
 typedef enum rend_auth_type_t {
   REND_NO_AUTH      = 0,
@@ -3308,6 +3321,18 @@ typedef struct origin_circuit_t {
    *  Only for intermediary circuits*/
   intermediary_identity_t *inter_ident;
 
+  /**
+   * Typicall for General circuits: hold a pay_path_t structure to
+   * handle payment made through this very circuit
+   */
+  pay_path_t *ppath;
+
+  /*
+   * Interface for controller - payment modules
+   */
+
+  mt_desc_t *desc;
+
   /** Holds the data that the entry guard system uses to track the
    * status of the guard this circuit is using, and thereby to determine
    * whether this circuit can be used. */
@@ -5582,7 +5607,6 @@ typedef enum {
 #define MT_SZ_ZKP 128
 
 #define MT_SZ_ADDR DIGEST_LEN
-#define MT_SZ_ID 20
 
 //---------------------------- Tor-Facing API -------------------------------//
 
@@ -5591,18 +5615,6 @@ typedef enum {
 
 #define MT_PAYLOAD_SIZE 497
 
-typedef enum {
-  MT_PARTY_CLI,
-  MT_PARTY_REL,
-  MT_PARTY_INT,
-  MT_PARTY_AUT,
-  MT_PARTY_LED,
-} mt_party_t;
-
-typedef struct {
-  byte id[MT_SZ_ID];
-  mt_party_t party;
-} mt_desc_t;
 
 typedef int (*mt_set_prem)(mt_desc_t);
 //typedef int (*mt_open_conn(/*some notion of a unique idenity (ED5519 idenity??*/);
@@ -5621,6 +5633,15 @@ typedef enum {
   MT_LSTATE_INT_CLOSED,             // channel closed by both parties
   MT_LSTATE_RESOLVED,               // final channel balances are set
 } mt_lstate_t;
+
+// possible states of the nanopayment channel on a general circuit
+
+typedef enum {
+  MT_NPSTATE_NONE,
+  MT_NPSTATE_INIT,
+  MT_NPSTATE_OPENED,
+  MT_NPSTATE_CLOSED,
+} mt_npstate_t;
 
 //----------------------------- Token Types ---------------------------------//
 

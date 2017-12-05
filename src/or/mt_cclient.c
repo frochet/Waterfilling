@@ -32,6 +32,9 @@ static void intermediary_free(intermediary_t *intermediary);
 
 /*List of selected intermediaries */
 static smartlist_t *intermediaries = NULL;
+/*static counter of descriptors - also used as id*/
+static uint32_t desc_id = 0;
+
 
 smartlist_t* get_node_t_smartlist_intermerdiaries(void) {
   smartlist_t *all_inter_nodes = smartlist_new();
@@ -82,6 +85,23 @@ intermediary_need_cleanup(intermediary_t *intermediary, time_t now) {
       }
     } SMARTLIST_FOREACH_END(inter);
   }
+}
+
+/*
+ * This function is responsible to choose the right intermediary
+ * to use with the circuit circ, create the descriptor
+ * mt_desc_t * and notify the payment module that we
+ * want to establish a payment circuit.
+ */
+
+void
+mt_cclient_launch_payment(origin_circuit_t* circ) {
+  (void) circ;
+
+  tor_assert(!circ->desc);
+  log_info(LD_MT, "Initiating payment - calling payment module");
+  circ->desc = tor_malloc_zero(sizeof(mt_desc_t));
+  circ->desc->id = desc_id++;
 }
 
 

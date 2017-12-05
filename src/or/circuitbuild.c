@@ -1372,6 +1372,14 @@ circuit_extend(cell_t *cell, circuit_t *circ)
   return 0;
 }
 
+
+pay_path_t*
+circuit_init_ppath(void) {
+  pay_path_t* ppath = tor_malloc_zero(sizeof(pay_path_t));
+
+  return ppath;
+}
+
 /** Initialize cpath-\>{f|b}_{crypto|digest} from the key material in key_data.
  *
  * If <b>is_hs_v3</b> is set, this cpath will be used for next gen hidden

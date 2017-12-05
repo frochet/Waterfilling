@@ -49,6 +49,17 @@ extend_info_t* mt_cclient_get_intermediary_from_edge(edge_connection_t* conn);
  */
 intermediary_t* mt_cclient_get_intermediary_from_ocirc(origin_circuit_t* circ);
 
+/********************** Payment actions *************************************/
+
+/**
+ * Interface from the circuit code to initiate the payment module when a first
+ * stream is attached to a general circuit
+ */
+
+void mt_cclient_launch_payment(origin_circuit_t* circ);
+
+/****************************************************************************/
+
 void mt_cclient_init(void);
 
 /**

@@ -215,27 +215,27 @@ static int mock_send_message(mt_desc_t *desc, mt_ntype_t type, byte* msg, int si
       break;
   }
 
-  if(memcmp(cur_desc.id, aut_desc.id, MT_SZ_ID) == 0 && cur_desc.party == MT_PARTY_AUT){
+  if(cur_desc.id == aut_desc.id && cur_desc.party == MT_PARTY_AUT){
     printf("%s -> aut : %s\n", party_str, type_str);
     return MT_SUCCESS;
   }
 
-  if(memcmp(cur_desc.id, led_desc.id, MT_SZ_ID) == 0 && cur_desc.party == MT_PARTY_LED){
+  if(cur_desc.id == led_desc.id && cur_desc.party == MT_PARTY_LED){
     printf("%s -> led : %s\n", party_str, type_str);
     return mt_lpay_recv(&old_desc, type, msg, size);
   }
 
-  if(memcmp(cur_desc.id, cli_desc.id, MT_SZ_ID) == 0 && cur_desc.party == MT_PARTY_CLI){
+  if(cur_desc.id == cli_desc.id && cur_desc.party == MT_PARTY_CLI){
     printf("%s -> cli : %s\n", party_str, type_str);
     return mt_cpay_recv(&old_desc, type, msg, size);
   }
 
-  if(memcmp(cur_desc.id, rel_desc.id, MT_SZ_ID) == 0 && cur_desc.party == MT_PARTY_REL){
+  if(cur_desc.id == rel_desc.id && cur_desc.party == MT_PARTY_REL){
     printf("%s -> rel : %s\n", party_str, type_str);
     return mt_rpay_recv(&old_desc, type, msg, size);
   }
 
-  if(memcmp(cur_desc.id, int_desc.id, MT_SZ_ID) == 0 && cur_desc.party == MT_PARTY_INT){
+  if(cur_desc.id == int_desc.id && cur_desc.party == MT_PARTY_INT){
     printf("%s -> int : %s\n", party_str, type_str);
     return mt_ipay_recv(&old_desc, type, msg, size);
   }
@@ -250,7 +250,7 @@ static int mock_send_message_multidesc(mt_desc_t *desc1, mt_desc_t* desc2, mt_nt
   memcpy(&old_desc, &cur_desc, sizeof(mt_desc_t));
   memcpy(&cur_desc, &temp_desc, sizeof(mt_desc_t));
 
-  if(memcmp(cur_desc.id, rel_desc.id, MT_SZ_ID) == 0
+  if(cur_desc.id == rel_desc.id
      && cur_desc.party == MT_PARTY_REL
      && type == MT_NTYPE_NAN_CLI_ESTAB1){
     printf("cli - >rel : nan_cli_estab1\n");
@@ -320,11 +320,11 @@ static void test_mt_paysimple(void *arg){
   mt_crypt_keygen(&pp, &cli_pk, &cli_sk);
   mt_crypt_keygen(&pp, &rel_pk, &rel_sk);
   mt_crypt_keygen(&pp, &int_pk, &int_sk);
-
-  mt_crypt_rand(MT_SZ_ID, led_desc.id);
-  mt_crypt_rand(MT_SZ_ID, cli_desc.id);
-  mt_crypt_rand(MT_SZ_ID, rel_desc.id);
-  mt_crypt_rand(MT_SZ_ID, int_desc.id);
+  uint32_t ids = 0;
+  led_desc.id = ids++;
+  cli_desc.id = ids++;
+  rel_desc.id = ids++;
+  int_desc.id = ids++;
 
   // write to files TODO: this should be done via torrc instead
   write_file("mt_config_temp/pp", pp, MT_SZ_PP);
