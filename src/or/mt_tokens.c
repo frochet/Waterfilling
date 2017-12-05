@@ -217,15 +217,15 @@ int pack_nan_rel_pay2(nan_rel_pay2_t* token, byte(*pid)[DIGEST_LEN], byte** str_
 }
 
 int pack_nan_cli_reqclose1(nan_cli_reqclose1_t* token, byte(*pid)[DIGEST_LEN], byte** str_out){
-    return pack_token(MT_NTYPE_NAN_CLI_REQCLOSE1, token, sizeof(token), pid, str_out);
+    return pack_token(MT_NTYPE_NAN_CLI_REQCLOSE1, token, sizeof(*token), pid, str_out);
 }
 
 int pack_nan_rel_reqclose2(nan_rel_reqclose2_t* token, byte(*pid)[DIGEST_LEN], byte** str_out){
-    return pack_token(MT_NTYPE_NAN_REL_REQCLOSE2, token, sizeof(token), pid, str_out);
+    return pack_token(MT_NTYPE_NAN_REL_REQCLOSE2, token, sizeof(*token), pid, str_out);
 }
 
 int pack_nan_cli_destab1(nan_cli_destab1_t* token, byte(*pid)[DIGEST_LEN], byte** str_out){
-    return pack_token(MT_NTYPE_NAN_CLI_DESTAB1, token, sizeof(token), pid, str_out);
+    return pack_token(MT_NTYPE_NAN_CLI_DESTAB1, token, sizeof(*token), pid, str_out);
 }
 
 int pack_nan_int_destab2(nan_int_destab2_t* token, byte(*pid)[DIGEST_LEN], byte** str_out){

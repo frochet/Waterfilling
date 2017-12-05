@@ -205,10 +205,9 @@ int mt_cpay_close(mt_desc_t* desc){
   mt_channel_t* chn;
   byte digest[DIGEST_LEN];
   mt_desc2digest(desc, &digest);
-
-  if((chn = digestmap_remove(client.nans_reqclosed, (char*)digest)) != NULL)
+  if((chn = digestmap_remove(client.nans_reqclosed, (char*)digest)) != NULL){
     return init_nan_end_close1(mt_close_notify, chn, desc);
-
+  }
   if((chn = digestmap_remove(client.nans_estab, (char*)digest)) != NULL)
     return init_nan_cli_reqclose1(mt_cpay_close, chn, desc);
 
@@ -415,7 +414,7 @@ static int init_chn_end_estab1(mt_user_notify_t notify, mt_channel_t* chn, mt_de
 
   // send message
   byte* msg;
-  int msg_size = pack_chn_end_estab1(&token, (byte (*)[DIGEST_LEN])&pid, &msg);
+  int msg_size = pack_chn_end_estab1(&token, &pid, &msg);
   mt_send_message(&chn->idesc, MT_NTYPE_CHN_END_ESTAB1, msg, msg_size);
 
   return MT_SUCCESS;
@@ -458,7 +457,7 @@ static int handle_chn_int_estab4(mt_desc_t* desc, chn_int_estab4_t* token, byte 
 
   // check validity of incoming message
   if(chn->callback != NULL)
-    chn->callback(&chn->callback_desc);
+    return chn->callback(&chn->callback_desc);
   return MT_SUCCESS;
 }
 
@@ -496,7 +495,7 @@ static int init_nan_cli_setup1(mt_user_notify_t notify, mt_channel_t* chn, mt_de
 
   // send message
   byte* msg;
-  int msg_size = pack_nan_cli_setup1(&token, (byte (*)[DIGEST_LEN])&pid, &msg);
+  int msg_size = pack_nan_cli_setup1(&token, &pid, &msg);
   mt_send_message(&chn->idesc, MT_NTYPE_NAN_CLI_SETUP1, msg, msg_size);
 
   return MT_SUCCESS;
@@ -561,7 +560,7 @@ static int handle_nan_int_setup6(mt_desc_t* desc, nan_int_setup6_t* token, byte 
 
   // check validity incoming message
   if(chn->callback != NULL)
-    chn->callback(&chn->callback_desc);
+    return chn->callback(&chn->callback_desc);
   return MT_SUCCESS;
 }
 
@@ -602,7 +601,7 @@ static int handle_nan_rel_estab6(mt_desc_t* desc, nan_rel_estab6_t* token, byte 
   digestmap_set(client.nans_estab, (char*)digest, chn);
 
   if(chn->callback != NULL){
-    chn->callback(&chn->callback_desc);
+    return chn->callback(&chn->callback_desc);
   }
   return MT_SUCCESS;
 }
@@ -625,7 +624,7 @@ static int init_nan_cli_pay1(mt_user_notify_t notify, mt_channel_t* chn, mt_desc
 
   // send message
   byte* msg;
-  int msg_size = pack_nan_cli_pay1(&token, (byte (*)[DIGEST_LEN])&pid, &msg);
+  int msg_size = pack_nan_cli_pay1(&token, &pid, &msg);
   return mt_send_message(desc, MT_NTYPE_NAN_CLI_PAY1, msg, msg_size);
 }
 
@@ -662,7 +661,7 @@ static int init_nan_cli_destab1(mt_user_notify_t notify, mt_channel_t* chn, mt_d
 
   // send message
   byte* msg;
-  int msg_size = pack_nan_cli_destab1(&token, (byte (*)[DIGEST_LEN])&pid, &msg);
+  int msg_size = pack_nan_cli_destab1(&token, &pid, &msg);
   mt_send_message(desc, MT_NTYPE_NAN_CLI_DESTAB1, msg, msg_size);
 
   return MT_SUCCESS;
@@ -685,12 +684,12 @@ static int handle_nan_int_destab2(mt_desc_t* desc, nan_int_destab2_t* token, byt
 
   // check validity incoming message
   if(chn->callback != NULL)
-    chn->callback(&chn->callback_desc);
-  return MT_SUCCESS;
+    return chn->callback(&chn->callback_desc);
 
   // check validity incoming message
   if(chn->callback != NULL)
-    chn->callback(&chn->callback_desc);
+    return chn->callback(&chn->callback_desc);
+
   return MT_SUCCESS;
 }
 
@@ -710,10 +709,8 @@ static int init_nan_cli_dpay1(mt_user_notify_t notify, mt_channel_t* chn, mt_des
 
   // send message
   byte* msg;
-  int msg_size = pack_nan_cli_dpay1(&token, (byte (*)[DIGEST_LEN])&pid, &msg);
-  mt_send_message(desc, MT_NTYPE_NAN_CLI_DPAY1, msg, msg_size);
-
-  return MT_SUCCESS;
+  int msg_size = pack_nan_cli_dpay1(&token, &pid, &msg);
+  return mt_send_message(desc, MT_NTYPE_NAN_CLI_DPAY1, msg, msg_size);
 }
 
 static int handle_nan_int_dpay2(mt_desc_t* desc, nan_int_dpay2_t* token, byte (*pid)[DIGEST_LEN]){
@@ -733,7 +730,7 @@ static int handle_nan_int_dpay2(mt_desc_t* desc, nan_int_dpay2_t* token, byte (*
 
   // check validity incoming message
   if(chn->callback != NULL)
-    chn->callback(&chn->callback_desc);
+    return chn->callback(&chn->callback_desc);
   return MT_SUCCESS;
 }
 
@@ -755,10 +752,8 @@ static int init_nan_cli_reqclose1(mt_user_notify_t notify, mt_channel_t* chn,  m
 
   // send message
   byte* msg;
-  int msg_size = pack_nan_cli_reqclose1(&token, (byte (*)[DIGEST_LEN])&pid, &msg);
-  mt_send_message(desc, MT_NTYPE_NAN_CLI_REQCLOSE1, msg, msg_size);
-
-  return MT_SUCCESS;
+  int msg_size = pack_nan_cli_reqclose1(&token, &pid, &msg);
+  return mt_send_message(desc, MT_NTYPE_NAN_CLI_REQCLOSE1, msg, msg_size);
 }
 
 static int handle_nan_rel_reqclose2(mt_desc_t* desc, nan_rel_reqclose2_t* token, byte (*pid)[DIGEST_LEN]){
@@ -774,11 +769,11 @@ static int handle_nan_rel_reqclose2(mt_desc_t* desc, nan_rel_reqclose2_t* token,
   byte digest[DIGEST_LEN];
   mt_desc2digest(desc, &digest);
   digestmap_remove(client.chns_transition, (char*)*pid);
-  digestmap_set(client.nans_reqclosed, (char*)desc, chn);
+  digestmap_set(client.nans_reqclosed, (char*)digest, chn);
 
   // check validity incoming message
   if(chn->callback != NULL)
-    chn->callback(&chn->callback_desc);
+    return chn->callback(&chn->callback_desc);
   return MT_SUCCESS;
 }
 
@@ -798,10 +793,8 @@ static int init_nan_end_close1(mt_user_notify_t notify, mt_channel_t* chn, mt_de
 
   // send message
   byte* msg;
-  int msg_size = pack_nan_end_close1(&token, (byte (*)[DIGEST_LEN])&pid, &msg);
-  mt_send_message(desc, MT_NTYPE_NAN_END_CLOSE1, msg, msg_size);
-
-  return MT_SUCCESS;
+  int msg_size = pack_nan_end_close1(&token, &pid, &msg);
+  return mt_send_message(&chn->idesc, MT_NTYPE_NAN_END_CLOSE1, msg, msg_size);
 }
 
 static int handle_nan_int_close2(mt_desc_t* desc, nan_int_close2_t* token, byte (*pid)[DIGEST_LEN]){
@@ -870,7 +863,6 @@ static int handle_nan_int_close6(mt_desc_t* desc, nan_int_close6_t* token, byte 
 static int handle_nan_int_close8(mt_desc_t* desc, nan_int_close8_t* token, byte (*pid)[DIGEST_LEN]){
   (void)token;
   (void)desc;
-
   mt_channel_t* chn = digestmap_get(client.chns_transition, (char*)*pid);
   if(chn == NULL){
     log_debug(LD_MT, "protocol id not recognized");
@@ -882,10 +874,10 @@ static int handle_nan_int_close8(mt_desc_t* desc, nan_int_close8_t* token, byte 
   byte digest[DIGEST_LEN];
   mt_desc2digest(desc, &digest);
   digestmap_remove(client.chns_transition, (char*)*pid);
-  digestmap_set(client.nans_estab, (char*)desc, chn);
+  digestmap_set(client.nans_estab, (char*)digest, chn);
 
   if(chn->callback != NULL)
-    chn->callback(&chn->callback_desc);
+    return chn->callback(&chn->callback_desc);
   return MT_SUCCESS;
 }
 
@@ -929,7 +921,6 @@ static int mt_directpay_notify(mt_desc_t* desc){
 
 static int mt_close_notify(mt_desc_t* desc){
   (void)desc;
-
   smartlist_sort(client.nans_setup, compare_chn_end_data);
-  return 0;
+  return MT_SUCCESS;
 }

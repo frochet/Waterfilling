@@ -439,29 +439,49 @@ static int handle_nan_cli_dpay1(mt_desc_t* desc, nan_cli_dpay1_t* token, byte (*
 /******************************* Nano Close *****************************/
 
 static int handle_nan_end_close1(mt_desc_t* desc, nan_end_close1_t* token, byte (*pid)[DIGEST_LEN]){
-  (void)desc;
-  (void)token;
-  (void)pid;
-  return MT_SUCCESS;
+  // verify token validity
+
+  nan_int_close2_t reply;
+
+  // fill out token
+
+  byte* packed_reply;
+  int packed_reply_size = pack_nan_int_close2(&reply, pid, &packed_reply);
+  return mt_send_message(desc, MT_NTYPE_NAN_INT_CLOSE2, packed_reply, packed_reply_size);
 }
 
 static int handle_nan_end_close3(mt_desc_t* desc, nan_end_close3_t* token, byte (*pid)[DIGEST_LEN]){
-  (void)desc;
-  (void)token;
-  (void)pid;
-  return MT_SUCCESS;
+  // verify token validity
+
+  nan_int_close4_t reply;
+
+  // fill out token
+
+  byte* packed_reply;
+  int packed_reply_size = pack_nan_int_close4(&reply, pid, &packed_reply);
+  return mt_send_message(desc, MT_NTYPE_NAN_INT_CLOSE4, packed_reply, packed_reply_size);
 }
 
 static int handle_nan_end_close5(mt_desc_t* desc, nan_end_close5_t* token, byte (*pid)[DIGEST_LEN]){
-  (void)desc;
-  (void)token;
-  (void)pid;
-  return MT_SUCCESS;
+  // verify token validity
+
+  nan_int_close6_t reply;
+
+  // fill out token
+
+  byte* packed_reply;
+  int packed_reply_size = pack_nan_int_close6(&reply, pid, &packed_reply);
+  return mt_send_message(desc, MT_NTYPE_NAN_INT_CLOSE6, packed_reply, packed_reply_size);
 }
 
 static int handle_nan_end_close7(mt_desc_t* desc, nan_end_close7_t* token, byte (*pid)[DIGEST_LEN]){
-  (void)desc;
-  (void)token;
-  (void)pid;
-  return MT_SUCCESS;
+  // verify token validity
+
+  nan_int_close8_t reply;
+
+  // fill out token
+
+  byte* packed_reply;
+  int packed_reply_size = pack_nan_int_close8(&reply, pid, &packed_reply);
+  return mt_send_message(desc, MT_NTYPE_NAN_INT_CLOSE8, packed_reply, packed_reply_size);
 }

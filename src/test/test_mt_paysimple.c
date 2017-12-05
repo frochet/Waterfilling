@@ -321,6 +321,7 @@ static void test_mt_paysimple(void *arg){
   mt_crypt_keygen(&pp, &int_pk, &int_sk);
 
   uint32_t ids = 0;
+  aut_desc.id = ids++;
   led_desc.id = ids++;
   cli_desc.id = ids++;
   rel_desc.id = ids++;
@@ -448,18 +449,22 @@ static void test_mt_paysimple(void *arg){
 
   /**************************** Protocol Tests ***************************/
 
-  printf("\n");
-
   // pay relay
+  printf("\n");
   memcpy(&cur_desc, &cli_desc, sizeof(mt_desc_t));
   tt_assert(mt_cpay_pay(&rel_desc) == MT_SUCCESS);
 
   for(int i = 0; i < 9; i++){
     printf("\n");
+    memcpy(&cur_desc, &cli_desc, sizeof(mt_desc_t));
     tt_assert(mt_cpay_pay(&rel_desc) == MT_SUCCESS);
   }
 
+
   // close channel
+  printf("\n");
+  memcpy(&cur_desc, &cli_desc, sizeof(mt_desc_t));
+  tt_assert(mt_cpay_close(&rel_desc) == MT_SUCCESS);
 
  done:;
   UNMOCK(mt_send_message);
