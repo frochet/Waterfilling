@@ -31,7 +31,7 @@ int mt_pk2addr(byte (*pk)[MT_SZ_PK], byte (*addr_out)[MT_SZ_ADDR]){
 void mt_desc2digest(mt_desc_t* desc, byte (*digest_out)[DIGEST_LEN]){
   byte hash[MT_SZ_HASH];
   byte input[sizeof(uint32_t) + sizeof(desc->party)];
-  memcpy(input, desc->id, sizeof(uint32_t));
+  memcpy(input, &desc->id, sizeof(uint32_t));
   //printf("%x", *((uint32_t*)input);
   memcpy(input + sizeof(uint32_t), &desc->party, sizeof(desc->party));
   mt_crypt_hash(input, sizeof(desc), &hash);
