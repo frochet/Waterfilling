@@ -24,8 +24,10 @@ static mt_desc_t old_desc;
 
 static int mock_send_message(mt_desc_t *desc, mt_ntype_t type, byte* msg, int size){
 
+  mt_desc_t temp_desc;
+  memcpy(&temp_desc, desc, sizeof(mt_desc_t));
   memcpy(&old_desc, &cur_desc, sizeof(mt_desc_t));
-  memcpy(&cur_desc, desc, sizeof(mt_desc_t));
+  memcpy(&cur_desc, &temp_desc, sizeof(mt_desc_t));
 
   const char* type_str;
   const char* party_str;
@@ -197,45 +199,65 @@ static int mock_send_message(mt_desc_t *desc, mt_ntype_t type, byte* msg, int si
 
   switch(old_desc.party){
     case MT_PARTY_AUT:
-      party_str = "authority";
+      party_str = "aut";
       break;
     case MT_PARTY_LED:
-      party_str = "ledger";
+      party_str = "led";
       break;
     case MT_PARTY_CLI:
-      party_str = "client";
+      party_str = "cli";
       break;
     case MT_PARTY_REL:
-      party_str = "relay";
+      party_str = "rel";
       break;
     case MT_PARTY_INT:
-      party_str = "intermediary";
+      party_str = "int";
       break;
   }
 
-  if(memcmp(desc->id, led_desc.id, MT_SZ_ID) == 0 && desc->party == MT_PARTY_LED){
-    printf("%s sent from %s to ledger\n", type_str, party_str);
+  if(memcmp(cur_desc.id, aut_desc.id, MT_SZ_ID) == 0 && cur_desc.party == MT_PARTY_AUT){
+    printf("%s -> aut : %s\n", party_str, type_str);
+    return MT_SUCCESS;
+  }
+
+  if(memcmp(cur_desc.id, led_desc.id, MT_SZ_ID) == 0 && cur_desc.party == MT_PARTY_LED){
+    printf("%s -> led : %s\n", party_str, type_str);
     return mt_lpay_recv(&old_desc, type, msg, size);
   }
 
-  if(memcmp(desc->id, cli_desc.id, MT_SZ_ID) == 0 && desc->party == MT_PARTY_CLI){
-    printf("%s sent from %s to client\n", type_str, party_str);
+  if(memcmp(cur_desc.id, cli_desc.id, MT_SZ_ID) == 0 && cur_desc.party == MT_PARTY_CLI){
+    printf("%s -> cli : %s\n", party_str, type_str);
     return mt_cpay_recv(&old_desc, type, msg, size);
   }
 
-  if(memcmp(desc->id, rel_desc.id, MT_SZ_ID) == 0 && desc->party == MT_PARTY_REL){
-    printf("%s sent from %s to relay\n", type_str, party_str);
+  if(memcmp(cur_desc.id, rel_desc.id, MT_SZ_ID) == 0 && cur_desc.party == MT_PARTY_REL){
+    printf("%s -> rel : %s\n", party_str, type_str);
     return mt_rpay_recv(&old_desc, type, msg, size);
   }
 
-  if(memcmp(desc->id, int_desc.id, MT_SZ_ID) == 0 && desc->party == MT_PARTY_INT){
-    printf("%s sent from %s to intermediary\n", type_str, party_str);
+  if(memcmp(cur_desc.id, int_desc.id, MT_SZ_ID) == 0 && cur_desc.party == MT_PARTY_INT){
+    printf("%s -> int : %s\n", party_str, type_str);
     return mt_ipay_recv(&old_desc, type, msg, size);
   }
 
   printf("ERROR: descriptor not recognized\n");
   return MT_ERROR;
 }
+
+static int mock_send_message_multidesc(mt_desc_t *desc1, mt_desc_t* desc2, mt_ntype_t type, byte* msg, int size){
+  mt_desc_t temp_desc;
+  memcpy(&temp_desc, desc1, sizeof(mt_desc_t));
+  memcpy(&old_desc, &cur_desc, sizeof(mt_desc_t));
+  memcpy(&cur_desc, &temp_desc, sizeof(mt_desc_t));
+
+  if(memcmp(cur_desc.id, rel_desc.id, MT_SZ_ID) == 0
+     && cur_desc.party == MT_PARTY_REL
+     && type == MT_NTYPE_NAN_CLI_ESTAB1){
+    printf("cli - >rel : nan_cli_estab1\n");
+    return mt_rpay_recv_multidesc(&old_desc, desc2, type, msg, size);
+  }
+}
+
 
 static int mock_alert_payment(mt_desc_t* desc){
   (void)desc;
@@ -257,11 +279,12 @@ static void write_file(const char* name, void* buf, int size){
 
 static void test_mt_paysimple(void *arg){
 
-  printf("\n------------ begin paysimple ------------\n\n");
+  printf("\n\n------------ begin paysimple ------------\n\n");
 
   (void)arg;
 
   MOCK(mt_send_message, mock_send_message);
+  MOCK(mt_send_message_multidesc, mock_send_message_multidesc);
   MOCK(mt_alert_payment, mock_alert_payment);
   MOCK(mt_new_intermediary, mock_new_intermediary);
 
@@ -423,8 +446,11 @@ static void test_mt_paysimple(void *arg){
 
   /**************************** Protocol Tests ***************************/
 
+  printf("\n");
+
   // pay relay
-  //tt_assert(mt_cpay_pay(&rel_desc) == MT_SUCCESS);
+  memcpy(&cur_desc, &cli_desc, sizeof(mt_desc_t));
+  tt_assert(mt_cpay_pay(&rel_desc) == MT_SUCCESS);
 
   // close channel
 

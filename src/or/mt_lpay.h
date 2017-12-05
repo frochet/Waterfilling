@@ -57,10 +57,4 @@ int mt_lpay_query_mac_balance(byte (*addr)[MT_SZ_ADDR]);
 int mt_lpay_query_end_balance(byte (*addr)[MT_SZ_ADDR]);
 int mt_lpay_query_int_balance(byte (*addr)[MT_SZ_ADDR]);
 
-/**
- *
- */
-
-
-
 #endif

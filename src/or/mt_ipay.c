@@ -6,7 +6,7 @@
 #include "mt_ipay.h"
 
 typedef struct {
-  mt_desc_t* desc;
+  mt_desc_t desc;
   mt_ntype_t type;
   byte* msg;
   int size;
@@ -19,7 +19,7 @@ typedef enum {
 } mt_zkp_state_t;
 
 typedef struct {
-  byte chn[MT_SZ_ADDR];
+  byte addr[MT_SZ_ADDR];
 
   mt_desc_t end_desc;
   chn_int_chntok_t chn_token;
@@ -49,7 +49,7 @@ typedef struct {
 
 
 // private initializer functions
-static int init_chn_int_setup(mt_recv_args_t* args, mt_channel_t* chn, mt_desc_t* desc);
+static int init_chn_int_setup(mt_recv_args_t* args, byte (*chn_addr)[MT_SZ_ADDR], mt_desc_t* desc);
 
 // local handler functions
 static int handle_any_led_confirm(mt_desc_t* desc, any_led_confirm_t* token, byte (*pid)[DIGEST_LEN]);
@@ -107,6 +107,7 @@ int mt_ipay_init(void){
   memcpy(intermediary.pp, pp, MT_SZ_PP);
   memcpy(intermediary.pk, pk, MT_SZ_PK);
   memcpy(intermediary.sk, sk, MT_SZ_SK);
+  mt_pk2addr(&intermediary.pk, &intermediary.addr);
   intermediary.ledger = ledger;
 
   // initialize channel containers
@@ -237,61 +238,159 @@ int mt_ipay_recv(mt_desc_t* desc, mt_ntype_t type, byte* msg, int size){
 
 /**************************** Initialize Protocols **********************/
 
-static int init_chn_int_setup(mt_recv_args_t* args, mt_channel_t* chn, mt_desc_t* desc){
-  (void)args;
-  (void)chn;
-  (void)desc;
-  return MT_SUCCESS;
+static int init_chn_int_setup(mt_recv_args_t* args, byte (*chn_addr)[MT_SZ_ADDR], mt_desc_t* desc){
+
+  // initialize new channel
+  mt_channel_t* chn = tor_calloc(1, sizeof(mt_channel_t));
+  memcpy(&chn->addr, chn_addr, MT_SZ_ADDR);
+  memcpy(&chn->end_desc, desc, sizeof(mt_desc_t));
+  memcpy(&chn->cb_args, args, sizeof(mt_recv_args_t));
+  // ignore channel token for now
+
+  byte pid[DIGEST_LEN];
+  mt_crypt_rand(DIGEST_LEN, pid);
+  digestmap_set(intermediary.chns_transition, (char*)pid, chn);
+
+  // initialize setup token
+  chn_int_setup_t token;
+  token.val_from = 50;
+  token.val_to = 50;   //TODO get fees
+  memcpy(token.from, intermediary.addr, MT_SZ_ADDR);
+  memcpy(token.chn, chn->addr, MT_SZ_ADDR);
+  // ignore channel token for now
+
+  // send setup message
+  byte* packed_reply;
+  byte* signed_reply;
+  int packed_reply_size = pack_chn_int_setup(&token, &pid, &packed_reply);
+  int signed_reply_size = mt_create_signed_msg(packed_reply, packed_reply_size,
+					     &intermediary.pk, &intermediary.sk, &signed_reply);
+  return mt_send_message(&intermediary.ledger, MT_NTYPE_CHN_INT_SETUP, signed_reply, signed_reply_size);
 }
 
 /******************************* Channel Escrow *************************/
 
 static int handle_any_led_confirm(mt_desc_t* desc, any_led_confirm_t* token, byte (*pid)[DIGEST_LEN]){
-  (void)desc;
-  (void)token;
-  (void)pid;
+
+  mt_channel_t* chn = digestmap_get(intermediary.chns_transition, (char*)*pid);
+  if(chn == NULL){
+    log_debug(LD_MT, "protocol id not recognized");
+    return MT_ERROR;
+  }
+
+  // check validity of incoming message
+
+  // move channel to chns_setup
+  byte digest[DIGEST_LEN];
+  mt_desc2digest(&chn->end_desc, &digest);
+  digestmap_remove(intermediary.chns_transition, (char*)*pid);
+  digestmap_set(intermediary.chns_setup, digest, chn);
+
+  mt_recv_args_t args = chn->cb_args;
+  if(args.msg != NULL){
+    return mt_ipay_recv(&args.desc, args.type, args.msg, args.size);
+  }
   return MT_SUCCESS;
 }
 
 /****************************** Channel Establish ***********************/
 
 static int handle_chn_end_estab1(mt_desc_t* desc, chn_end_estab1_t* token, byte (*pid)[DIGEST_LEN]){
-  (void)desc;
-  (void)token;
-  (void)pid;
 
-  init_chn_int_setup(NULL, NULL, desc); // just to get rid of warning for now
+  // verify token validity
+
+  // setup chn
+  mt_channel_t* chn;
+  byte digest[DIGEST_LEN];
+  mt_desc2digest(desc, &digest);
+
+  // if existing channel is setup with this address then start establish protocol
+  if((chn = digestmap_remove(intermediary.chns_setup, (char*)digest)) != NULL){
+
+    // add channel to transition
+    digestmap_set(intermediary.chns_transition, (char*)pid, chn);
+
+    chn_int_estab2_t reply;
+
+    // fill out token
+
+    chn->cb_args.msg = NULL;
+    byte* packed_reply;
+    int packed_reply_size = pack_chn_int_estab2(&reply, pid, &packed_reply);
+    return mt_send_message(desc, MT_NTYPE_CHN_INT_ESTAB2, packed_reply, packed_reply_size);
+  }
+
+  // otherwise prepare callback
+  mt_recv_args_t args;
+  args.type = MT_NTYPE_CHN_END_ESTAB1;
+  memcpy(&args.desc, desc, sizeof(mt_desc_t));
+  args.size = pack_chn_end_estab1(token, pid, &args.msg);
+
+  init_chn_int_setup(&args, &token->addr, desc); // just to get rid of warning for now
   return MT_SUCCESS;
 }
 
 static int handle_chn_end_estab3(mt_desc_t* desc, chn_end_estab3_t* token, byte (*pid)[DIGEST_LEN]){
-  (void)desc;
-  (void)token;
-  (void)pid;
-  return MT_SUCCESS;
+
+  mt_channel_t* chn = digestmap_get(intermediary.chns_transition, (char*)*pid);
+  if(chn == NULL){
+    log_debug(LD_MT, "protocol id not recognized");
+    return MT_ERROR;
+  }
+
+  byte digest[DIGEST_LEN];
+  mt_desc2digest(desc, &digest);
+  digestmap_remove(intermediary.chns_transition, (char*)*pid);
+  digestmap_set(intermediary.chns_estab, (char*)digest, chn);
+
+  chn_int_estab4_t reply;
+
+  // fill out token
+
+  byte* packed_reply;
+  int packed_reply_size = pack_chn_int_estab4(&reply, pid, &packed_reply);
+  return mt_send_message(desc, MT_NTYPE_CHN_INT_ESTAB4, packed_reply, packed_reply_size);
 }
 
 /******************************** Nano Setup ****************************/
 
 static int handle_nan_cli_setup1(mt_desc_t* desc, nan_cli_setup1_t* token, byte (*pid)[DIGEST_LEN]){
-  (void)desc;
-  (void)token;
-  (void)pid;
-  return MT_SUCCESS;
+
+  // verify token validity
+
+  nan_int_setup2_t reply;
+
+  // fill out token
+
+  byte* packed_reply;
+  int packed_reply_size = pack_nan_int_setup2(&reply, pid, &packed_reply);
+  return mt_send_message(desc, MT_NTYPE_NAN_INT_SETUP2, packed_reply, packed_reply_size);
 }
 
 static int handle_nan_cli_setup3(mt_desc_t* desc, nan_cli_setup3_t* token, byte (*pid)[DIGEST_LEN]){
-  (void)desc;
-  (void)token;
-  (void)pid;
-  return MT_SUCCESS;
+
+  // verify token validity
+
+  nan_int_setup4_t reply;
+
+  // fill reply with correct values
+
+  byte* packed_reply;
+  int packed_reply_size = pack_nan_int_setup4(&reply, pid, &packed_reply);
+  return mt_send_message(desc, MT_NTYPE_NAN_INT_SETUP4, packed_reply, packed_reply_size);
 }
 
 static int handle_nan_cli_setup5(mt_desc_t* desc, nan_cli_setup5_t* token, byte (*pid)[DIGEST_LEN]){
-  (void)desc;
-  (void)token;
-  (void)pid;
-  return MT_SUCCESS;
+
+  // verify token validity
+
+  nan_int_setup6_t reply;
+
+  // fill out token
+
+  byte* packed_reply;
+  int packed_reply_size = pack_nan_int_setup6(&reply, pid, &packed_reply);
+  return mt_send_message(desc, MT_NTYPE_NAN_INT_SETUP6, packed_reply, packed_reply_size);
 }
 
 /**************************** Nano Establish ****************************/
