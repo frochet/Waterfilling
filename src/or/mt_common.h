@@ -95,6 +95,8 @@ void monetor_run_scheduled_events(time_t now);
 
 MOCK_DECL(int, mt_send_message, (mt_desc_t *desc, mt_ntype_t type, byte* msg, int size));
 
+MOCK_DECL(int, mt_send_message_multidesc, (mt_desc_t *desc1, mt_desc_t* desc2, mt_ntype_t type, byte* msg, int size));
+
 MOCK_DECL(int, mt_alert_payment, (mt_desc_t *desc));
 
 MOCK_DECL(int, mt_new_intermediary, (mt_desc_t *desc));

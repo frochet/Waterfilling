@@ -5836,9 +5836,9 @@ typedef struct {
 } mac_end_data_t;
 
 typedef struct {
-  byte pp[MT_SZ_PP];
   byte pk[MT_SZ_PK];
   byte sk[MT_SZ_SK];
+  byte addr[MT_SZ_ADDR];
   int balance;
 
   mic_end_wallet_t wallet;
@@ -5978,9 +5978,8 @@ typedef struct {
   byte addr[MT_SZ_ADDR];
 } chn_led_query_t;
 
-// TODO: notify intermediary to connect to ledger at given chn address
-
 typedef struct {
+  byte addr[MT_SZ_ADDR];
   byte zkp[MT_SZ_ZKP];
 } chn_end_estab1_t;
 

@@ -31,8 +31,8 @@ int mt_pk2addr(byte (*pk)[MT_SZ_PK], byte (*addr_out)[MT_SZ_ADDR]){
 void mt_desc2digest(mt_desc_t* desc, byte (*digest_out)[DIGEST_LEN]){
   byte hash[MT_SZ_HASH];
   byte input[MT_SZ_ID + sizeof(desc->party)];
-  memcpy(desc->id, input, MT_SZ_ID);
-  memcpy(&desc->party, input + MT_SZ_ID, sizeof(desc->party));
+  memcpy(input, desc->id, MT_SZ_ID);
+  memcpy(input + MT_SZ_ID, &desc->party, sizeof(desc->party));
   mt_crypt_hash(input, sizeof(desc), &hash);
   memcpy(*digest_out, hash, DIGEST_LEN);
 }
@@ -131,6 +131,15 @@ void monetor_run_scheduled_events(time_t now) {
 
 MOCK_IMPL(int, mt_send_message, (mt_desc_t *desc, mt_ntype_t type, byte* msg, int size)) {
   (void) desc;
+  (void) type;
+  (void) msg;
+  (void) size;
+  return 0;
+}
+
+MOCK_IMPL(int, mt_send_message_multidesc, (mt_desc_t *desc1, mt_desc_t* desc2, mt_ntype_t type, byte* msg, int size)) {
+  (void) desc1;
+  (void) desc2;
   (void) type;
   (void) msg;
   (void) size;
