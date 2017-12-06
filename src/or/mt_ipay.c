@@ -262,6 +262,8 @@ static int init_chn_int_setup(mt_channel_t* chn, byte (*pid)[DIGEST_LEN]){
 /******************************* Channel Escrow *************************/
 
 static int handle_any_led_confirm(mt_desc_t* desc, any_led_confirm_t* token, byte (*pid)[DIGEST_LEN]){
+  (void)token;
+  (void)desc;
 
   mt_channel_t* chn = digestmap_get(intermediary.chns_transition, (char*)*pid);
   if(chn == NULL){
@@ -287,6 +289,7 @@ static int handle_any_led_confirm(mt_desc_t* desc, any_led_confirm_t* token, byt
 /****************************** Channel Establish ***********************/
 
 static int handle_chn_end_estab1(mt_desc_t* desc, chn_end_estab1_t* token, byte (*pid)[DIGEST_LEN]){
+  (void)token;
 
   // verify token validity
 
@@ -322,6 +325,7 @@ static int handle_chn_end_estab1(mt_desc_t* desc, chn_end_estab1_t* token, byte 
 }
 
 static int handle_chn_end_estab3(mt_desc_t* desc, chn_end_estab3_t* token, byte (*pid)[DIGEST_LEN]){
+  (void)token;
 
   mt_channel_t* chn = digestmap_get(intermediary.chns_transition, (char*)*pid);
   if(chn == NULL){
@@ -346,6 +350,7 @@ static int handle_chn_end_estab3(mt_desc_t* desc, chn_end_estab3_t* token, byte 
 /******************************** Nano Setup ****************************/
 
 static int handle_nan_cli_setup1(mt_desc_t* desc, nan_cli_setup1_t* token, byte (*pid)[DIGEST_LEN]){
+  (void)token;
 
   // verify token validity
 
@@ -359,6 +364,7 @@ static int handle_nan_cli_setup1(mt_desc_t* desc, nan_cli_setup1_t* token, byte 
 }
 
 static int handle_nan_cli_setup3(mt_desc_t* desc, nan_cli_setup3_t* token, byte (*pid)[DIGEST_LEN]){
+  (void)token;
 
   // verify token validity
 
@@ -372,6 +378,7 @@ static int handle_nan_cli_setup3(mt_desc_t* desc, nan_cli_setup3_t* token, byte 
 }
 
 static int handle_nan_cli_setup5(mt_desc_t* desc, nan_cli_setup5_t* token, byte (*pid)[DIGEST_LEN]){
+  (void)token;
 
   // verify token validity
 
@@ -387,6 +394,7 @@ static int handle_nan_cli_setup5(mt_desc_t* desc, nan_cli_setup5_t* token, byte 
 /**************************** Nano Establish ****************************/
 
 static int handle_nan_rel_estab2(mt_desc_t* desc, nan_rel_estab2_t* token, byte (*pid)[DIGEST_LEN]){
+  (void)token;
   // verify token validity
 
   nan_int_estab3_t reply;
@@ -399,6 +407,7 @@ static int handle_nan_rel_estab2(mt_desc_t* desc, nan_rel_estab2_t* token, byte 
 }
 
 static int handle_nan_rel_estab4(mt_desc_t* desc, nan_rel_estab4_t* token, byte (*pid)[DIGEST_LEN]){
+  (void)token;
   // verify token validity
 
   nan_int_estab5_t reply;
@@ -413,6 +422,7 @@ static int handle_nan_rel_estab4(mt_desc_t* desc, nan_rel_estab4_t* token, byte 
 /************************ Nano Direct Establish *************************/
 
 static int handle_nan_cli_destab1(mt_desc_t* desc, nan_cli_destab1_t* token, byte (*pid)[DIGEST_LEN]){
+  (void)token;
   // verify token validity
 
   nan_int_destab2_t reply;
@@ -427,6 +437,7 @@ static int handle_nan_cli_destab1(mt_desc_t* desc, nan_cli_destab1_t* token, byt
 /**************************** Nano Direct Pay ***************************/
 
 static int handle_nan_cli_dpay1(mt_desc_t* desc, nan_cli_dpay1_t* token, byte (*pid)[DIGEST_LEN]){
+  (void)token;
   // verify token validity
 
   nan_int_dpay2_t reply;
@@ -441,6 +452,7 @@ static int handle_nan_cli_dpay1(mt_desc_t* desc, nan_cli_dpay1_t* token, byte (*
 /******************************* Nano Close *****************************/
 
 static int handle_nan_end_close1(mt_desc_t* desc, nan_end_close1_t* token, byte (*pid)[DIGEST_LEN]){
+  (void)token;
   // verify token validity
 
   nan_int_close2_t reply;
@@ -453,6 +465,7 @@ static int handle_nan_end_close1(mt_desc_t* desc, nan_end_close1_t* token, byte 
 }
 
 static int handle_nan_end_close3(mt_desc_t* desc, nan_end_close3_t* token, byte (*pid)[DIGEST_LEN]){
+  (void)token;
   // verify token validity
 
   nan_int_close4_t reply;
@@ -465,6 +478,7 @@ static int handle_nan_end_close3(mt_desc_t* desc, nan_end_close3_t* token, byte 
 }
 
 static int handle_nan_end_close5(mt_desc_t* desc, nan_end_close5_t* token, byte (*pid)[DIGEST_LEN]){
+  (void)token;
   // verify token validity
 
   nan_int_close6_t reply;
@@ -477,6 +491,7 @@ static int handle_nan_end_close5(mt_desc_t* desc, nan_end_close5_t* token, byte 
 }
 
 static int handle_nan_end_close7(mt_desc_t* desc, nan_end_close7_t* token, byte (*pid)[DIGEST_LEN]){
+  (void)token;
   // verify token validity
 
   nan_int_close8_t reply;

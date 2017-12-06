@@ -151,8 +151,3 @@ MOCK_IMPL(int, mt_alert_payment, (mt_desc_t *desc)) {
   (void) desc;
   return 0;
 }
-
-MOCK_IMPL(int, mt_new_intermediary, (mt_desc_t *desc)){
-  (void) desc;
-  return 0;
-}

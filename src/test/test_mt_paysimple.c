@@ -263,11 +263,6 @@ static int mock_alert_payment(mt_desc_t* desc){
   return MT_SUCCESS;
 }
 
-static int mock_new_intermediary(mt_desc_t* desc){
-  memcpy(desc, &int_desc, sizeof(mt_desc_t));
-  return MT_SUCCESS;
-}
-
 static void write_file(const char* name, void* buf, int size){
   FILE *fp;
   fp = fopen(name, "wb");
@@ -284,7 +279,6 @@ static void test_mt_paysimple(void *arg){
   MOCK(mt_send_message, mock_send_message);
   MOCK(mt_send_message_multidesc, mock_send_message_multidesc);
   MOCK(mt_alert_payment, mock_alert_payment);
-  MOCK(mt_new_intermediary, mock_new_intermediary);
 
   /****************************** Setup **********************************/
 
@@ -452,30 +446,29 @@ static void test_mt_paysimple(void *arg){
   for(int i = 0; i < 10; i++){
     printf("\n");
     memcpy(&cur_desc, &cli_desc, sizeof(mt_desc_t));
-    tt_assert(mt_cpay_pay(&rel_desc) == MT_SUCCESS);
+    tt_assert(mt_cpay_pay(&rel_desc, &int_desc) == MT_SUCCESS);
   }
 
   // close channel
   printf("\n");
   memcpy(&cur_desc, &cli_desc, sizeof(mt_desc_t));
-  tt_assert(mt_cpay_close(&rel_desc) == MT_SUCCESS);
+  tt_assert(mt_cpay_close(&rel_desc, &int_desc) == MT_SUCCESS);
 
   // pay intermediary
   for(int i = 0; i < 10; i++){
     printf("\n");
     memcpy(&cur_desc, &cli_desc, sizeof(mt_desc_t));
-    tt_assert(mt_cpay_directpay(&int_desc) == MT_SUCCESS);
+    tt_assert(mt_cpay_pay(&int_desc, &int_desc) == MT_SUCCESS);
   }
 
   // close channel
   printf("\n");
   memcpy(&cur_desc, &cli_desc, sizeof(mt_desc_t));
-  tt_assert(mt_cpay_close(&int_desc) == MT_SUCCESS);
+  tt_assert(mt_cpay_close(&int_desc, &int_desc) == MT_SUCCESS);
 
  done:;
   UNMOCK(mt_send_message);
   UNMOCK(mt_alert_payment);
-  UNMOCK(mt_new_intermediary);
 
   printf("\n-------------- end paysimple ------------\n\n");
 

@@ -17,20 +17,15 @@
 int mt_cpay_init(void);
 
 /**
- * Pay the given descriptor using an existing nanopayment channel
+ * Pay a relay through a given intermediary. To pay the intermediary directly,
+ * set rdesc and idesc to be the same intermediary.
  */
-int mt_cpay_pay(mt_desc_t* desc);
-
-/**
- * Pay the given descriptor directly (instead of through an intermediary) as
- * needed for paying entry guards
- */
-int mt_cpay_directpay(mt_desc_t* desc);
+int mt_cpay_pay(mt_desc_t* rdesc, mt_desc_t* idesc);
 
 /**
  * Close a nanopayment channel with the given descriptor
  */
-int mt_cpay_close(mt_desc_t* desc);
+int mt_cpay_close(mt_desc_t* rdesc, mt_desc_t* idesc);
 
 /**
  * Handle an incoming message. Requires the message sender, type, and size.

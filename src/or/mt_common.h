@@ -98,6 +98,4 @@ MOCK_DECL(int, mt_send_message_multidesc, (mt_desc_t *desc1, mt_desc_t* desc2, m
 
 MOCK_DECL(int, mt_alert_payment, (mt_desc_t *desc));
 
-MOCK_DECL(int, mt_new_intermediary, (mt_desc_t *desc));
-
 #endif
