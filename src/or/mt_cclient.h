@@ -31,6 +31,10 @@ void run_cclient_scheduled_events(time_t now);
 smartlist_t* get_node_t_smartlist_intermerdiaries(void);
 
 smartlist_t* get_intermediaries(int for_circuit);
+
+/* Get one intermediary usable for position */
+intermediary_t* get_intermediary_by_role(position_t position);
+
 /**
  * Picks a random intermediary from our pre-built list
  * of available intermediaries

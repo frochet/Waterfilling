@@ -24,9 +24,8 @@ typedef struct intermediary_t {
   unsigned int is_reachable : 2;
   time_t chosen_at;
   extend_info_t *ei;
-  // TD: doesn't compile, is this supposed to be my_dest_t?
-  // FR: yup - typos
-  mt_desc_t *m_channel;
+  /*Used by the payment module*/
+  mt_desc_t desc;
   /*
    * Whether this intermediary is used
    * to pay for middle or exit

@@ -2759,7 +2759,9 @@ connection_ap_handshake_attach_circuit(entry_connection_t *conn)
      */
     if (get_options()->EnablePayment) {
       if (!circ->ppath) {
-          circ->ppath = circuit_init_ppath();
+          circ->ppath = circuit_init_ppath(NULL);
+          circ->ppath->next = circuit_init_ppath(circ->ppath);
+          circ->ppath->next->next = circuit_init_ppath(circ->ppath->next);
           mt_cclient_launch_payment(circ);
       }
     }

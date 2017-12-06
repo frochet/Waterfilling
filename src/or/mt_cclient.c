@@ -35,13 +35,28 @@ static smartlist_t *intermediaries = NULL;
 /*static counter of descriptors - also used as id*/
 static uint32_t desc_id = 0;
 
-
+/*
+ * Builds and returns a smartlist_t containing node_t objects
+ * of intermediaries
+ */
 smartlist_t* get_node_t_smartlist_intermerdiaries(void) {
   smartlist_t *all_inter_nodes = smartlist_new();
   SMARTLIST_FOREACH_BEGIN(intermediaries, intermediary_t*, intermediary) {
     smartlist_add(all_inter_nodes, (void *)node_get_by_id(intermediary->identity->identity));
   }SMARTLIST_FOREACH_END(intermediary);
   return all_inter_nodes;
+}
+
+/*
+ * Get the first intermediary withing the list intermediaries that
+ * matches linked_to to position
+ */
+intermediary_t* get_intermediary_by_role(position_t position) {
+  SMARTLIST_FOREACH_BEGIN(intermediaries, intermediary_t*, intermediary) {
+    if (intermediary->linked_to == position)
+      return intermediary;
+  } SMARTLIST_FOREACH_END(intermediary);
+  return NULL;
 }
 
 smartlist_t* get_intermediaries(int for_circuit) {
@@ -96,12 +111,34 @@ intermediary_need_cleanup(intermediary_t *intermediary, time_t now) {
 
 void
 mt_cclient_launch_payment(origin_circuit_t* circ) {
-  (void) circ;
-
   tor_assert(!circ->desc);
-  log_info(LD_MT, "Initiating payment - calling payment module");
+  log_info(LD_MT, "MoneTor - Initiating payment - calling payment module");
   circ->desc = tor_malloc_zero(sizeof(mt_desc_t));
   circ->desc->id = desc_id++;
+  circ->desc->party = MT_PARTY_CLI;
+
+  /* Choosing right intermediary */
+  tor_assert(circ->ppath->next);
+  pay_path_t* middle = circ->ppath->next;
+  intermediary_t* intermediary = get_intermediary_by_role(MIDDLE);
+  /* Log if intermediary is NULL? Should not happen*/
+  tor_assert_nonfatal(intermediary);
+  
+  if (intermediary) {
+    memcpy(middle->inter_ident->identity, intermediary->identity->identity,
+        DIGEST_LEN);
+  }
+  tor_assert(middle->next);
+  pay_path_t* exit = middle->next;
+  intermediary = get_intermediary_by_role(EXIT);
+  tor_assert_nonfatal(intermediary);
+  
+  if (intermediary) {
+    memcpy(exit->inter_ident->identity, intermediary->identity->identity,
+        DIGEST_LEN);
+  }
+  /*Now, notify payment module that we have to start a payment*/
+  // XXX MoneTor - Todo wait thien-nam discussion
 }
 
 
@@ -347,7 +384,8 @@ intermediary_new(const node_t *node, extend_info_t *ei, time_t now) {
   //XXX MoneTor change nickname to something else, or remove nickname
   //intermediary->nickname = tor_strdup(node->ri->nickname);
   intermediary->is_reachable = INTERMEDIARY_REACHABLE_MAYBE;
-
+  intermediary->desc.id = desc_id++;
+  intermediary->desc.party = MT_PARTY_INT;
   intermediary->chosen_at = now;
   intermediary->ei = ei;
   return intermediary;
@@ -359,9 +397,5 @@ intermediary_free(intermediary_t *intermediary) {
     return;
   if (intermediary->ei)
     extend_info_free(intermediary->ei);
-  if (intermediary->m_channel) {
-    // XXX MoneTor implem following function
-    //mt_desc_free(intermediary->m_channel);
-  }
   tor_free(intermediary);
 }
