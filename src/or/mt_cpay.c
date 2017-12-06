@@ -49,6 +49,7 @@ typedef struct {
   smartlist_t* chns_estab;
   smartlist_t* nans_setup;
   digestmap_t* nans_estab;        // desc -> channel
+  digestmap_t* nans_destab;        // desc -> channel
   digestmap_t* nans_reqclosed;    // desc -> channel
   digestmap_t* chns_transition;   // pid -> channsl
 
@@ -84,6 +85,7 @@ static int handle_nan_int_close8(mt_desc_t* desc, nan_int_close8_t* token, byte 
 
 // private helper functions
 static int compare_chn_end_data(const void** a, const void** b);
+static mt_channel_t* smartlist_search_idesc(smartlist_t* list, mt_desc_t* desc);
 
 static workqueue_reply_t wallet_make(void* thread, void* arg);
 static void wallet_reply(void* arg);
@@ -144,6 +146,7 @@ int mt_cpay_init(void){
   client.chns_estab = smartlist_new();
   client.nans_setup = smartlist_new();
   client.nans_estab = digestmap_new();
+  client.nans_destab = digestmap_new();
   client.nans_reqclosed = digestmap_new();
   client.chns_transition = digestmap_new();
 
@@ -159,8 +162,8 @@ int mt_cpay_pay(mt_desc_t* desc){
 
   // TODO: if out of payments then close channel
 
-  if((chn = digestmap_get(client.nans_estab, (char*)digest)) != NULL)
-    return init_nan_cli_pay1(mt_cpay_pay, chn, desc);
+  if((chn = digestmap_remove(client.nans_estab, (char*)digest)) != NULL)
+    return init_nan_cli_pay1(mt_pay_notify, chn, desc);
 
   if((chn = smartlist_pop_last(client.nans_setup)) != NULL)
     return init_nan_cli_estab1(mt_cpay_pay, chn, desc);
@@ -180,21 +183,16 @@ int mt_cpay_directpay(mt_desc_t* desc){
   byte digest[DIGEST_LEN];
   mt_desc2digest(desc, &digest);
 
-  if(((chn = digestmap_get(client.nans_estab, (char*)digest)) != NULL) &&
-     chn->data.nan_state.num_payments < chn->data.nan_token.num_payments)
+  if((chn = digestmap_remove(client.nans_destab, (char*)digest)) != NULL)
     return init_nan_cli_dpay1(mt_directpay_notify, chn, desc);
 
-  if(((chn = digestmap_get(client.nans_estab, (char*)digest)) != NULL) &&
-     chn->data.nan_state.num_payments == chn->data.nan_token.num_payments)
-    return init_nan_end_close1(mt_cpay_directpay, chn, desc);
-
-  if((chn = smartlist_pop_last(client.nans_setup)) != NULL)
+  if((chn = smartlist_search_idesc(client.nans_setup, desc)) != NULL)
     return init_nan_cli_destab1(mt_cpay_directpay, chn, desc);
 
-  if((chn = smartlist_pop_last(client.chns_estab)) != NULL)
+  if((chn = smartlist_search_idesc(client.chns_estab, desc)) != NULL)
     return init_nan_cli_setup1(mt_cpay_directpay, chn, desc);
 
-  if((chn = smartlist_pop_last(client.chns_setup)) != NULL)
+  if((chn = smartlist_search_idesc(client.chns_setup, desc)) != NULL)
     return init_chn_end_estab1(mt_cpay_directpay, chn, desc);
 
   return init_chn_end_setup(mt_cpay_directpay, NULL, desc);
@@ -205,11 +203,15 @@ int mt_cpay_close(mt_desc_t* desc){
   mt_channel_t* chn;
   byte digest[DIGEST_LEN];
   mt_desc2digest(desc, &digest);
-  if((chn = digestmap_remove(client.nans_reqclosed, (char*)digest)) != NULL){
+
+  if((chn = digestmap_remove(client.nans_reqclosed, (char*)digest)) != NULL)
     return init_nan_end_close1(mt_close_notify, chn, desc);
-  }
+
   if((chn = digestmap_remove(client.nans_estab, (char*)digest)) != NULL)
     return init_nan_cli_reqclose1(mt_cpay_close, chn, desc);
+
+  if((chn = digestmap_remove(client.nans_destab, (char*)digest)) != NULL)
+    return init_nan_end_close1(mt_close_notify, chn, desc);
 
   log_debug(LD_MT, "descriptor is in an incorrect state to perform the requested action");
   return MT_ERROR;
@@ -350,6 +352,8 @@ static int init_chn_end_setup(mt_user_notify_t notify, mt_channel_t* chn, mt_des
   mt_crypt_rand(MT_SZ_ADDR, chn->data.addr);
 
   chn->callback = notify;
+  chn->callback_desc = *desc;
+
   memcpy(&(chn->callback_desc), desc, sizeof(mt_desc_t));
 
   // TODO finish initializing channel
@@ -573,6 +577,8 @@ static int init_nan_cli_estab1(mt_user_notify_t notify, mt_channel_t* chn, mt_de
   mt_crypt_rand(DIGEST_LEN, pid);
   digestmap_set(client.chns_transition, (char*)pid, chn);
   chn->callback = notify;
+  chn->callback_desc = *desc;
+
   // intiate token
   nan_cli_estab1_t token;
 
@@ -615,6 +621,7 @@ static int init_nan_cli_pay1(mt_user_notify_t notify, mt_channel_t* chn, mt_desc
   mt_crypt_rand(DIGEST_LEN, pid);
   digestmap_set(client.chns_transition, (char*)pid, chn);
   chn->callback = notify;
+  chn->callback_desc = *desc;
 
   // intiate token
 
@@ -641,7 +648,10 @@ static int handle_nan_rel_pay2(mt_desc_t* desc, nan_rel_pay2_t* token, byte (*pi
   byte digest[DIGEST_LEN];
   mt_desc2digest(desc, &digest);
   digestmap_remove(client.chns_transition, (char*)*pid);
-  digestmap_set(client.nans_estab, (char*)desc, chn);
+  digestmap_set(client.nans_estab, (char*)digest, chn);
+
+  if(chn->callback != NULL)
+    return chn->callback(&chn->callback_desc);
   return MT_SUCCESS;
 }
 
@@ -654,6 +664,8 @@ static int init_nan_cli_destab1(mt_user_notify_t notify, mt_channel_t* chn, mt_d
   mt_crypt_rand(DIGEST_LEN, pid);
   digestmap_set(client.chns_transition, (char*)pid, chn);
   chn->callback = notify;
+  chn->callback_desc = *desc;
+
   // intiate token
   nan_cli_destab1_t token;
 
@@ -662,9 +674,7 @@ static int init_nan_cli_destab1(mt_user_notify_t notify, mt_channel_t* chn, mt_d
   // send message
   byte* msg;
   int msg_size = pack_nan_cli_destab1(&token, &pid, &msg);
-  mt_send_message(desc, MT_NTYPE_NAN_CLI_DESTAB1, msg, msg_size);
-
-  return MT_SUCCESS;
+  return mt_send_message(desc, MT_NTYPE_NAN_CLI_DESTAB1, msg, msg_size);
 }
 
 static int handle_nan_int_destab2(mt_desc_t* desc, nan_int_destab2_t* token, byte (*pid)[DIGEST_LEN]){
@@ -680,16 +690,12 @@ static int handle_nan_int_destab2(mt_desc_t* desc, nan_int_destab2_t* token, byt
   byte digest[DIGEST_LEN];
   mt_desc2digest(desc, &digest);
   digestmap_remove(client.chns_transition, (char*)*pid);
-  digestmap_set(client.nans_estab, (char*)desc, chn);
+  digestmap_set(client.nans_destab, (char*)digest, chn);
 
   // check validity incoming message
+
   if(chn->callback != NULL)
     return chn->callback(&chn->callback_desc);
-
-  // check validity incoming message
-  if(chn->callback != NULL)
-    return chn->callback(&chn->callback_desc);
-
   return MT_SUCCESS;
 }
 
@@ -702,6 +708,8 @@ static int init_nan_cli_dpay1(mt_user_notify_t notify, mt_channel_t* chn, mt_des
   mt_crypt_rand(DIGEST_LEN, pid);
   digestmap_set(client.chns_transition, (char*)pid, chn);
   chn->callback = notify;
+  chn->callback_desc = *desc;
+
   // intiate token
   nan_cli_dpay1_t token;
 
@@ -726,7 +734,7 @@ static int handle_nan_int_dpay2(mt_desc_t* desc, nan_int_dpay2_t* token, byte (*
   byte digest[DIGEST_LEN];
   mt_desc2digest(desc, &digest);
   digestmap_remove(client.chns_transition, (char*)*pid);
-  digestmap_set(client.nans_estab, (char*)desc, chn);
+  digestmap_set(client.nans_destab, (char*)digest, chn);
 
   // check validity incoming message
   if(chn->callback != NULL)
@@ -786,6 +794,8 @@ static int init_nan_end_close1(mt_user_notify_t notify, mt_channel_t* chn, mt_de
   mt_crypt_rand(DIGEST_LEN, pid);
   digestmap_set(client.chns_transition, (char*)pid, chn);
   chn->callback = notify;
+  chn->callback_desc = *desc;
+
   // intiate token
   nan_end_close1_t token;
 
@@ -874,7 +884,7 @@ static int handle_nan_int_close8(mt_desc_t* desc, nan_int_close8_t* token, byte 
   byte digest[DIGEST_LEN];
   mt_desc2digest(desc, &digest);
   digestmap_remove(client.chns_transition, (char*)*pid);
-  digestmap_set(client.nans_estab, (char*)digest, chn);
+  smartlist_add(client.nans_setup, chn);
 
   if(chn->callback != NULL)
     return chn->callback(&chn->callback_desc);
@@ -915,12 +925,20 @@ static int mt_pay_notify(mt_desc_t* desc){
 
 static int mt_directpay_notify(mt_desc_t* desc){
   (void)desc;
-  return 0;
-
+  return MT_SUCCESS;
 }
 
 static int mt_close_notify(mt_desc_t* desc){
   (void)desc;
-  smartlist_sort(client.nans_setup, compare_chn_end_data);
+  //smartlist_sort(client.nans_setup, compare_chn_end_data);
   return MT_SUCCESS;
+}
+
+static mt_channel_t* smartlist_search_idesc(smartlist_t* list, mt_desc_t* desc){
+
+  SMARTLIST_FOREACH_BEGIN(list, mt_channel_t*, elm){
+    if(elm->idesc.id == desc->id && elm->idesc.party == desc->party)
+      return elm;
+  } SMARTLIST_FOREACH_END(elm);
+  return NULL;
 }

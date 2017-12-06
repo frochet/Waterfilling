@@ -421,19 +421,29 @@ static int handle_nan_rel_estab4(mt_desc_t* desc, nan_rel_estab4_t* token, byte 
 /************************ Nano Direct Establish *************************/
 
 static int handle_nan_cli_destab1(mt_desc_t* desc, nan_cli_destab1_t* token, byte (*pid)[DIGEST_LEN]){
-  (void)desc;
-  (void)token;
-  (void)pid;
-  return MT_SUCCESS;
+  // verify token validity
+
+  nan_int_destab2_t reply;
+
+  // fill out token
+
+  byte* packed_reply;
+  int packed_reply_size = pack_nan_int_destab2(&reply, pid, &packed_reply);
+  return mt_send_message(desc, MT_NTYPE_NAN_INT_DESTAB2, packed_reply, packed_reply_size);
 }
 
 /**************************** Nano Direct Pay ***************************/
 
 static int handle_nan_cli_dpay1(mt_desc_t* desc, nan_cli_dpay1_t* token, byte (*pid)[DIGEST_LEN]){
-  (void)desc;
-  (void)token;
-  (void)pid;
-  return MT_SUCCESS;
+  // verify token validity
+
+  nan_int_dpay2_t reply;
+
+  // fill out token
+
+  byte* packed_reply;
+  int packed_reply_size = pack_nan_int_dpay2(&reply, pid, &packed_reply);
+  return mt_send_message(desc, MT_NTYPE_NAN_INT_DPAY2, packed_reply, packed_reply_size);
 }
 
 /******************************* Nano Close *****************************/

@@ -260,7 +260,6 @@ static int mock_send_message_multidesc(mt_desc_t *desc1, mt_desc_t* desc2, mt_nt
 
 static int mock_alert_payment(mt_desc_t* desc){
   (void)desc;
-  printf("payment successful\n");
   return MT_SUCCESS;
 }
 
@@ -450,21 +449,28 @@ static void test_mt_paysimple(void *arg){
   /**************************** Protocol Tests ***************************/
 
   // pay relay
-  printf("\n");
-  memcpy(&cur_desc, &cli_desc, sizeof(mt_desc_t));
-  tt_assert(mt_cpay_pay(&rel_desc) == MT_SUCCESS);
-
-  for(int i = 0; i < 9; i++){
+  for(int i = 0; i < 10; i++){
     printf("\n");
     memcpy(&cur_desc, &cli_desc, sizeof(mt_desc_t));
     tt_assert(mt_cpay_pay(&rel_desc) == MT_SUCCESS);
   }
 
-
   // close channel
   printf("\n");
   memcpy(&cur_desc, &cli_desc, sizeof(mt_desc_t));
   tt_assert(mt_cpay_close(&rel_desc) == MT_SUCCESS);
+
+  // pay intermediary
+  for(int i = 0; i < 10; i++){
+    printf("\n");
+    memcpy(&cur_desc, &cli_desc, sizeof(mt_desc_t));
+    tt_assert(mt_cpay_directpay(&int_desc) == MT_SUCCESS);
+  }
+
+  // close channel
+  printf("\n");
+  memcpy(&cur_desc, &cli_desc, sizeof(mt_desc_t));
+  tt_assert(mt_cpay_close(&int_desc) == MT_SUCCESS);
 
  done:;
   UNMOCK(mt_send_message);
