@@ -111,34 +111,42 @@ intermediary_need_cleanup(intermediary_t *intermediary, time_t now) {
 
 void
 mt_cclient_launch_payment(origin_circuit_t* circ) {
-  tor_assert(!circ->desc);
   log_info(LD_MT, "MoneTor - Initiating payment - calling payment module");
-  circ->desc = tor_malloc_zero(sizeof(mt_desc_t));
-  circ->desc->id = desc_id++;
-  circ->desc->party = MT_PARTY_CLI;
-
+  circ->ppath->desc.id = desc_id++;
+  circ->ppath->desc.party = MT_PARTY_REL;
   /* Choosing right intermediary */
   tor_assert(circ->ppath->next);
   pay_path_t* middle = circ->ppath->next;
-  intermediary_t* intermediary = get_intermediary_by_role(MIDDLE);
+  intermediary_t* intermediary_g = get_intermediary_by_role(MIDDLE);
+  middle->desc.id = desc_id++;
+  middle->desc.party = MT_PARTY_REL;
   /* Log if intermediary is NULL? Should not happen*/
-  tor_assert_nonfatal(intermediary);
+  tor_assert_nonfatal(intermediary_g);
   
-  if (intermediary) {
-    memcpy(middle->inter_ident->identity, intermediary->identity->identity,
+  if (intermediary_g) {
+    memcpy(middle->inter_ident->identity, intermediary_g->identity->identity,
         DIGEST_LEN);
   }
   tor_assert(middle->next);
   pay_path_t* exit = middle->next;
-  intermediary = get_intermediary_by_role(EXIT);
-  tor_assert_nonfatal(intermediary);
+  intermediary_t* intermediary_e = get_intermediary_by_role(EXIT);
+  exit->desc.id = desc_id++;
+  exit->desc.party = MT_PARTY_REL;
+  tor_assert_nonfatal(intermediary_e);
   
-  if (intermediary) {
-    memcpy(exit->inter_ident->identity, intermediary->identity->identity,
+  if (intermediary_e) {
+    memcpy(exit->inter_ident->identity, intermediary_e->identity->identity,
         DIGEST_LEN);
   }
+  // XXX MoneTor - what to do with retVal
   /*Now, notify payment module that we have to start a payment*/
-  // XXX MoneTor - Todo wait thien-nam discussion
+  int retVal;
+  /* Direct payment to the guard */
+  retVal = mt_cpay_pay(&circ->ppath->desc, &circ->ppath->desc);
+  /* Payment to the middle relay involving intermediary */
+  retVal = mt_cpay_pay(&middle->desc, &intermediary_g->desc);
+  /* Payment to the exit relay involving intermediary */
+  retVal = mt_cpay_pay(&exit->desc, &intermediary_e->desc);
 }
 
 

@@ -2928,6 +2928,9 @@ typedef struct pay_path_t {
   /*How many times we retry to establish the channel */
   uint32_t channel_retries;
 
+  /* Payment descriptor for the relay at that hop*/
+  mt_desc_t desc;
+
   struct pay_path_t *next;
   struct pay_path_t *prev;
 } pay_path_t;
@@ -3327,11 +3330,6 @@ typedef struct origin_circuit_t {
    */
   pay_path_t *ppath;
 
-  /*
-   * Interface for controller - payment modules
-   */
-
-  mt_desc_t *desc;
 
   /** Holds the data that the entry guard system uses to track the
    * status of the guard this circuit is using, and thereby to determine
