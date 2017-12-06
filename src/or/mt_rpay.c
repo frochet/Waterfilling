@@ -17,18 +17,19 @@ typedef enum {
 } mt_zkp_state_t;
 
 typedef struct {
-  mt_desc_t desc;
-  mt_ntype_t type;
-  byte* msg;
-  int size;
-} mt_recv_args_t;
+  int (*fn)(mt_desc_t*, mt_ntype_t, byte*, int);
+  mt_desc_t dref1;
+  mt_ntype_t arg2;
+  byte* arg3;
+  int arg4;
+} mt_callback_t;
 
 typedef struct {
   mt_desc_t cdesc;
   mt_desc_t idesc;
   chn_end_data_t data;
 
-  mt_recv_args_t cb_args;
+  mt_callback_t callback;
   mt_zkp_state_t zkp_state;
 
 } mt_channel_t;
@@ -56,9 +57,9 @@ typedef struct {
 static mt_rpay_t relay;
 
 // initializer functions
-static int init_chn_end_setup(mt_recv_args_t* args, mt_channel_t* chn, mt_desc_t* desc);
-static int init_chn_end_estab1(mt_recv_args_t* args, mt_channel_t* chn,  mt_desc_t* desc);
-static int init_nan_end_close1(mt_recv_args_t* args, mt_channel_t* chn, mt_desc_t* desc);
+static int init_chn_end_setup(mt_channel_t* chn, byte (*pid)[DIGEST_LEN]);
+static int init_chn_end_estab1(mt_channel_t* chn, byte (*pid)[DIGEST_LEN]);
+static int init_nan_end_close1(mt_channel_t* chn, byte (*pid)[DIGEST_LEN]);
 
 // local handler functions
 static int handle_any_led_confirm(mt_desc_t* desc, any_led_confirm_t* token, byte (*pid)[DIGEST_LEN]);
@@ -73,6 +74,11 @@ static int handle_nan_int_close2(mt_desc_t* desc, nan_int_close2_t* token, byte 
 static int handle_nan_int_close4(mt_desc_t* desc, nan_int_close4_t* token, byte (*pid)[DIGEST_LEN]);
 static int handle_nan_int_close6(mt_desc_t* desc, nan_int_close6_t* token, byte (*pid)[DIGEST_LEN]);
 static int handle_nan_int_close8(mt_desc_t* desc, nan_int_close8_t* token, byte (*pid)[DIGEST_LEN]);
+
+// helper functions
+static mt_channel_t* new_channel(void);
+static void digestmap_smartlist_append(digestmap_t* map, char* key, void* val);
+static void* digestmap_smartlist_pop_last(digestmap_t* map, char* key);
 
 // Tor-facing API
 int mt_rpay_init(void){
@@ -237,21 +243,9 @@ int mt_rpay_recv(mt_desc_t* desc, mt_ntype_t type, byte* msg, int size){
 
 /******************************* Channel Escrow *************************/
 
-static int init_chn_end_setup(mt_recv_args_t* args, mt_channel_t* chn, mt_desc_t* desc){
-
-  // initialize new channel
-  chn = tor_calloc(1, sizeof(mt_channel_t));
-  memcpy(&chn->idesc, desc, sizeof(mt_desc_t));
-  memcpy(chn->data.pk, relay.pk, MT_SZ_PK);
-  memcpy(chn->data.sk, relay.sk, MT_SZ_SK);
-  mt_crypt_rand(MT_SZ_ADDR, chn->data.addr);
-  memcpy(&chn->cb_args, args, sizeof(mt_recv_args_t));
+static int init_chn_end_setup(mt_channel_t* chn, byte (*pid)[DIGEST_LEN]){
 
   // TODO finish initializing channel
-
-  byte pid[DIGEST_LEN];
-  mt_crypt_rand(DIGEST_LEN, pid);
-  digestmap_set(relay.chns_transition, (char*)pid, chn);
 
   // initialize setup token
   chn_end_setup_t token;
@@ -264,7 +258,7 @@ static int init_chn_end_setup(mt_recv_args_t* args, mt_channel_t* chn, mt_desc_t
   // send setup message
   byte* packed_msg;
   byte* signed_msg;
-  int packed_msg_size = pack_chn_end_setup(&token, &pid, &packed_msg);
+  int packed_msg_size = pack_chn_end_setup(&token, pid, &packed_msg);
   int signed_msg_size = mt_create_signed_msg(packed_msg, packed_msg_size,
 					     &chn->data.pk, &chn->data.sk, &signed_msg);
 
@@ -282,32 +276,24 @@ static int handle_any_led_confirm(mt_desc_t* desc, any_led_confirm_t* token, byt
   }
 
   // check validity of incoming message
-
   byte digest[DIGEST_LEN];
   mt_desc2digest(&chn->idesc, &digest);
   digestmap_remove(relay.chns_transition, (char*)*pid);
+  digestmap_smartlist_append(relay.chns_setup, (char*)digest, chn);
 
-  smartlist_t* setup_list = digestmap_get(relay.chns_setup, (char*)digest);
-  if(setup_list == NULL){
-    digestmap_set(relay.chns_setup, (char*)digest, smartlist_new());
-    setup_list = digestmap_get(relay.chns_setup, (char*)digest);
+
+  if(chn->callback.fn){
+    mt_callback_t cb = chn->callback;
+    return cb.fn(&cb.dref1, cb.arg2, cb.arg3, cb.arg4);
   }
-  smartlist_add(setup_list, chn);
-
-  mt_recv_args_t args = chn->cb_args;
-  return mt_rpay_recv(&args.desc, args.type, args.msg, args.size);
+  return MT_SUCCESS;
 }
 
 /****************************** Channel Establish ***********************/
 
-static int init_chn_end_estab1(mt_recv_args_t* args, mt_channel_t* chn,  mt_desc_t* desc){
-  // add new protocol to chns_transition
-  byte pid[DIGEST_LEN];
-  mt_crypt_rand(DIGEST_LEN, pid);
-  digestmap_set(relay.chns_transition, (char*)pid, chn);
-  memcpy(&chn->cb_args, args, sizeof(mt_recv_args_t));
+static int init_chn_end_estab1(mt_channel_t* chn, byte (*pid)[DIGEST_LEN]){
 
-  // intiate token
+  // ZKP
 
   chn_end_estab1_t token;
 
@@ -315,7 +301,7 @@ static int init_chn_end_estab1(mt_recv_args_t* args, mt_channel_t* chn,  mt_desc
 
   // send message
   byte* msg;
-  int msg_size = pack_chn_end_estab1(&token, &pid, &msg);
+  int msg_size = pack_chn_end_estab1(&token, pid, &msg);
   return mt_send_message(&chn->idesc, MT_NTYPE_CHN_END_ESTAB1, msg, msg_size);
 }
 
@@ -354,16 +340,13 @@ static int handle_chn_int_estab4(mt_desc_t* desc, chn_int_estab4_t* token, byte 
   byte digest[DIGEST_LEN];
   mt_desc2digest(&chn->idesc, &digest);
   digestmap_remove(relay.chns_transition, (char*)*pid);
+  digestmap_smartlist_append(relay.chns_estab, (char*)digest, chn);
 
-  smartlist_t* estab_list = digestmap_get(relay.chns_estab, (char*)digest);
-  if(estab_list == NULL){
-    digestmap_set(relay.chns_estab, (char*)digest, smartlist_new());
-    estab_list = digestmap_get(relay.chns_estab, (char*)digest);
+  if(chn->callback.fn){
+    mt_callback_t cb = chn->callback;
+    return cb.fn(&cb.dref1, cb.arg2, cb.arg3, cb.arg4);
   }
-  smartlist_add(estab_list, chn);
-
-  mt_recv_args_t args = chn->cb_args;
-  return mt_rpay_recv(&args.desc, args.type, args.msg, args.size);
+  return MT_SUCCESS;
 }
 
 /****************************** Nano Establish **************************/
@@ -372,53 +355,53 @@ static int handle_nan_cli_estab1(mt_desc_t* desc, nan_cli_estab1_t* token, byte 
   (void)token;
   (void)desc;
 
-  byte digest[DIGEST_LEN];
-  mt_desc2digest(desc, &digest);
-
-  // make sure there is a intermediary in the intermediary store otherwise return error
-  mt_desc_t* intermediary;
-  if((intermediary = digestmap_get(relay.clis_intermediary, (char*)digest)) == NULL){
-    log_debug(LD_MT, "not associated intermediary with given client");
-    return MT_ERROR;
-  }
   // check validity of incoming message;
 
   mt_channel_t* chn;
-  byte int_digest[DIGEST_LEN];
-  mt_desc2digest(intermediary, &int_digest);
+  byte rdigest[DIGEST_LEN];
+  mt_desc2digest(desc, &rdigest);
 
-  smartlist_t* estab_list = digestmap_get(relay.chns_estab, (char*)int_digest);
+  mt_desc_t* intermediary = digestmap_get(relay.clis_intermediary, (char*)rdigest);
+  byte idigest[DIGEST_LEN];
+  mt_desc2digest(intermediary, &idigest);
 
   // we have a free channel with this intermediary
-  if(estab_list != NULL && (chn = smartlist_pop_last(estab_list)) != NULL){
+  if((chn = digestmap_smartlist_pop_last(relay.chns_estab, (char*)idigest))){
     digestmap_set(relay.chns_transition, (char*)*pid, chn);
-    chn->cb_args.msg = NULL;
-    memcpy(&chn->cdesc, desc, sizeof(mt_desc_t));
+    chn->cdesc = *desc;
+    chn->callback.fn = NULL;
 
-    digestmap_set(relay.chns_transition, (char*)pid, chn);
+    // ZKP
 
+    //************************************************************//
+    // Wrap this in helper that gets called afterwards
     nan_rel_estab2_t reply;
 
     // send message
     byte* reply_msg;
     int reply_size = pack_nan_rel_estab2(&reply, pid, &reply_msg);
     return mt_send_message(&chn->idesc, MT_NTYPE_NAN_REL_ESTAB2, reply_msg, reply_size);
+    //************************************************************//
   }
 
-  // prepare args for callback
-  mt_recv_args_t args;
-  args.type = MT_NTYPE_NAN_CLI_ESTAB1;
-  memcpy(&args.desc, desc, sizeof(mt_desc_t));
-  args.size = pack_nan_cli_estab1(token, pid, &args.msg);
+  byte rpid[DIGEST_LEN];
+  mt_crypt_rand(DIGEST_LEN, rpid);
 
   // if we have a channel setup then establish it
-  smartlist_t* setup_list = digestmap_get(relay.chns_setup, (char*)int_digest);
-  if(setup_list != NULL && (chn = smartlist_pop_last(setup_list)) != NULL){
-    return init_chn_end_estab1(&args, chn, desc);
+  if((chn = digestmap_smartlist_pop_last(relay.chns_setup, (char*)idigest))){
+    digestmap_set(relay.chns_transition, (char*)rpid, chn);
+    chn->callback = (mt_callback_t){.fn = mt_rpay_recv, .dref1 = *desc, .arg2 = MT_NTYPE_NAN_CLI_ESTAB1};
+    chn->callback.arg4 = pack_nan_cli_estab1(token, pid, &chn->callback.arg3);
+    return init_chn_end_estab1(chn, &rpid);
   }
 
   // setup a new channel with the intermediary
-  return init_chn_end_setup(&args, NULL, intermediary);
+  chn = new_channel();
+  digestmap_set(relay.chns_transition, (char*)rpid, chn);
+  chn->idesc = *intermediary;
+  chn->callback = (mt_callback_t){.fn = mt_rpay_recv, .dref1 = *desc, .arg2 = MT_NTYPE_NAN_CLI_ESTAB1};
+  chn->callback.arg4 = pack_nan_cli_estab1(token, pid, &chn->callback.arg3);
+  return init_chn_end_setup(chn, &rpid);
 }
 
 static int handle_nan_int_estab3(mt_desc_t* desc, nan_int_estab3_t* token, byte (*pid)[DIGEST_LEN]){
@@ -467,7 +450,7 @@ static int handle_nan_int_estab5(mt_desc_t* desc, nan_int_estab5_t* token, byte 
 
   byte* reply_msg;
   int reply_size = pack_nan_rel_estab6(&reply, pid, &reply_msg);
-  mt_send_message(&chn->cdesc, MT_NTYPE_NAN_REL_ESTAB6, reply_msg, reply_size);
+  return mt_send_message(&chn->cdesc, MT_NTYPE_NAN_REL_ESTAB6, reply_msg, reply_size);
 }
 
 /******************************* Nano Pay *******************************/
@@ -503,11 +486,11 @@ static int handle_nan_cli_reqclose1(mt_desc_t* desc, nan_cli_reqclose1_t* token,
 
 
   if((chn = digestmap_remove(relay.nans_estab, (char*)digest)) != NULL){
-    mt_recv_args_t args;
-    args.type = MT_NTYPE_NAN_CLI_REQCLOSE1;
-    memcpy(&args.desc, desc, sizeof(mt_desc_t));
-    args.size = pack_nan_cli_reqclose1(token, pid, &args.msg);
-    return init_nan_end_close1(&args, chn, desc);
+    digestmap_set(relay.chns_transition, (char*)pid, chn);
+    chn->callback = (mt_callback_t){.fn = mt_rpay_recv, .dref1 = *desc};
+    chn->callback.arg2 = MT_NTYPE_NAN_CLI_REQCLOSE1;
+    chn->callback.arg4 = pack_nan_cli_reqclose1(token, pid, &chn->callback.arg3);
+    return init_nan_end_close1(chn, pid);
   }
 
   nan_rel_reqclose2_t reply;
@@ -521,13 +504,7 @@ static int handle_nan_cli_reqclose1(mt_desc_t* desc, nan_cli_reqclose1_t* token,
 
 /******************************* Nano Close *****************************/
 
-static int init_nan_end_close1(mt_recv_args_t* args, mt_channel_t* chn, mt_desc_t* desc){
-
-  // add new protocol to chns_transition
-  byte pid[DIGEST_LEN];
-  mt_crypt_rand(DIGEST_LEN, pid);
-  digestmap_set(relay.chns_transition, (char*)pid, chn);
-  memcpy(&chn->cb_args, args, sizeof(mt_recv_args_t));
+static int init_nan_end_close1(mt_channel_t* chn, byte (*pid)[DIGEST_LEN]){
 
   // intiate token
   nan_end_close1_t token;
@@ -536,7 +513,7 @@ static int init_nan_end_close1(mt_recv_args_t* args, mt_channel_t* chn, mt_desc_
 
   // send message
   byte* msg;
-  int msg_size = pack_nan_end_close1(&token, &pid, &msg);
+  int msg_size = pack_nan_end_close1(&token, pid, &msg);
   return mt_send_message(&chn->idesc, MT_NTYPE_NAN_END_CLOSE1, msg, msg_size);
 }
 
@@ -620,10 +597,47 @@ static int handle_nan_int_close8(mt_desc_t* desc, nan_int_close8_t* token, byte 
   digestmap_remove(relay.chns_transition, (char*)*pid);
   digestmap_set(relay.nans_estab, (char*)digest, chn);
 
-  // start creating token
+  // ZKP
 
-  mt_recv_args_t args = chn->cb_args;
-  if(args.msg != NULL)
-    return mt_rpay_recv(&args.desc, args.type, args.msg, args.size);
+  /****************************************************************/
+  // Wrap this in helper that gets called afterwards
+  if(chn->callback.fn){
+    mt_callback_t cb = chn->callback;
+    return cb.fn(&cb.dref1, cb.arg2, cb.arg3, cb.arg4);
+  }
   return MT_SUCCESS;
+
+  /****************************************************************/
+}
+
+/*************************** Helper Functions ***************************/
+
+static mt_channel_t* new_channel(void){
+  // initialize new channel
+  mt_channel_t* chn = tor_calloc(1, sizeof(mt_channel_t));
+  memcpy(chn->data.pk, relay.pk, MT_SZ_PK);
+  memcpy(chn->data.sk, relay.sk, MT_SZ_SK);
+  mt_crypt_rand(MT_SZ_ADDR, chn->data.addr);
+  return chn;
+}
+/**
+ * Append a value to the appropriate list in a digestmap of smartlists
+ */
+static void digestmap_smartlist_append(digestmap_t* map, char* key, void* val){
+  smartlist_t* list = digestmap_get(map, (char*)key);
+  if(list == NULL){
+    digestmap_set(map, (char*)key, smartlist_new());
+    list = digestmap_get(map, (char*)key);
+  }
+  smartlist_add(list, val);
+}
+
+/**
+ * Pop the last item from the appropriate list in a digestmap of smartlists
+ */
+static void* digestmap_smartlist_pop_last(digestmap_t* map, char* key){
+  smartlist_t* list = digestmap_get(map, (char*)key);
+  if(!list)
+    return NULL;
+  return smartlist_pop_last(list);
 }

@@ -6,11 +6,12 @@
 #include "mt_ipay.h"
 
 typedef struct {
-  mt_desc_t desc;
-  mt_ntype_t type;
-  byte* msg;
-  int size;
-} mt_recv_args_t;
+  int (*fn)(mt_desc_t*, mt_ntype_t, byte*, int);
+  mt_desc_t dref1;
+  mt_ntype_t arg2;
+  byte* arg3;
+  int arg4;
+} mt_callback_t;
 
 typedef enum {
   MT_ZKP_STATE_NONE,
@@ -21,10 +22,10 @@ typedef enum {
 typedef struct {
   byte addr[MT_SZ_ADDR];
 
-  mt_desc_t end_desc;
+  mt_desc_t edesc;
   chn_int_chntok_t chn_token;
 
-  mt_recv_args_t cb_args;
+  mt_callback_t callback;
 } mt_channel_t;
 
 /**
@@ -50,7 +51,7 @@ typedef struct {
 
 
 // private initializer functions
-static int init_chn_int_setup(mt_recv_args_t* args, byte (*chn_addr)[MT_SZ_ADDR], mt_desc_t* desc);
+static int init_chn_int_setup(mt_channel_t* chn, byte (*pid)[DIGEST_LEN]);
 
 // local handler functions
 static int handle_any_led_confirm(mt_desc_t* desc, any_led_confirm_t* token, byte (*pid)[DIGEST_LEN]);
@@ -67,6 +68,8 @@ static int handle_nan_end_close1(mt_desc_t* desc, nan_end_close1_t* token, byte 
 static int handle_nan_end_close3(mt_desc_t* desc, nan_end_close3_t* token, byte (*pid)[DIGEST_LEN]);
 static int handle_nan_end_close5(mt_desc_t* desc, nan_end_close5_t* token, byte (*pid)[DIGEST_LEN]);
 static int handle_nan_end_close7(mt_desc_t* desc, nan_end_close7_t* token, byte (*pid)[DIGEST_LEN]);
+
+static mt_channel_t* new_channel(byte (*chn_addr)[MT_SZ_ADDR]);
 
 static mt_ipay_t intermediary;
 
@@ -237,18 +240,7 @@ int mt_ipay_recv(mt_desc_t* desc, mt_ntype_t type, byte* msg, int size){
 
 /**************************** Initialize Protocols **********************/
 
-static int init_chn_int_setup(mt_recv_args_t* args, byte (*chn_addr)[MT_SZ_ADDR], mt_desc_t* desc){
-
-  // initialize new channel
-  mt_channel_t* chn = tor_calloc(1, sizeof(mt_channel_t));
-  memcpy(&chn->addr, chn_addr, MT_SZ_ADDR);
-  memcpy(&chn->end_desc, desc, sizeof(mt_desc_t));
-  memcpy(&chn->cb_args, args, sizeof(mt_recv_args_t));
-  // ignore channel token for now
-
-  byte pid[DIGEST_LEN];
-  mt_crypt_rand(DIGEST_LEN, pid);
-  digestmap_set(intermediary.chns_transition, (char*)pid, chn);
+static int init_chn_int_setup(mt_channel_t* chn, byte (*pid)[DIGEST_LEN]){
 
   // initialize setup token
   chn_int_setup_t token;
@@ -261,7 +253,7 @@ static int init_chn_int_setup(mt_recv_args_t* args, byte (*chn_addr)[MT_SZ_ADDR]
   // send setup message
   byte* packed_reply;
   byte* signed_reply;
-  int packed_reply_size = pack_chn_int_setup(&token, &pid, &packed_reply);
+  int packed_reply_size = pack_chn_int_setup(&token, pid, &packed_reply);
   int signed_reply_size = mt_create_signed_msg(packed_reply, packed_reply_size,
 					     &intermediary.pk, &intermediary.sk, &signed_reply);
   return mt_send_message(&intermediary.ledger, MT_NTYPE_CHN_INT_SETUP, signed_reply, signed_reply_size);
@@ -281,13 +273,13 @@ static int handle_any_led_confirm(mt_desc_t* desc, any_led_confirm_t* token, byt
 
   // move channel to chns_setup
   byte digest[DIGEST_LEN];
-  mt_desc2digest(&chn->end_desc, &digest);
+  mt_desc2digest(&chn->edesc, &digest);
   digestmap_remove(intermediary.chns_transition, (char*)*pid);
   digestmap_set(intermediary.chns_setup, digest, chn);
 
-  mt_recv_args_t args = chn->cb_args;
-  if(args.msg != NULL){
-    return mt_ipay_recv(&args.desc, args.type, args.msg, args.size);
+  if(chn->callback.fn){
+    mt_callback_t cb = chn->callback;
+    return cb.fn(&cb.dref1, cb.arg2, cb.arg3, cb.arg4);
   }
   return MT_SUCCESS;
 }
@@ -303,30 +295,30 @@ static int handle_chn_end_estab1(mt_desc_t* desc, chn_end_estab1_t* token, byte 
   byte digest[DIGEST_LEN];
   mt_desc2digest(desc, &digest);
 
+  byte ipid[DIGEST_LEN];
+  mt_crypt_rand(DIGEST_LEN, ipid);
+
   // if existing channel is setup with this address then start establish protocol
   if((chn = digestmap_remove(intermediary.chns_setup, (char*)digest)) != NULL){
-
-    // add channel to transition
     digestmap_set(intermediary.chns_transition, (char*)pid, chn);
+    chn->callback.fn = NULL;
 
     chn_int_estab2_t reply;
 
     // fill out token
 
-    chn->cb_args.msg = NULL;
     byte* packed_reply;
     int packed_reply_size = pack_chn_int_estab2(&reply, pid, &packed_reply);
     return mt_send_message(desc, MT_NTYPE_CHN_INT_ESTAB2, packed_reply, packed_reply_size);
   }
 
-  // otherwise prepare callback
-  mt_recv_args_t args;
-  args.type = MT_NTYPE_CHN_END_ESTAB1;
-  memcpy(&args.desc, desc, sizeof(mt_desc_t));
-  args.size = pack_chn_end_estab1(token, pid, &args.msg);
-
-  init_chn_int_setup(&args, &token->addr, desc); // just to get rid of warning for now
-  return MT_SUCCESS;
+  // setup new channel at requested address
+  chn = new_channel(&token->addr);
+  chn->edesc = *desc;
+  chn->callback = (mt_callback_t){.fn = mt_ipay_recv, .dref1 = *desc, .arg2 = MT_NTYPE_CHN_END_ESTAB1};
+  chn->callback.arg4 = pack_chn_end_estab1(token, pid, &chn->callback.arg3);
+  digestmap_set(intermediary.chns_transition, (char*)ipid, chn);
+  return init_chn_int_setup(chn, &ipid); // just to get rid of warning for now
 }
 
 static int handle_chn_end_estab3(mt_desc_t* desc, chn_end_estab3_t* token, byte (*pid)[DIGEST_LEN]){
@@ -494,4 +486,13 @@ static int handle_nan_end_close7(mt_desc_t* desc, nan_end_close7_t* token, byte 
   byte* packed_reply;
   int packed_reply_size = pack_nan_int_close8(&reply, pid, &packed_reply);
   return mt_send_message(desc, MT_NTYPE_NAN_INT_CLOSE8, packed_reply, packed_reply_size);
+}
+
+/*************************** Helper Functions ***************************/
+
+static mt_channel_t* new_channel(byte (*chn_addr)[MT_SZ_ADDR]){
+  // initialize new channel
+  mt_channel_t* chn = tor_calloc(1, sizeof(mt_channel_t));
+  memcpy(chn->addr, *chn_addr, MT_SZ_ADDR);
+  return chn;
 }
