@@ -3,6 +3,7 @@
 #include "config.h"
 #include "mt_cclient.h"
 #include "mt_common.h"
+#include "mt_cpay.h"
 #include "nodelist.h"
 #include "routerlist.h"
 #include "util.h"
@@ -32,7 +33,12 @@ static void intermediary_free(intermediary_t *intermediary);
 
 /*List of selected intermediaries */
 static smartlist_t *intermediaries = NULL;
+/*Contains which origin_circuit_t is related to desc
+ *a get operation will need to be done at each payment callback call
+ *- Is there enough performance?? */
+static digestmap_t* desc2circ = NULL; // mt_desc2digest => origin_circuit_t
 /*static counter of descriptors - also used as id*/
+
 static uint32_t desc_id = 0;
 
 /*
@@ -69,6 +75,7 @@ mt_cclient_init(void) {
   log_info(LD_MT, "MoneTor: initialization of controler client code");
   tor_assert(!intermediaries); //should never be called twice
   intermediaries = smartlist_new();
+  desc2circ = digestmap_new();
 }
 
 /**
@@ -138,15 +145,34 @@ mt_cclient_launch_payment(origin_circuit_t* circ) {
     memcpy(exit->inter_ident->identity, intermediary_e->identity->identity,
         DIGEST_LEN);
   }
+  /* Adding new elements to digestmap */
+  byte id[DIGEST_LEN];
+  mt_desc2digest(&circ->ppath->desc, &id);
+  digestmap_set(desc2circ, (char*) id, circ);
+  mt_desc2digest(&middle->desc, &id);
+  digestmap_set(desc2circ, (char*) id, circ);
+  mt_desc2digest(&exit->desc, &id);
+  digestmap_set(desc2circ, (char*) id, circ);
   // XXX MoneTor - what to do with retVal
   /*Now, notify payment module that we have to start a payment*/
   int retVal;
   /* Direct payment to the guard */
   retVal = mt_cpay_pay(&circ->ppath->desc, &circ->ppath->desc);
+  if (retVal < 0) {
+    //XXX MoneTor - Do we mark the payment for close?
+    circ->ppath->p_marked_for_close = 1;
+    // If first one marked for close, do we close the others?
+  }
   /* Payment to the middle relay involving intermediary */
   retVal = mt_cpay_pay(&middle->desc, &intermediary_g->desc);
+  if (retVal < 0) {
+    middle->p_marked_for_close = 1;
+  }
   /* Payment to the exit relay involving intermediary */
   retVal = mt_cpay_pay(&exit->desc, &intermediary_e->desc);
+  if (retVal < 0) {
+    exit->p_marked_for_close = 1;
+  }
 }
 
 
@@ -323,17 +349,22 @@ run_cclient_scheduled_events(time_t now) {
 }
 
 /**
+ * XXX MoneTor -- TODO here: general_circuit_has_closed()
+ */
+
+
+/**
  * We got notified that a CIRCUIT_PURPOSE_C_INTERMEDIARY has closed
  *  - Is this a remote close?
  *  - Is this a local close due to a timeout error or a circuit failure?
  */
 void mt_cclient_intermediary_circ_has_closed(origin_circuit_t *circ) {
   intermediary_t* intermediary = NULL;
+  intermediary = mt_cclient_get_intermediary_from_ocirc(circ);
   time_t now;
   if (TO_CIRCUIT(circ)->state != CIRCUIT_STATE_OPEN) {
     // means that we did not reach the intermediary point for whatever reason
     // (probably timeout -- retry)
-    intermediary = mt_cclient_get_intermediary_from_ocirc(circ);
     intermediary->circuit_retries++;
     if (intermediary->is_reachable == INTERMEDIARY_REACHABLE_YES)
       intermediary->is_reachable = INTERMEDIARY_REACHABLE_MAYBE;
@@ -353,8 +384,11 @@ void mt_cclient_intermediary_circ_has_closed(origin_circuit_t *circ) {
     extend_info_free(intermediary->ei);
     intermediary->ei = ei;
   } else {
+    /* Remove desc ->circ from digestmap */
+    byte id[DIGEST_LEN];
+    mt_desc2digest(&intermediary->desc, &id);
+    digestmap_remove(desc2circ, (char*) id);
     /* Circuit has been closed - notify the payment module */
-
   }
 
  cleanup:
@@ -372,6 +406,12 @@ void mt_cclient_intermediary_circ_has_opened(origin_circuit_t *circ) {
   (void)circ;
   log_info(LD_MT, "MoneTor: Yay! intermediary circuit opened");
   /* reset circuit_retries counter */
+  //Todo
+  /* add intermediary desc and circ in digestmap */
+  intermediary_t* intermediary = mt_cclient_get_intermediary_from_ocirc(circ);
+  byte id[DIGEST_LEN];
+  mt_desc2digest(&intermediary->desc, &id);
+  digestmap_set(desc2circ, (char*) id, circ);
 
   /*XXX MoneTor - What do we do? notify payment, wait to full establishement of all circuits?*/
 }

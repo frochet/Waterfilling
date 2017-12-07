@@ -1516,6 +1516,16 @@ circuit_get_ready_rend_circ_by_rend_data(const rend_data_t *rend_data)
   return NULL;
 }
 
+/** Returns the circuit where one of the pay_path_t in the
+ * linked list contains a desc that matches the one received
+ * in parameter.
+ */
+origin_circuit_t *
+circuit_get_by_mt_desc(mt_desc_t *desc) {
+  (void) desc;
+  return NULL;
+}
+
 /** Return the circuit whose intermediary_identity_t matches 
  *  or NULL if no such circuit exists */
 
