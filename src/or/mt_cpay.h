@@ -11,24 +11,28 @@
 #include "or.h"
 
 /**
- * Initialize a client instance given public parameters, a currency
- * keypair, and a list of channels associated with the keypair.
+ * Initialize the module; should only be called once. All necessary variables
+ * will be loaded from the torrc configuration file.
  */
 int mt_cpay_init(void);
 
 /**
- * Pay a relay through a given intermediary. To pay the intermediary directly,
- * set rdesc and idesc to be the same intermediary.
+ * Send a single payment to the relay through a given intermediary. If
+ * <b>rdesc<\b> and <b>idesc<\b> are equal, then the payment module will make a
+ * direct payment to the intermediary module. If a payment request to a given
+ * relay is made with a different intermediary BEFORE the previous
+ * relay/intermediary payment pair was closed, then this function will return an
+ * error.
  */
 int mt_cpay_pay(mt_desc_t* rdesc, mt_desc_t* idesc);
 
 /**
- * Close a nanopayment channel with the given descriptor
+ * Close an existing payment channel with the given relay/intermediary pair
  */
 int mt_cpay_close(mt_desc_t* rdesc, mt_desc_t* idesc);
 
 /**
- * Handle an incoming message. Requires the message sender, type, and size.
+ * Handle an incoming message from the given descriptor
  */
 int mt_cpay_recv(mt_desc_t* desc, mt_ntype_t type, byte* msg, int size);
 

@@ -22,9 +22,10 @@ int mt_rpay_init(void);
 int mt_rpay_recv(mt_desc_t* desc, mt_ntype_t type, byte* msg, int size);
 
 /**
- * Handle a special establish init message. This is needed because unlike other
- * messages, we need to consider not one but two descriptors
+ * Handle an incoming message from the given client descriptor that is also
+ * associated with a new intermediary descriptor. Currently, this is only needed
+ * for the singular nan_cli_estab1 message.
  */
-int mt_rpay_recv_multidesc(mt_desc_t* client, mt_desc_t* intermediary, mt_ntype_t type, byte* msg, int size);
+int mt_rpay_recv_multidesc(mt_desc_t* cdesc, mt_desc_t* idesc, mt_ntype_t type, byte* msg, int size);
 
 #endif
