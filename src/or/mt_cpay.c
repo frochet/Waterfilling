@@ -1,3 +1,41 @@
+/**
+ * \file mt_cpay.c
+ *
+ * Implement logic for the client role in the moneTor payment scheme. The module
+ * interacts with other payment code (<b>mt_cpay<\b>, <b>mt_rpay<\b>,
+ * <b>mt_ipay<\b>) across the Tor network. The module only interacts with two
+ * other parts of the Tor code base: the corresponding moneTor controller and
+ * the cpuworker. Interactions with controllers are managed through descriptors
+ * defined by the struct <b>mt_desc_t<\b>. These descriptors serve as unique
+ * payment identifies for the payment module such that the controller can
+ * abstract away all network connection details.
+ *
+ * The following interface is made available to the controller:
+ *   <ul>
+ *     <li>mt_cpay_init();
+ *     <li>mt_cpay_pay()
+ *     <li>mt_cpay_close()
+ *     <li>mt_cpay_recv()
+ *   <\ul>
+ *
+ * Conversely, the module requires access to the following controller interface:
+ *   <ul>
+ *     <li>mt_send_message()
+ *     <li>mt_send_message_multidesc()
+ *     <li>mt_alert_payment()
+ *   <\ul>
+ *
+ * The payment module manages a collection of payment channels each of which is
+ * roughly implemented as a state machine. Channels only have a well-defined
+ * state inbetween protocol executions; inbetween then are in a limbo
+ * "transition" state. These active protocols are tracked by protocol ids (pid)s
+ * that are probabilistically assumed to be globally unique
+ *
+ * The code features a "re-entrancy" pattern whereby the same function is called
+ * again and again via callbacks until the channel is in the right state to
+ * complete the task.
+ */
+
 #pragma GCC diagnostic ignored "-Wswitch-enum"
 #pragma GCC diagnostic ignored "-Wunused-function"
 
@@ -13,8 +51,15 @@
 
 #define INIT_CHN_BALANCE 10 * 100;
 
+/**
+ * Prototype for multi-thread function used to generate the expensive zkp proof
+ */
 typedef void (*work_task)(void*);
 
+/**
+ * Hold function and arguments necessary to execute callbacks on a channel once
+ * the current protocol has completed
+ */
 typedef struct {
   // callback function
   int (*fn)(mt_desc_t*, mt_desc_t*);
@@ -24,6 +69,9 @@ typedef struct {
   mt_desc_t dref2;
 } mt_callback_t;
 
+/**
+ * Hold information necessary to maintain a single payment channel
+ */
 typedef struct {
   mt_desc_t rdesc;
   mt_desc_t idesc;
@@ -32,6 +80,10 @@ typedef struct {
   mt_callback_t callback;
 } mt_channel_t;
 
+/**
+ * Hold arguments need to run the multi-thread workqueue for the expensive zkp
+ * proof generation
+ */
 typedef struct {
   mt_channel_t* chn;
   byte pid[DIGEST_LEN];
@@ -50,17 +102,19 @@ typedef struct {
   mt_desc_t ledger;
   int fee;
 
+  // channel states are encoded by which of these containers they are held
   smartlist_t* chns_setup;
   smartlist_t* chns_estab;
   smartlist_t* nans_setup;
-  digestmap_t* nans_estab;        // desc -> channel
-  digestmap_t* nans_destab;        // desc -> channel
-  digestmap_t* nans_reqclosed;    // desc -> channel
+  digestmap_t* nans_estab;        // digest(rdesc) -> channel
+  digestmap_t* nans_destab;       // digest(rdesc) -> channel
+  digestmap_t* nans_reqclosed;    // digest(rdesc) -> channel
+
+  // special container to hold channels in the middle of a protocol
   digestmap_t* chns_transition;   // pid -> channel
 } mt_cpay_t;
 
-// private initializer functions
-static mt_channel_t* new_channel(void);
+// functions to initialize new protocols
 static int init_chn_end_setup(mt_channel_t* chn, byte (*pid)[DIGEST_LEN]);
 static int init_chn_end_estab1(mt_channel_t* chn, byte (*pid)[DIGEST_LEN]);
 static int init_nan_cli_setup1(mt_channel_t* chn, byte (*pid)[DIGEST_LEN]);
@@ -71,7 +125,7 @@ static int init_nan_cli_dpay1(mt_channel_t* chn, byte (*pid)[DIGEST_LEN]);
 static int init_nan_cli_reqclose1(mt_channel_t* chn, byte (*pid)[DIGEST_LEN]);
 static int init_nan_end_close1(mt_channel_t* chn, byte (*pid)[DIGEST_LEN]);
 
-// private handler functions
+// functions to handle incoming recv messages
 static int handle_any_led_confirm(mt_desc_t* desc, any_led_confirm_t* token, byte (*pid)[DIGEST_LEN]);
 static int handle_chn_int_estab2(mt_desc_t* desc, chn_int_estab2_t* token, byte (*pid)[DIGEST_LEN]);
 static int handle_chn_int_estab4(mt_desc_t* desc, chn_int_estab4_t* token, byte (*pid)[DIGEST_LEN]);
@@ -88,26 +142,31 @@ static int handle_nan_int_close4(mt_desc_t* desc, nan_int_close4_t* token, byte 
 static int handle_nan_int_close6(mt_desc_t* desc, nan_int_close6_t* token, byte (*pid)[DIGEST_LEN]);
 static int handle_nan_int_close8(mt_desc_t* desc, nan_int_close8_t* token, byte (*pid)[DIGEST_LEN]);
 
-// helper functions that are called after workqueued zkp proof is generated
+// special helper functions for protocol steps involving a zkp proof generation
 static int help_chn_end_estab1(void* args);
 static int help_chn_int_estab4(void* args);
 static int help_nan_int_close8(void* args);
 
-// private helper functions
+// miscallaneous helper functions
+static int pay_helper(mt_desc_t* rdesc, mt_desc_t* idesc);
+static int dpay_helper(mt_desc_t* rdesc, mt_desc_t* idesc);
+static mt_channel_t* new_channel(void);
 static int compare_chn_end_data(const void** a, const void** b);
 static mt_channel_t* smartlist_search_idesc(smartlist_t* list, mt_desc_t* desc);
-
 static workqueue_reply_t wcom_task(void* thread, void* arg);
 static void wallet_reply(void* arg);
-
-static int mt_pay_notify(mt_desc_t* rdesc, mt_desc_t* idesc);
-static int mt_close_notify(mt_desc_t* rdesc, mt_desc_t* idesc);
+static int pay_notify(mt_desc_t* rdesc, mt_desc_t* idesc);
+static int close_notify(mt_desc_t* rdesc, mt_desc_t* idesc);
 
 static mt_cpay_t client;
 
+/**
+ * Initialize the module; should only be called once. All necessary variables
+ * will be loaded from the torrc configuration file.
+ */
 int mt_cpay_init(void){
 
-  // TODO: get this to workx
+  // TODO: get this to work
   // cpu_init();
 
   byte pp[MT_SZ_PP];
@@ -163,85 +222,123 @@ int mt_cpay_init(void){
   return MT_SUCCESS;
 }
 
+/**
+ * Send a single payment to the relay through a given intermediary. If
+ * <b>rdesc<\b> and <b>idesc<\b> are equal, then the payment module will make a
+ * direct payment to the intermediary module. If a payment request to a given
+ * relay is made with a different intermediary BEFORE the previous
+ * relay/intermediary payment pair was closed, then this function will return an
+ * error.
+ */
 int mt_cpay_pay(mt_desc_t* rdesc, mt_desc_t* idesc){
 
-  mt_channel_t* chn;
+  // determine whether this is a standard or direct payment
+  if(rdesc->id != idesc->id)
+    return pay_helper(rdesc, idesc);
+  else
+    return dpay_helper(rdesc, idesc);
+}
 
+/**
+ * Handle standard payments from mt_cpay_pay(). Re-enter this payment again and
+ * again until the payment is successful and pay_notify is called.
+ */
+static int pay_helper(mt_desc_t* rdesc, mt_desc_t* idesc){
+
+  mt_channel_t* chn;
   byte digest[DIGEST_LEN];
   mt_desc2digest(rdesc, &digest);
-
   byte pid[DIGEST_LEN];
   mt_crypt_rand(DIGEST_LEN, pid);
 
-  // TODO: if out of payments then close channel
-
-  // intermediary payment
-  if(rdesc->id != idesc->id){
-    // make payment if possible
-    if((chn = digestmap_remove(client.nans_estab, (char*)digest)) != NULL){
-      digestmap_set(client.chns_transition, (char*)pid, chn);
-      chn->callback = (mt_callback_t){.fn = mt_pay_notify, .dref1 = *rdesc, .dref2 = *idesc};
-      return init_nan_cli_pay1(chn, &pid);
-    }
-
-    // establish nanopayment channel if possible
-    if((chn = smartlist_pop_last(client.nans_setup)) != NULL){
-      digestmap_set(client.chns_transition, (char*)pid, chn);
-      chn->rdesc = *rdesc;
-      chn->callback = (mt_callback_t){.fn = mt_cpay_pay, .dref1 = *rdesc, .dref2 = *idesc};
-      return init_nan_cli_estab1(chn, &pid);
-    }
-
-    // setup nanopayment channel if possible
-    if((chn = smartlist_pop_last(client.chns_estab)) != NULL){
-      digestmap_set(client.chns_transition, (char*)pid, chn);
-      chn->callback = (mt_callback_t){.fn = mt_cpay_pay, .dref1 = *rdesc, .dref2 = *idesc};
-      return init_nan_cli_setup1(chn, &pid);
-    }
-
-    // establish channel if possible
-    if((chn = smartlist_pop_last(client.chns_setup)) != NULL){
-      digestmap_set(client.chns_transition, (char*)pid, chn);
-      chn->callback = (mt_callback_t){.fn = mt_cpay_pay, .dref1 = *rdesc, .dref2 = *idesc};
-      return init_chn_end_estab1(chn, &pid);
-    }
-  }
-  // direct payment
-  else {
-    if((chn = digestmap_remove(client.nans_destab, (char*)digest)) != NULL){
-      digestmap_set(client.chns_transition, (char*)pid, chn);
-      chn->callback = (mt_callback_t){.fn = mt_pay_notify, .dref1 = *rdesc, .dref2 = *idesc};
-      return init_nan_cli_dpay1(chn, &pid);
-    }
-
-    if((chn = smartlist_search_idesc(client.nans_setup, rdesc)) != NULL){
-      digestmap_set(client.chns_transition, (char*)pid, chn);
-      chn->rdesc = *rdesc;
-      chn->callback = (mt_callback_t){.fn = mt_cpay_pay, .dref1 = *rdesc, .dref2 = *idesc};
-      return init_nan_cli_destab1(chn, &pid);
-    }
-
-    if((chn = smartlist_search_idesc(client.chns_estab, rdesc)) != NULL){
-      digestmap_set(client.chns_transition, (char*)pid, chn);
-      chn->callback = (mt_callback_t){.fn = mt_cpay_pay, .dref1 = *rdesc, .dref2 = *idesc};
-      return init_nan_cli_setup1(chn, &pid);
-    }
-
-    if((chn = smartlist_search_idesc(client.chns_setup, rdesc)) != NULL){
-      digestmap_set(client.chns_transition, (char*)pid, chn);
-      chn->callback = (mt_callback_t){.fn = mt_cpay_pay, .dref1 = *rdesc, .dref2 = *idesc};
-      return init_chn_end_estab1(chn, &pid);
-    }
+  // make payment if possible; callback pay_notify
+  if((chn = digestmap_remove(client.nans_estab, (char*)digest)) != NULL){
+    digestmap_set(client.chns_transition, (char*)pid, chn);
+    chn->callback = (mt_callback_t){.fn = pay_notify, .dref1 = *rdesc, .dref2 = *idesc};
+    return init_nan_cli_pay1(chn, &pid);
   }
 
-  // setup channel
+  // establish nanopayment channel if possible; callback pay_helper
+  if((chn = smartlist_pop_last(client.nans_setup)) != NULL){
+    digestmap_set(client.chns_transition, (char*)pid, chn);
+    chn->rdesc = *rdesc;
+    chn->callback = (mt_callback_t){.fn = pay_helper, .dref1 = *rdesc, .dref2 = *idesc};
+    return init_nan_cli_estab1(chn, &pid);
+  }
+
+  // set up nanopayment channel if possible; callback pay_helper
+  if((chn = smartlist_pop_last(client.chns_estab)) != NULL){
+    digestmap_set(client.chns_transition, (char*)pid, chn);
+    chn->callback = (mt_callback_t){.fn = pay_helper, .dref1 = *rdesc, .dref2 = *idesc};
+    return init_nan_cli_setup1(chn, &pid);
+  }
+
+  // establish channel if possible; callback pay_helper
+  if((chn = smartlist_pop_last(client.chns_setup)) != NULL){
+    digestmap_set(client.chns_transition, (char*)pid, chn);
+    chn->callback = (mt_callback_t){.fn = pay_helper, .dref1 = *rdesc, .dref2 = *idesc};
+    return init_chn_end_estab1(chn, &pid);
+  }
+
+  // set up channel if possible; callback pay_helper
   chn = new_channel();
   digestmap_set(client.chns_transition, (char*)pid, chn);
-  chn->idesc = *idesc;
-  chn->callback = (mt_callback_t){.fn = mt_cpay_pay, .dref1 = *rdesc};
+  chn->idesc = *idesc;    // set channel intermediary
+  chn->callback = (mt_callback_t){.fn = pay_helper, .dref1 = *rdesc};
   return init_chn_end_setup(chn, &pid);
 }
 
+/**
+ * Handle direct payments from mt_cpay_pay(). Re-enter this payment again and
+ * again until the payment is successful and pay_notify is called.
+ */
+static int dpay_helper(mt_desc_t* rdesc, mt_desc_t* idesc){
+  mt_channel_t* chn;
+  byte digest[DIGEST_LEN];
+  mt_desc2digest(rdesc, &digest);
+  byte pid[DIGEST_LEN];
+  mt_crypt_rand(DIGEST_LEN, pid);
+
+  // make direct payment if possible; callback pay_notify
+  if((chn = digestmap_remove(client.nans_destab, (char*)digest)) != NULL){
+    digestmap_set(client.chns_transition, (char*)pid, chn);
+    chn->callback = (mt_callback_t){.fn = pay_notify, .dref1 = *rdesc, .dref2 = *idesc};
+    return init_nan_cli_dpay1(chn, &pid);
+  }
+
+  // establish nanopayment channel if possible; callback dpay_helper
+  if((chn = smartlist_search_idesc(client.nans_setup, rdesc)) != NULL){
+    digestmap_set(client.chns_transition, (char*)pid, chn);
+    chn->rdesc = *rdesc;
+    chn->callback = (mt_callback_t){.fn = dpay_helper, .dref1 = *rdesc, .dref2 = *idesc};
+    return init_nan_cli_destab1(chn, &pid);
+  }
+
+  // set up nanopayment channel if possible; callback dpay_helper
+  if((chn = smartlist_search_idesc(client.chns_estab, rdesc)) != NULL){
+    digestmap_set(client.chns_transition, (char*)pid, chn);
+    chn->callback = (mt_callback_t){.fn = dpay_helper, .dref1 = *rdesc, .dref2 = *idesc};
+    return init_nan_cli_setup1(chn, &pid);
+  }
+
+  // establish channel if possible; callback dpay_helper
+  if((chn = smartlist_search_idesc(client.chns_setup, rdesc)) != NULL){
+    digestmap_set(client.chns_transition, (char*)pid, chn);
+    chn->callback = (mt_callback_t){.fn = dpay_helper, .dref1 = *rdesc, .dref2 = *idesc};
+    return init_chn_end_estab1(chn, &pid);
+  }
+
+  // setup channel if possible; callback dpay_helper
+  chn = new_channel();
+  digestmap_set(client.chns_transition, (char*)pid, chn);
+  chn->idesc = *idesc;
+  chn->callback = (mt_callback_t){.fn = dpay_helper, .dref1 = *rdesc};
+  return init_chn_end_setup(chn, &pid);
+}
+
+/**
+ * Close an existing payment channel with the given relay/intermediary pair
+ */
 int mt_cpay_close(mt_desc_t* rdesc, mt_desc_t* idesc){
   mt_channel_t* chn;
 
@@ -251,21 +348,24 @@ int mt_cpay_close(mt_desc_t* rdesc, mt_desc_t* idesc){
   byte pid[DIGEST_LEN];
   mt_crypt_rand(DIGEST_LEN, pid);
 
+  // close the standard nanopayment channel if possible; callback close_notify
   if((chn = digestmap_remove(client.nans_reqclosed, (char*)digest)) != NULL){
     digestmap_set(client.chns_transition, (char*)pid, chn);
-    chn->callback = (mt_callback_t){.fn = mt_close_notify, .dref1 = *rdesc, .dref2 = *idesc};
+    chn->callback = (mt_callback_t){.fn = close_notify, .dref1 = *rdesc, .dref2 = *idesc};
     return init_nan_end_close1(chn, &pid);
   }
 
+  // send a request to close the channel if possible; callback mt_cpay_close
   if((chn = digestmap_remove(client.nans_estab, (char*)digest)) != NULL){
     digestmap_set(client.chns_transition, (char*)pid, chn);
     chn->callback = (mt_callback_t){.fn = mt_cpay_close, .dref1 = *rdesc, .dref2 = *idesc};
     return init_nan_cli_reqclose1(chn, &pid);
   }
 
+  // close the direct nanopayment channel if possible; callback close_notify
   if((chn = digestmap_remove(client.nans_destab, (char*)digest)) != NULL){
     digestmap_set(client.chns_transition, (char*)pid, chn);
-    chn->callback = (mt_callback_t){.fn = mt_close_notify, .dref1 = *rdesc, .dref2 = *idesc};
+    chn->callback = (mt_callback_t){.fn = close_notify, .dref1 = *rdesc, .dref2 = *idesc};
     return init_nan_end_close1(chn, &pid);
   }
 
@@ -273,11 +373,15 @@ int mt_cpay_close(mt_desc_t* rdesc, mt_desc_t* idesc){
   return MT_ERROR;
 }
 
+/**
+ * Handle an incoming message from the given descriptor
+ */
 int mt_cpay_recv(mt_desc_t* desc, mt_ntype_t type, byte* msg, int size){
 
   int result;
   byte pid[DIGEST_LEN];
 
+  // unpack the token and delegate to appropriate handler
   switch(type){
     case MT_NTYPE_ANY_LED_CONFIRM:;
       any_led_confirm_t any_led_confirm_tkn;
@@ -396,6 +500,7 @@ int mt_cpay_recv(mt_desc_t* desc, mt_ntype_t type, byte* msg, int size){
 static int init_chn_end_setup(mt_channel_t* chn, byte (*pid)[DIGEST_LEN]){
 
   // initialize setup token
+
   chn_end_setup_t token;
   token.val_from = 50 + client.fee;
   token.val_to = 50;
@@ -404,12 +509,15 @@ static int init_chn_end_setup(mt_channel_t* chn, byte (*pid)[DIGEST_LEN]){
   // skip chn_token for now
 
   // send setup message
-  byte* packed_msg;
+  byte* msg;
   byte* signed_msg;
-  int packed_msg_size = pack_chn_end_setup(&token, pid, &packed_msg);
-  int signed_msg_size = mt_create_signed_msg(packed_msg, packed_msg_size,
+  int msg_size = pack_chn_end_setup(&token, pid, &msg);
+  int signed_msg_size = mt_create_signed_msg(msg, msg_size,
 					     &chn->data.pk, &chn->data.sk, &signed_msg);
-  return mt_send_message(&client.ledger, MT_NTYPE_CHN_END_SETUP, signed_msg, signed_msg_size);
+  int result = mt_send_message(&client.ledger, MT_NTYPE_CHN_END_SETUP, signed_msg, signed_msg_size);
+  free(msg);
+  free(signed_msg);
+  return result;
 }
 
 static int handle_any_led_confirm(mt_desc_t* desc, any_led_confirm_t* token, byte (*pid)[DIGEST_LEN]){
@@ -460,7 +568,9 @@ static int help_chn_end_estab1(void* args){
   // send message
   byte* msg;
   int msg_size = pack_chn_end_estab1(&token, &pid, &msg);
-  return mt_send_message(&chn->idesc, MT_NTYPE_CHN_END_ESTAB1, msg, msg_size);
+  int result =  mt_send_message(&chn->idesc, MT_NTYPE_CHN_END_ESTAB1, msg, msg_size);
+  free(msg);
+  return result;
 }
 
 static int handle_chn_int_estab2(mt_desc_t* desc, chn_int_estab2_t* token, byte (*pid)[DIGEST_LEN]){
@@ -479,10 +589,11 @@ static int handle_chn_int_estab2(mt_desc_t* desc, chn_int_estab2_t* token, byte 
 
   // fill reply with correct values
 
-  byte* reply_msg;
-  int reply_size = pack_chn_end_estab3(&reply, pid, &reply_msg);
-  mt_send_message(desc, MT_NTYPE_CHN_END_ESTAB3, reply_msg, reply_size);
-  return MT_SUCCESS;
+  byte* msg;
+  int msg_size = pack_chn_end_estab3(&reply, pid, &msg);
+  int result = mt_send_message(desc, MT_NTYPE_CHN_END_ESTAB3, msg, msg_size);
+  free(msg);
+  return result;
 }
 
 static int handle_chn_int_estab4(mt_desc_t* desc, chn_int_estab4_t* token, byte (*pid)[DIGEST_LEN]){
@@ -535,7 +646,9 @@ static int init_nan_cli_setup1(mt_channel_t* chn, byte (*pid)[DIGEST_LEN]){
   // send message
   byte* msg;
   int msg_size = pack_nan_cli_setup1(&token, pid, &msg);
-  return mt_send_message(&chn->idesc, MT_NTYPE_NAN_CLI_SETUP1, msg, msg_size);
+  int result = mt_send_message(&chn->idesc, MT_NTYPE_NAN_CLI_SETUP1, msg, msg_size);
+  free(msg);
+  return result;
 }
 
 static int handle_nan_int_setup2(mt_desc_t* desc, nan_int_setup2_t* token, byte (*pid)[DIGEST_LEN]){
@@ -554,9 +667,11 @@ static int handle_nan_int_setup2(mt_desc_t* desc, nan_int_setup2_t* token, byte 
 
   // fill reply with correct values
 
-  byte* reply_msg;
-  int reply_size = pack_nan_cli_setup3(&reply, pid, &reply_msg);
-  return mt_send_message(desc, MT_NTYPE_NAN_CLI_SETUP3, reply_msg, reply_size);
+  byte* msg;
+  int msg_size = pack_nan_cli_setup3(&reply, pid, &msg);
+  int result = mt_send_message(desc, MT_NTYPE_NAN_CLI_SETUP3, msg, msg_size);
+  free(msg);
+  return result;
 }
 
 static int handle_nan_int_setup4(mt_desc_t* desc, nan_int_setup4_t* token, byte (*pid)[DIGEST_LEN]){
@@ -575,9 +690,11 @@ static int handle_nan_int_setup4(mt_desc_t* desc, nan_int_setup4_t* token, byte 
 
   // fill reply with correct values
 
-  byte* reply_msg;
-  int reply_size = pack_nan_cli_setup5(&reply, pid, &reply_msg);
-  return mt_send_message(desc, MT_NTYPE_NAN_CLI_SETUP5, reply_msg, reply_size);
+  byte* msg;
+  int msg_size = pack_nan_cli_setup5(&reply, pid, &msg);
+  int result = mt_send_message(desc, MT_NTYPE_NAN_CLI_SETUP5, msg, msg_size);
+  free(msg);
+  return result;
 }
 
 static int handle_nan_int_setup6(mt_desc_t* desc, nan_int_setup6_t* token, byte (*pid)[DIGEST_LEN]){
@@ -613,7 +730,10 @@ static int init_nan_cli_estab1(mt_channel_t* chn, byte (*pid)[DIGEST_LEN]){
   // send message
   byte* msg;
   int msg_size = pack_nan_cli_estab1(&token, pid, &msg);
-  return mt_send_message_multidesc(&chn->rdesc, &chn->idesc, MT_NTYPE_NAN_CLI_ESTAB1, msg, msg_size);
+  int result = mt_send_message_multidesc(&chn->rdesc, &chn->idesc, MT_NTYPE_NAN_CLI_ESTAB1,
+					 msg, msg_size);
+  free(msg);
+  return result;
 }
 
 static int handle_nan_rel_estab6(mt_desc_t* desc, nan_rel_estab6_t* token, byte (*pid)[DIGEST_LEN]){
@@ -650,7 +770,9 @@ static int init_nan_cli_pay1(mt_channel_t* chn, byte (*pid)[DIGEST_LEN]){
   // send message
   byte* msg;
   int msg_size = pack_nan_cli_pay1(&token, pid, &msg);
-  return mt_send_message(&chn->rdesc, MT_NTYPE_NAN_CLI_PAY1, msg, msg_size);
+  int result = mt_send_message(&chn->rdesc, MT_NTYPE_NAN_CLI_PAY1, msg, msg_size);
+  free(msg);
+  return result;
 }
 
 static int handle_nan_rel_pay2(mt_desc_t* desc, nan_rel_pay2_t* token, byte (*pid)[DIGEST_LEN]){
@@ -685,7 +807,9 @@ static int init_nan_cli_destab1(mt_channel_t* chn, byte (*pid)[DIGEST_LEN]){
   // send message
   byte* msg;
   int msg_size = pack_nan_cli_destab1(&token, pid, &msg);
-  return mt_send_message(&chn->idesc, MT_NTYPE_NAN_CLI_DESTAB1, msg, msg_size);
+  int result = mt_send_message(&chn->idesc, MT_NTYPE_NAN_CLI_DESTAB1, msg, msg_size);
+  free(msg);
+  return result;
 }
 
 static int handle_nan_int_destab2(mt_desc_t* desc, nan_int_destab2_t* token, byte (*pid)[DIGEST_LEN]){
@@ -722,7 +846,9 @@ static int init_nan_cli_dpay1(mt_channel_t* chn, byte (*pid)[DIGEST_LEN]){
   // send message
   byte* msg;
   int msg_size = pack_nan_cli_dpay1(&token, pid, &msg);
-  return mt_send_message(&chn->idesc, MT_NTYPE_NAN_CLI_DPAY1, msg, msg_size);
+  int result = mt_send_message(&chn->idesc, MT_NTYPE_NAN_CLI_DPAY1, msg, msg_size);
+  free(msg);
+  return result;
 }
 
 static int handle_nan_int_dpay2(mt_desc_t* desc, nan_int_dpay2_t* token, byte (*pid)[DIGEST_LEN]){
@@ -758,7 +884,9 @@ static int init_nan_cli_reqclose1(mt_channel_t* chn, byte (*pid)[DIGEST_LEN]){
   // send message
   byte* msg;
   int msg_size = pack_nan_cli_reqclose1(&token, pid, &msg);
-  return mt_send_message(&chn->rdesc, MT_NTYPE_NAN_CLI_REQCLOSE1, msg, msg_size);
+  int result = mt_send_message(&chn->rdesc, MT_NTYPE_NAN_CLI_REQCLOSE1, msg, msg_size);
+  free(msg);
+  return result;
 }
 
 static int handle_nan_rel_reqclose2(mt_desc_t* desc, nan_rel_reqclose2_t* token, byte (*pid)[DIGEST_LEN]){
@@ -794,7 +922,9 @@ static int init_nan_end_close1(mt_channel_t* chn, byte (*pid)[DIGEST_LEN]){
   // send message
   byte* msg;
   int msg_size = pack_nan_end_close1(&token, pid, &msg);
-  return mt_send_message(&chn->idesc, MT_NTYPE_NAN_END_CLOSE1, msg, msg_size);
+  int result = mt_send_message(&chn->idesc, MT_NTYPE_NAN_END_CLOSE1, msg, msg_size);
+  free(msg);
+  return result;
 }
 
 static int handle_nan_int_close2(mt_desc_t* desc, nan_int_close2_t* token, byte (*pid)[DIGEST_LEN]){
@@ -813,9 +943,11 @@ static int handle_nan_int_close2(mt_desc_t* desc, nan_int_close2_t* token, byte 
 
   // fill reply with correct values
 
-  byte* reply_msg;
-  int reply_size = pack_nan_end_close3(&reply, pid, &reply_msg);
-  return mt_send_message(desc, MT_NTYPE_NAN_END_CLOSE3, reply_msg, reply_size);
+  byte* msg;
+  int msg_size = pack_nan_end_close3(&reply, pid, &msg);
+  int result = mt_send_message(desc, MT_NTYPE_NAN_END_CLOSE3, msg, msg_size);
+  free(msg);
+  return result;
 }
 
 static int handle_nan_int_close4(mt_desc_t* desc, nan_int_close4_t* token, byte (*pid)[DIGEST_LEN]){
@@ -834,9 +966,11 @@ static int handle_nan_int_close4(mt_desc_t* desc, nan_int_close4_t* token, byte 
 
   // fill reply with correct values
 
-  byte* reply_msg;
-  int reply_size = pack_nan_end_close5(&reply, pid, &reply_msg);
-  return mt_send_message(desc, MT_NTYPE_NAN_END_CLOSE5, reply_msg, reply_size);
+  byte* msg;
+  int msg_size = pack_nan_end_close5(&reply, pid, &msg);
+  int result = mt_send_message(desc, MT_NTYPE_NAN_END_CLOSE5, msg, msg_size);
+  free(msg);
+  return result;
 }
 
 static int handle_nan_int_close6(mt_desc_t* desc, nan_int_close6_t* token, byte (*pid)[DIGEST_LEN]){
@@ -855,9 +989,11 @@ static int handle_nan_int_close6(mt_desc_t* desc, nan_int_close6_t* token, byte 
 
   // fill reply with correct values
 
-  byte* reply_msg;
-  int reply_size = pack_nan_end_close7(&reply, pid, &reply_msg);
-  return mt_send_message(desc, MT_NTYPE_NAN_END_CLOSE7, reply_msg, reply_size);
+  byte* msg;
+  int msg_size = pack_nan_end_close7(&reply, pid, &msg);
+  int result = mt_send_message(desc, MT_NTYPE_NAN_END_CLOSE7, msg, msg_size);
+  free(msg);
+  return result;
 }
 
 static int handle_nan_int_close8(mt_desc_t* desc, nan_int_close8_t* token, byte (*pid)[DIGEST_LEN]){
@@ -932,19 +1068,13 @@ static workqueue_reply_t wcom_task(void* thread, void* args){
   return WQ_RPL_REPLY;
 }
 
-static int mt_pay_notify(mt_desc_t* rdesc, mt_desc_t* idesc){
+static int pay_notify(mt_desc_t* rdesc, mt_desc_t* idesc){
   (void)rdesc;
   (void)idesc;
   return 0;
 }
 
-static int mt_directpay_notify(mt_desc_t* rdesc, mt_desc_t* idesc){
-  (void)rdesc;
-  (void)idesc;
-  return MT_SUCCESS;
-}
-
-static int mt_close_notify(mt_desc_t* rdesc, mt_desc_t* idesc){
+static int close_notify(mt_desc_t* rdesc, mt_desc_t* idesc){
   (void)rdesc;
   (void)idesc;
 

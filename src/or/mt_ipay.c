@@ -1,3 +1,39 @@
+/**
+ * \file mt_ipay.c
+ *
+ * Implement logic for the intermediary in the moneTor payment scheme. The module
+ * interacts with other payment code (<b>mt_cpay<\b>, <b>mt_rpay<\b>,
+ * <b>mt_ipay<\b>) across the Tor network. The module only interacts with two
+ * other parts of the Tor code base: the corresponding moneTor controller and
+ * the cpuworker. Interactions with controllers are managed through descriptors
+ * defined by the struct <b>mt_desc_t<\b>. These descriptors serve as unique
+ * payment identifies for the payment module such that the controller can
+ * abstract away all network connection details.
+ *
+ * The following interface is made available to the controller:
+ *   <ul>
+ *     <li>mt_ipay_init();
+ *     <li>mt_ipay_recv()
+ *   <\ul>
+ *
+ * Conversely, the module requires access to the following controller interface:
+ *   <ul>
+ *     <li>mt_send_message()
+ *     <li>mt_send_message_multidesc()
+ *     <li>mt_alert_payment()
+ *   <\ul>
+ *
+ * The payment module manages a collection of payment channels each of which is
+ * roughly implemented as a state machine. Channels only have a well-defined
+ * state inbetween protocol executions; inbetween then are in a limbo
+ * "transition" state. These active protocols are tracked by protocol ids (pid)s
+ * that are probabilistically assumed to be globally unique
+ *
+ * The code features a "re-entrancy" pattern whereby the same function is called
+ * again and again via callbacks until the channel is in the right state to
+ * complete the task.
+ */
+
 #pragma GCC diagnostic ignored "-Wswitch-enum"
 
 #include "or.h"
@@ -5,6 +41,10 @@
 #include "mt_common.h"
 #include "mt_ipay.h"
 
+/**
+ * Hold function and arguments necessary to execute callbacks on a channel once
+ * the current protocol has completed
+ */
 typedef struct {
   int (*fn)(mt_desc_t*, mt_ntype_t, byte*, int);
   mt_desc_t dref1;
@@ -13,12 +53,9 @@ typedef struct {
   int arg4;
 } mt_callback_t;
 
-typedef enum {
-  MT_ZKP_STATE_NONE,
-  MT_ZKP_STATE_STARTED,
-  MT_ZKP_STATE_READY,
-} mt_zkp_state_t;
-
+/**
+ * Hold information necessary to maintain a single payment channel
+ */
 typedef struct {
   byte addr[MT_SZ_ADDR];
 
@@ -50,10 +87,10 @@ typedef struct {
 } mt_ipay_t;
 
 
-// private initializer functions
+// functions to initialize new protocols
 static int init_chn_int_setup(mt_channel_t* chn, byte (*pid)[DIGEST_LEN]);
 
-// local handler functions
+// functions to handle incoming recv messages
 static int handle_any_led_confirm(mt_desc_t* desc, any_led_confirm_t* token, byte (*pid)[DIGEST_LEN]);
 static int handle_chn_end_estab1(mt_desc_t* desc, chn_end_estab1_t* token, byte (*pid)[DIGEST_LEN]);
 static int handle_chn_end_estab3(mt_desc_t* desc, chn_end_estab3_t* token, byte (*pid)[DIGEST_LEN]);
@@ -69,10 +106,15 @@ static int handle_nan_end_close3(mt_desc_t* desc, nan_end_close3_t* token, byte 
 static int handle_nan_end_close5(mt_desc_t* desc, nan_end_close5_t* token, byte (*pid)[DIGEST_LEN]);
 static int handle_nan_end_close7(mt_desc_t* desc, nan_end_close7_t* token, byte (*pid)[DIGEST_LEN]);
 
+// miscallaneous helper functions
 static mt_channel_t* new_channel(byte (*chn_addr)[MT_SZ_ADDR]);
 
 static mt_ipay_t intermediary;
 
+/**
+ * Initialize the module; should only be called once. All necessary variables
+ * will be loaded from the torrc configuration file.
+ */
 int mt_ipay_init(void){
 
   // TODO: load in keys
@@ -127,11 +169,15 @@ int mt_ipay_init(void){
   return MT_SUCCESS;
 }
 
+/**
+ * Handle an incoming message from the given descriptor
+ */
 int mt_ipay_recv(mt_desc_t* desc, mt_ntype_t type, byte* msg, int size){
 
   int result;
   byte pid[DIGEST_LEN];
 
+  // unpack the token and delegate to appropriate handler
   switch(type){
     case MT_NTYPE_ANY_LED_CONFIRM:;
       any_led_confirm_t any_led_confirm_tkn;
@@ -251,12 +297,15 @@ static int init_chn_int_setup(mt_channel_t* chn, byte (*pid)[DIGEST_LEN]){
   // ignore channel token for now
 
   // send setup message
-  byte* packed_reply;
-  byte* signed_reply;
-  int packed_reply_size = pack_chn_int_setup(&token, pid, &packed_reply);
-  int signed_reply_size = mt_create_signed_msg(packed_reply, packed_reply_size,
-					     &intermediary.pk, &intermediary.sk, &signed_reply);
-  return mt_send_message(&intermediary.ledger, MT_NTYPE_CHN_INT_SETUP, signed_reply, signed_reply_size);
+  byte* msg;
+  byte* signed_msg;
+  int msg_size = pack_chn_int_setup(&token, pid, &msg);
+  int signed_msg_size = mt_create_signed_msg(msg, msg_size,
+					     &intermediary.pk, &intermediary.sk, &signed_msg);
+  int result = mt_send_message(&intermediary.ledger, MT_NTYPE_CHN_INT_SETUP, signed_msg, signed_msg_size);
+  free(msg);
+  free(signed_msg);
+  return result;
 }
 
 /******************************* Channel Escrow *************************/
@@ -277,7 +326,7 @@ static int handle_any_led_confirm(mt_desc_t* desc, any_led_confirm_t* token, byt
   byte digest[DIGEST_LEN];
   mt_desc2digest(&chn->edesc, &digest);
   digestmap_remove(intermediary.chns_transition, (char*)*pid);
-  digestmap_set(intermediary.chns_setup, digest, chn);
+  digestmap_set(intermediary.chns_setup, (char*)digest, chn);
 
   if(chn->callback.fn){
     mt_callback_t cb = chn->callback;
@@ -310,9 +359,11 @@ static int handle_chn_end_estab1(mt_desc_t* desc, chn_end_estab1_t* token, byte 
 
     // fill out token
 
-    byte* packed_reply;
-    int packed_reply_size = pack_chn_int_estab2(&reply, pid, &packed_reply);
-    return mt_send_message(desc, MT_NTYPE_CHN_INT_ESTAB2, packed_reply, packed_reply_size);
+    byte* msg;
+    int msg_size = pack_chn_int_estab2(&reply, pid, &msg);
+    int result = mt_send_message(desc, MT_NTYPE_CHN_INT_ESTAB2, msg, msg_size);
+    free(msg);
+    return result;
   }
 
   // setup new channel at requested address
@@ -342,9 +393,11 @@ static int handle_chn_end_estab3(mt_desc_t* desc, chn_end_estab3_t* token, byte 
 
   // fill out token
 
-  byte* packed_reply;
-  int packed_reply_size = pack_chn_int_estab4(&reply, pid, &packed_reply);
-  return mt_send_message(desc, MT_NTYPE_CHN_INT_ESTAB4, packed_reply, packed_reply_size);
+  byte* msg;
+  int msg_size = pack_chn_int_estab4(&reply, pid, &msg);
+  int result = mt_send_message(desc, MT_NTYPE_CHN_INT_ESTAB4, msg, msg_size);
+  free(msg);
+  return result;
 }
 
 /******************************** Nano Setup ****************************/
@@ -358,9 +411,11 @@ static int handle_nan_cli_setup1(mt_desc_t* desc, nan_cli_setup1_t* token, byte 
 
   // fill out token
 
-  byte* packed_reply;
-  int packed_reply_size = pack_nan_int_setup2(&reply, pid, &packed_reply);
-  return mt_send_message(desc, MT_NTYPE_NAN_INT_SETUP2, packed_reply, packed_reply_size);
+  byte* msg;
+  int msg_size = pack_nan_int_setup2(&reply, pid, &msg);
+  int result = mt_send_message(desc, MT_NTYPE_NAN_INT_SETUP2, msg, msg_size);
+  free(msg);
+  return result;
 }
 
 static int handle_nan_cli_setup3(mt_desc_t* desc, nan_cli_setup3_t* token, byte (*pid)[DIGEST_LEN]){
@@ -370,11 +425,13 @@ static int handle_nan_cli_setup3(mt_desc_t* desc, nan_cli_setup3_t* token, byte 
 
   nan_int_setup4_t reply;
 
-  // fill reply with correct values
+  // fill msg with correct values
 
-  byte* packed_reply;
-  int packed_reply_size = pack_nan_int_setup4(&reply, pid, &packed_reply);
-  return mt_send_message(desc, MT_NTYPE_NAN_INT_SETUP4, packed_reply, packed_reply_size);
+  byte* msg;
+  int msg_size = pack_nan_int_setup4(&reply, pid, &msg);
+  int result = mt_send_message(desc, MT_NTYPE_NAN_INT_SETUP4, msg, msg_size);
+  free(msg);
+  return result;
 }
 
 static int handle_nan_cli_setup5(mt_desc_t* desc, nan_cli_setup5_t* token, byte (*pid)[DIGEST_LEN]){
@@ -386,9 +443,11 @@ static int handle_nan_cli_setup5(mt_desc_t* desc, nan_cli_setup5_t* token, byte 
 
   // fill out token
 
-  byte* packed_reply;
-  int packed_reply_size = pack_nan_int_setup6(&reply, pid, &packed_reply);
-  return mt_send_message(desc, MT_NTYPE_NAN_INT_SETUP6, packed_reply, packed_reply_size);
+  byte* msg;
+  int msg_size = pack_nan_int_setup6(&reply, pid, &msg);
+  int result = mt_send_message(desc, MT_NTYPE_NAN_INT_SETUP6, msg, msg_size);
+  free(msg);
+  return result;
 }
 
 /**************************** Nano Establish ****************************/
@@ -401,9 +460,11 @@ static int handle_nan_rel_estab2(mt_desc_t* desc, nan_rel_estab2_t* token, byte 
 
   // fill out token
 
-  byte* packed_reply;
-  int packed_reply_size = pack_nan_int_estab3(&reply, pid, &packed_reply);
-  return mt_send_message(desc, MT_NTYPE_NAN_INT_ESTAB3, packed_reply, packed_reply_size);
+  byte* msg;
+  int msg_size = pack_nan_int_estab3(&reply, pid, &msg);
+  int result = mt_send_message(desc, MT_NTYPE_NAN_INT_ESTAB3, msg, msg_size);
+  free(msg);
+  return result;
 }
 
 static int handle_nan_rel_estab4(mt_desc_t* desc, nan_rel_estab4_t* token, byte (*pid)[DIGEST_LEN]){
@@ -414,9 +475,11 @@ static int handle_nan_rel_estab4(mt_desc_t* desc, nan_rel_estab4_t* token, byte 
 
   // fill out token
 
-  byte* packed_reply;
-  int packed_reply_size = pack_nan_int_estab5(&reply, pid, &packed_reply);
-  return mt_send_message(desc, MT_NTYPE_NAN_INT_ESTAB5, packed_reply, packed_reply_size);
+  byte* msg;
+  int msg_size = pack_nan_int_estab5(&reply, pid, &msg);
+  int result = mt_send_message(desc, MT_NTYPE_NAN_INT_ESTAB5, msg, msg_size);
+  free(msg);
+  return result;
 }
 
 /************************ Nano Direct Establish *************************/
@@ -429,9 +492,11 @@ static int handle_nan_cli_destab1(mt_desc_t* desc, nan_cli_destab1_t* token, byt
 
   // fill out token
 
-  byte* packed_reply;
-  int packed_reply_size = pack_nan_int_destab2(&reply, pid, &packed_reply);
-  return mt_send_message(desc, MT_NTYPE_NAN_INT_DESTAB2, packed_reply, packed_reply_size);
+  byte* msg;
+  int msg_size = pack_nan_int_destab2(&reply, pid, &msg);
+  int result = mt_send_message(desc, MT_NTYPE_NAN_INT_DESTAB2, msg, msg_size);
+  free(msg);
+  return result;
 }
 
 /**************************** Nano Direct Pay ***************************/
@@ -444,9 +509,11 @@ static int handle_nan_cli_dpay1(mt_desc_t* desc, nan_cli_dpay1_t* token, byte (*
 
   // fill out token
 
-  byte* packed_reply;
-  int packed_reply_size = pack_nan_int_dpay2(&reply, pid, &packed_reply);
-  return mt_send_message(desc, MT_NTYPE_NAN_INT_DPAY2, packed_reply, packed_reply_size);
+  byte* msg;
+  int msg_size = pack_nan_int_dpay2(&reply, pid, &msg);
+  int result = mt_send_message(desc, MT_NTYPE_NAN_INT_DPAY2, msg, msg_size);
+  free(msg);
+  return result;
 }
 
 /******************************* Nano Close *****************************/
@@ -459,9 +526,11 @@ static int handle_nan_end_close1(mt_desc_t* desc, nan_end_close1_t* token, byte 
 
   // fill out token
 
-  byte* packed_reply;
-  int packed_reply_size = pack_nan_int_close2(&reply, pid, &packed_reply);
-  return mt_send_message(desc, MT_NTYPE_NAN_INT_CLOSE2, packed_reply, packed_reply_size);
+  byte* msg;
+  int msg_size = pack_nan_int_close2(&reply, pid, &msg);
+  int result = mt_send_message(desc, MT_NTYPE_NAN_INT_CLOSE2, msg, msg_size);
+  free(msg);
+  return result;
 }
 
 static int handle_nan_end_close3(mt_desc_t* desc, nan_end_close3_t* token, byte (*pid)[DIGEST_LEN]){
@@ -472,9 +541,11 @@ static int handle_nan_end_close3(mt_desc_t* desc, nan_end_close3_t* token, byte 
 
   // fill out token
 
-  byte* packed_reply;
-  int packed_reply_size = pack_nan_int_close4(&reply, pid, &packed_reply);
-  return mt_send_message(desc, MT_NTYPE_NAN_INT_CLOSE4, packed_reply, packed_reply_size);
+  byte* msg;
+  int msg_size = pack_nan_int_close4(&reply, pid, &msg);
+  int result = mt_send_message(desc, MT_NTYPE_NAN_INT_CLOSE4, msg, msg_size);
+  free(msg);
+  return result;
 }
 
 static int handle_nan_end_close5(mt_desc_t* desc, nan_end_close5_t* token, byte (*pid)[DIGEST_LEN]){
@@ -485,9 +556,11 @@ static int handle_nan_end_close5(mt_desc_t* desc, nan_end_close5_t* token, byte 
 
   // fill out token
 
-  byte* packed_reply;
-  int packed_reply_size = pack_nan_int_close6(&reply, pid, &packed_reply);
-  return mt_send_message(desc, MT_NTYPE_NAN_INT_CLOSE6, packed_reply, packed_reply_size);
+  byte* msg;
+  int msg_size = pack_nan_int_close6(&reply, pid, &msg);
+  int result = mt_send_message(desc, MT_NTYPE_NAN_INT_CLOSE6, msg, msg_size);
+  free(msg);
+  return result;
 }
 
 static int handle_nan_end_close7(mt_desc_t* desc, nan_end_close7_t* token, byte (*pid)[DIGEST_LEN]){
@@ -498,9 +571,11 @@ static int handle_nan_end_close7(mt_desc_t* desc, nan_end_close7_t* token, byte 
 
   // fill out token
 
-  byte* packed_reply;
-  int packed_reply_size = pack_nan_int_close8(&reply, pid, &packed_reply);
-  return mt_send_message(desc, MT_NTYPE_NAN_INT_CLOSE8, packed_reply, packed_reply_size);
+  byte* msg;
+  int msg_size = pack_nan_int_close8(&reply, pid, &msg);
+  int result = mt_send_message(desc, MT_NTYPE_NAN_INT_CLOSE8, msg, msg_size);
+  free(msg);
+  return result;
 }
 
 /*************************** Helper Functions ***************************/

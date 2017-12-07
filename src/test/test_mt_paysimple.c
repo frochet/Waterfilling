@@ -1,3 +1,13 @@
+/**
+ * \file test_mt_paysimple.c
+ * \brief Isolated payment module with single client/relay/intermediary
+ *
+ * Run unit tests for as much functionality as possible given a single client,
+ * relay, and intermediary on the same instance of Tor. Descriptors are stored
+ * as static varibales within this module. The moneTor controller interface is
+ * mocked to reroute messages, etc to the corresponding local destinatin.
+ */
+
 #include <stdio.h>
 #include <unistd.h>
 
@@ -24,6 +34,12 @@ static mt_desc_t int_desc;
 static mt_desc_t cur_desc;
 static mt_desc_t old_desc;
 
+/**
+ * Pass a payment module call of <b>send_message<\b> to the given local instance
+ * of a payment module. The variables <b>cur_desc<\b> and <b>old_desc<\b> are
+ * used to track where messages are coming from and going to in order to route
+ * messages properly.
+ */
 static int mock_send_message(mt_desc_t *desc, mt_ntype_t type, byte* msg, int size){
 
   mt_desc_t temp_desc;
@@ -34,6 +50,7 @@ static int mock_send_message(mt_desc_t *desc, mt_ntype_t type, byte* msg, int si
   const char* type_str;
   const char* party_str;
 
+  // assign a string for logging purposes
   switch(type){
     case MT_NTYPE_CHN_END_ESTAB1:
       type_str = "chn_end_estab1";
@@ -199,6 +216,7 @@ static int mock_send_message(mt_desc_t *desc, mt_ntype_t type, byte* msg, int si
       break;
   }
 
+  // assign a string for logging purposes
   switch(old_desc.party){
     case MT_PARTY_AUT:
       party_str = "aut";
@@ -217,6 +235,7 @@ static int mock_send_message(mt_desc_t *desc, mt_ntype_t type, byte* msg, int si
       break;
   }
 
+  // invoke the corresponding recv call and log
   if(cur_desc.id == aut_desc.id && cur_desc.party == MT_PARTY_AUT){
     printf("%s -> aut : %s\n", party_str, type_str);
     return MT_SUCCESS;
@@ -246,6 +265,9 @@ static int mock_send_message(mt_desc_t *desc, mt_ntype_t type, byte* msg, int si
   return MT_ERROR;
 }
 
+/**
+ * Same as send_message but for the special multidesc function
+ */
 static int mock_send_message_multidesc(mt_desc_t *desc1, mt_desc_t* desc2, mt_ntype_t type, byte* msg, int size){
   mt_desc_t temp_desc;
   memcpy(&temp_desc, desc1, sizeof(mt_desc_t));
@@ -262,11 +284,19 @@ static int mock_send_message_multidesc(mt_desc_t *desc1, mt_desc_t* desc2, mt_nt
   return MT_ERROR;
 }
 
+/**
+ * Mock the alert_payment function
+ */
 static int mock_alert_payment(mt_desc_t* desc){
   (void)desc;
   return MT_SUCCESS;
 }
 
+/**
+ * Mock a call to the cpu worker. Of course, no multithreading is actually done;
+ * the requested function is executed and control is passed serially back to the
+ * reply function.
+ */
 static workqueue_entry_t* mock_cpuworker_queue_work(workqueue_priority_t priority,
 						    workqueue_reply_t (*fn)(void*, void*),
 						    int (*reply_fn)(void*), void* arg){
@@ -279,6 +309,9 @@ static workqueue_entry_t* mock_cpuworker_queue_work(workqueue_priority_t priorit
   return (workqueue_entry_t*)1;
 }
 
+/**
+ * Write a file to the disk. File will be in the active directory (tor/)
+ */
 static void write_file(const char* name, void* buf, int size){
   FILE *fp;
   fp = fopen(name, "wb");
@@ -286,6 +319,9 @@ static void write_file(const char* name, void* buf, int size){
   fclose(fp);
 }
 
+/**
+ * Execute paysimple test
+ */
 static void test_mt_paysimple(void *arg){
 
   printf("\n\n------------ begin paysimple ------------\n\n");
@@ -299,7 +335,8 @@ static void test_mt_paysimple(void *arg){
 
   /****************************** Setup **********************************/
 
-  // account infos for each party
+  // declare values to save to the disk
+
   byte pp[MT_SZ_PP];
   byte aut_pk[MT_SZ_PK];
   byte aut_sk[MT_SZ_SK];
@@ -321,9 +358,9 @@ static void test_mt_paysimple(void *arg){
   byte int_sk[MT_SZ_SK];
   int_desc.party = MT_PARTY_INT;
 
-  // fill in account info
-  mt_crypt_setup(&pp);
+  // define values to save to disk
 
+  mt_crypt_setup(&pp);
   mt_crypt_keygen(&pp, &aut_pk, &aut_sk);
   mt_crypt_keygen(&pp, &led_pk, &led_sk);
   mt_crypt_keygen(&pp, &cli_pk, &cli_sk);
@@ -337,7 +374,9 @@ static void test_mt_paysimple(void *arg){
   rel_desc.id = ids++;
   int_desc.id = ids++;
 
-  // write to files TODO: this should be done via torrc instead
+  // write values to disk as separate files in the tor/ directory
+  // TODO: this should go through torcc instead
+
   write_file("mt_config_temp/pp", pp, MT_SZ_PP);
 
   write_file("mt_config_temp/aut_pk", aut_pk, MT_SZ_PK);
@@ -360,7 +399,8 @@ static void test_mt_paysimple(void *arg){
   write_file("mt_config_temp/int_sk", int_sk, MT_SZ_SK);
   write_file("mt_config_temp/int_desc", &int_desc, sizeof(mt_desc_t));
 
-  // calculate ledger addresses
+  // declare and define addresses for ledger interaction
+
   byte aut_addr[MT_SZ_ADDR];
   byte led_addr[MT_SZ_ADDR];
   byte cli_addr[MT_SZ_ADDR];
@@ -373,19 +413,22 @@ static void test_mt_paysimple(void *arg){
   mt_pk2addr(&rel_pk, &rel_addr);
   mt_pk2addr(&int_pk, &int_addr);
 
-  // initialize all payment modules
+  // initialize payment modules
+
   tt_assert(mt_lpay_init() == MT_SUCCESS);
   tt_assert(mt_cpay_init() == MT_SUCCESS);
   tt_assert(mt_ipay_init() == MT_SUCCESS);
   tt_assert(mt_rpay_init() == MT_SUCCESS);
 
+  // extract and save important values in the "public" ledger values
+
   mt_payment_public_t public = mt_lpay_get_payment_public();
   write_file("mt_config_temp/fee", &public.fee, sizeof(public.fee));
 
+  int result; // generic variable to track function call success/failure
 
-  int result;
+  // authority mints money
 
-  // mint money
   int mint_val = 1000 * 100;
   mac_aut_mint_t mint = {.value = mint_val};
   byte mint_id[DIGEST_LEN];
@@ -401,7 +444,8 @@ static void test_mt_paysimple(void *arg){
   result = mt_send_message(&led_desc, MT_NTYPE_MAC_AUT_MINT, signed_mint, signed_mint_size);
   tt_assert(result == MT_SUCCESS);
 
-  // send money to client
+  // send money from authority to client
+
   int cli_trans_val = 500 * 100;
   mac_any_trans_t cli_trans = {.val_to = cli_trans_val, .val_from = cli_trans_val + public.fee};
   memcpy(cli_trans.from, aut_addr, MT_SZ_ADDR);
@@ -418,7 +462,8 @@ static void test_mt_paysimple(void *arg){
   result = mt_send_message(&led_desc, MT_NTYPE_MAC_ANY_TRANS, signed_cli_trans, signed_cli_trans_size);
   tt_assert(result == MT_SUCCESS);
 
-  // send money to relay
+  // send money from authority to relay
+
   int rel_trans_val = 100 * 100;
   mac_any_trans_t rel_trans = {.val_to = rel_trans_val, .val_from = rel_trans_val + public.fee};
   memcpy(rel_trans.from, aut_addr, MT_SZ_ADDR);
@@ -435,7 +480,8 @@ static void test_mt_paysimple(void *arg){
   result = mt_send_message(&led_desc, MT_NTYPE_MAC_ANY_TRANS, signed_rel_trans, signed_rel_trans_size);
   tt_assert(result == MT_SUCCESS);
 
-  // send money to intermediary
+  // send money from authority to intermediary
+
   int int_trans_val = 100 * 100;
   mac_any_trans_t int_trans = {.val_to = int_trans_val, .val_from = int_trans_val + public.fee};
   memcpy(int_trans.from, aut_addr, MT_SZ_ADDR);
@@ -452,46 +498,59 @@ static void test_mt_paysimple(void *arg){
   result = mt_send_message(&led_desc, MT_NTYPE_MAC_ANY_TRANS, signed_int_trans, signed_int_trans_size);
   tt_assert(result == MT_SUCCESS);
 
-  // make sure balances are correct
+  // make sure balances are what we expect them to be
+
   tt_assert(mt_lpay_query_mac_balance(&cli_addr) == cli_trans_val);
   tt_assert(mt_lpay_query_mac_balance(&rel_addr) == rel_trans_val);
   tt_assert(mt_lpay_query_mac_balance(&int_addr) == int_trans_val);
 
   /**************************** Protocol Tests ***************************/
 
-  // pay relay
+  // send payments to a relay through the intermediary
+
   for(int i = 0; i < 10; i++){
     printf("\n");
     memcpy(&cur_desc, &cli_desc, sizeof(mt_desc_t));
     tt_assert(mt_cpay_pay(&rel_desc, &int_desc) == MT_SUCCESS);
   }
 
-  // close channel
+  // close the channel
+
   printf("\n");
   memcpy(&cur_desc, &cli_desc, sizeof(mt_desc_t));
   tt_assert(mt_cpay_close(&rel_desc, &int_desc) == MT_SUCCESS);
 
-  // pay intermediary
+  // send direct payments to the intermediary
+
   for(int i = 0; i < 10; i++){
     printf("\n");
     memcpy(&cur_desc, &cli_desc, sizeof(mt_desc_t));
     tt_assert(mt_cpay_pay(&int_desc, &int_desc) == MT_SUCCESS);
   }
 
-  // close channel
+  // close the channel
+
   printf("\n");
   memcpy(&cur_desc, &cli_desc, sizeof(mt_desc_t));
   tt_assert(mt_cpay_close(&int_desc, &int_desc) == MT_SUCCESS);
 
+  printf("\n-------------- end paysimple ------------\n\n");
+
  done:;
+
   UNMOCK(mt_send_message);
   UNMOCK(mt_send_message_multidesc);
   UNMOCK(mt_alert_payment);
   UNMOCK(cpuworker_queue_work);
 
-
-  printf("\n-------------- end paysimple ------------\n\n");
-
+  free(signed_mint);
+  free(packed_mint);
+  free(packed_cli_trans);
+  free(signed_cli_trans);
+  free(packed_rel_trans);
+  free(signed_rel_trans);
+  free(packed_int_trans);
+  free(signed_int_trans);
 }
 
 struct testcase_t mt_paysimple_tests[] = {

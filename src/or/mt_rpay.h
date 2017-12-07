@@ -11,13 +11,13 @@
 #include "mt_tokens.h"
 
 /**
- * Initialize a relay instance given public parameters, a currency
- * keypair, and a list of channels associated with the keypair.
+ * Initialize the module; should only be called once. All necessary variables
+ * will be loaded from the torrc configuration file.
  */
 int mt_rpay_init(void);
 
 /**
- * Handle an incoming message. Requires the message sender, type, and size.
+ * Handle an incoming message from the given descriptor
  */
 int mt_rpay_recv(mt_desc_t* desc, mt_ntype_t type, byte* msg, int size);
 
@@ -26,10 +26,5 @@ int mt_rpay_recv(mt_desc_t* desc, mt_ntype_t type, byte* msg, int size);
  * messages, we need to consider not one but two descriptors
  */
 int mt_rpay_recv_multidesc(mt_desc_t* client, mt_desc_t* intermediary, mt_ntype_t type, byte* msg, int size);
-
-/**
- * Notify the payment module that a descriptor connection is read
- */
-int mt_rpay_notify_connect(mt_desc_t* desc);
 
 #endif

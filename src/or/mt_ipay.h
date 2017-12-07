@@ -9,12 +9,13 @@
 #include "or.h"
 
 /**
- * Initialize the intermediary payment module
+ * Initialize the module; should only be called once. All necessary variables
+ * will be loaded from the torrc configuration file.
  */
 int mt_ipay_init(void);
 
 /**
- * Handle an incoming message. Requires the message sender, type, and size.
+ * Handle an incoming message from the given descriptor
  */
 int mt_ipay_recv(mt_desc_t* desc, mt_ntype_t type, byte* msg, int size);
 
