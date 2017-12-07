@@ -6,15 +6,12 @@
 #include<pthread.h>
 
 #include "or.h"
+#include "cpuworker.h"
 #include "workqueue.h"
 #include "mt_common.h"
 #include "mt_rpay.h"
 
-typedef enum {
-  MT_ZKP_STATE_NONE,
-  MT_ZKP_STATE_STARTED,
-  MT_ZKP_STATE_READY,
-} mt_zkp_state_t;
+typedef void (*work_task)(void*);
 
 typedef struct {
   int (*fn)(mt_desc_t*, mt_ntype_t, byte*, int);
@@ -30,9 +27,12 @@ typedef struct {
   chn_end_data_t data;
 
   mt_callback_t callback;
-  mt_zkp_state_t zkp_state;
-
 } mt_channel_t;
+
+typedef struct {
+  mt_channel_t* chn;
+  byte pid[DIGEST_LEN];
+} mt_wcom_args_t;
 
 /**
  * Single instance of a relay payment object
@@ -76,6 +76,12 @@ static int handle_nan_int_close6(mt_desc_t* desc, nan_int_close6_t* token, byte 
 static int handle_nan_int_close8(mt_desc_t* desc, nan_int_close8_t* token, byte (*pid)[DIGEST_LEN]);
 
 // helper functions
+static int help_chn_end_estab1(void* args);
+static int help_chn_int_estab4(void* args);
+static int help_nan_int_close8(void *args);
+
+static workqueue_reply_t wcom_task(void* thread, void* arg);
+
 static mt_channel_t* new_channel(void);
 static void digestmap_smartlist_append(digestmap_t* map, char* key, void* val);
 static void* digestmap_smartlist_pop_last(digestmap_t* map, char* key);
@@ -293,7 +299,22 @@ static int handle_any_led_confirm(mt_desc_t* desc, any_led_confirm_t* token, byt
 
 static int init_chn_end_estab1(mt_channel_t* chn, byte (*pid)[DIGEST_LEN]){
 
-  // ZKP
+  mt_wcom_args_t* args = tor_malloc(sizeof(mt_wcom_args_t));
+  args->chn = chn;
+  memcpy(args->pid, *pid, DIGEST_LEN);
+
+  if(!cpuworker_queue_work(WQ_PRI_HIGH, wcom_task, (work_task)help_chn_end_estab1, args))
+    return MT_ERROR;
+  return MT_SUCCESS;
+
+}
+
+static int help_chn_end_estab1(void* args){
+
+  mt_channel_t* chn = ((mt_wcom_args_t*)args)->chn;
+  byte pid[DIGEST_LEN];
+  memcpy(pid, ((mt_wcom_args_t*)args)->pid, DIGEST_LEN);
+  free(args);
 
   chn_end_estab1_t token;
 
@@ -301,7 +322,7 @@ static int init_chn_end_estab1(mt_channel_t* chn, byte (*pid)[DIGEST_LEN]){
 
   // send message
   byte* msg;
-  int msg_size = pack_chn_end_estab1(&token, pid, &msg);
+  int msg_size = pack_chn_end_estab1(&token, &pid, &msg);
   return mt_send_message(&chn->idesc, MT_NTYPE_CHN_END_ESTAB1, msg, msg_size);
 }
 
@@ -310,9 +331,6 @@ static int handle_chn_int_estab2(mt_desc_t* desc, chn_int_estab2_t* token, byte 
   (void)desc;
 
   // check validity of incoming message;
-
-  // TODO assign channel or setup new micro channel if none exists
-  //    put the channel in transition
 
   chn_end_estab3_t reply;
 
@@ -337,9 +355,27 @@ static int handle_chn_int_estab4(mt_desc_t* desc, chn_int_estab4_t* token, byte 
 
   // check validity of incoming message;
 
+  // prepare nanopayment channel token now
+  mt_wcom_args_t* args = tor_malloc(sizeof(mt_wcom_args_t));
+  args->chn = chn;
+  memcpy(args->pid, *pid, DIGEST_LEN);
+
+  if(!cpuworker_queue_work(WQ_PRI_HIGH, wcom_task, (work_task)help_chn_int_estab4, args))
+    return MT_ERROR;
+  return MT_SUCCESS;
+}
+
+static int help_chn_int_estab4(void* args){
+
+  // extract parameters
+  mt_channel_t* chn = ((mt_wcom_args_t*)args)->chn;
+  byte pid[DIGEST_LEN];
+  memcpy(pid, ((mt_wcom_args_t*)args)->pid, DIGEST_LEN);
+  free(args);
+
   byte digest[DIGEST_LEN];
   mt_desc2digest(&chn->idesc, &digest);
-  digestmap_remove(relay.chns_transition, (char*)*pid);
+  digestmap_remove(relay.chns_transition, (char*)pid);
   digestmap_smartlist_append(relay.chns_estab, (char*)digest, chn);
 
   if(chn->callback.fn){
@@ -348,6 +384,7 @@ static int handle_chn_int_estab4(mt_desc_t* desc, chn_int_estab4_t* token, byte 
   }
   return MT_SUCCESS;
 }
+
 
 /****************************** Nano Establish **************************/
 
@@ -403,6 +440,8 @@ static int handle_nan_cli_estab1(mt_desc_t* desc, nan_cli_estab1_t* token, byte 
   chn->callback.arg4 = pack_nan_cli_estab1(token, pid, &chn->callback.arg3);
   return init_chn_end_setup(chn, &rpid);
 }
+
+
 
 static int handle_nan_int_estab3(mt_desc_t* desc, nan_int_estab3_t* token, byte (*pid)[DIGEST_LEN]){
   (void)token;
@@ -592,22 +631,33 @@ static int handle_nan_int_close8(mt_desc_t* desc, nan_int_close8_t* token, byte 
 
   // check validity of incoming message;
 
+
+  mt_wcom_args_t* args = tor_malloc(sizeof(mt_wcom_args_t));
+  args->chn = chn;
+  memcpy(args->pid, *pid, DIGEST_LEN);
+
+  if(!cpuworker_queue_work(WQ_PRI_HIGH, wcom_task, (work_task)help_nan_int_close8, args))
+    return MT_ERROR;
+  return MT_SUCCESS;
+
+}
+
+static int help_nan_int_close8(void *args){
+  mt_channel_t* chn = ((mt_wcom_args_t*)args)->chn;
+  byte pid[DIGEST_LEN];
+  memcpy(pid, ((mt_wcom_args_t*)args)->pid, DIGEST_LEN);
+  free(args);
+
   byte digest[DIGEST_LEN];
-  mt_desc2digest(desc, &digest);
-  digestmap_remove(relay.chns_transition, (char*)*pid);
+  mt_desc2digest(&chn->idesc, &digest);
+  digestmap_remove(relay.chns_transition, (char*)pid);
   digestmap_set(relay.nans_estab, (char*)digest, chn);
 
-  // ZKP
-
-  /****************************************************************/
-  // Wrap this in helper that gets called afterwards
   if(chn->callback.fn){
     mt_callback_t cb = chn->callback;
     return cb.fn(&cb.dref1, cb.arg2, cb.arg3, cb.arg4);
   }
   return MT_SUCCESS;
-
-  /****************************************************************/
 }
 
 /*************************** Helper Functions ***************************/
@@ -640,4 +690,15 @@ static void* digestmap_smartlist_pop_last(digestmap_t* map, char* key){
   if(!list)
     return NULL;
   return smartlist_pop_last(list);
+}
+
+static workqueue_reply_t wcom_task(void* thread, void* args){
+  (void)thread;
+
+  // extract parameters
+  mt_channel_t* chn = ((mt_wcom_args_t*)args)->chn;
+  (void)chn;
+
+  // call mt_commit_wallet here
+  return WQ_RPL_REPLY;
 }

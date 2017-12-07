@@ -13,6 +13,8 @@
 
 #define INIT_CHN_BALANCE 10 * 100;
 
+typedef void (*work_task)(void*);
+
 typedef struct {
   // callback function
   int (*fn)(mt_desc_t*, mt_desc_t*);
@@ -22,20 +24,18 @@ typedef struct {
   mt_desc_t dref2;
 } mt_callback_t;
 
-typedef enum {
-  MT_ZKP_STATE_NONE,
-  MT_ZKP_STATE_STARTED,
-  MT_ZKP_STATE_READY,
-} mt_zkp_state_t;
-
 typedef struct {
   mt_desc_t rdesc;
   mt_desc_t idesc;
   chn_end_data_t data;
 
-  mt_zkp_state_t zkp_state;
   mt_callback_t callback;
 } mt_channel_t;
+
+typedef struct {
+  mt_channel_t* chn;
+  byte pid[DIGEST_LEN];
+} mt_wcom_args_t;
 
 /**
  * Single instance of a client payment object
@@ -90,14 +90,14 @@ static int handle_nan_int_close8(mt_desc_t* desc, nan_int_close8_t* token, byte 
 
 // helper functions that are called after workqueued zkp proof is generated
 static int help_chn_end_estab1(void* args);
-static int help_nan_cli_setup1(void* args);
+static int help_chn_int_estab4(void* args);
 static int help_nan_int_close8(void* args);
 
 // private helper functions
 static int compare_chn_end_data(const void** a, const void** b);
 static mt_channel_t* smartlist_search_idesc(smartlist_t* list, mt_desc_t* desc);
 
-static workqueue_reply_t wallet_make(void* thread, void* arg);
+static workqueue_reply_t wcom_task(void* thread, void* arg);
 static void wallet_reply(void* arg);
 
 static int mt_pay_notify(mt_desc_t* rdesc, mt_desc_t* idesc);
@@ -436,27 +436,31 @@ static int handle_any_led_confirm(mt_desc_t* desc, any_led_confirm_t* token, byt
 
 static int init_chn_end_estab1(mt_channel_t* chn, byte (*pid)[DIGEST_LEN]){
 
-  // ZKP
+  mt_wcom_args_t* args = tor_malloc(sizeof(mt_wcom_args_t));
+  args->chn = chn;
+  memcpy(args->pid, *pid, DIGEST_LEN);
 
-  /****************************************************************/
-  // Wrap this in helper that gets called afterwards
+  if(!cpuworker_queue_work(WQ_PRI_HIGH, wcom_task, (work_task)help_chn_end_estab1, args))
+    return MT_ERROR;
+  return MT_SUCCESS;
+}
+
+static int help_chn_end_estab1(void* args){
+
+  // extract parameters
+  mt_channel_t* chn = ((mt_wcom_args_t*)args)->chn;
+  byte pid[DIGEST_LEN];
+  memcpy(pid, ((mt_wcom_args_t*)args)->pid, DIGEST_LEN);
+  free(args);
+
   chn_end_estab1_t token;
 
   // TODO finish making token;
 
   // send message
   byte* msg;
-  int msg_size = pack_chn_end_estab1(&token, pid, &msg);
-  mt_send_message(&chn->idesc, MT_NTYPE_CHN_END_ESTAB1, msg, msg_size);
-
-  return MT_SUCCESS;
-  /****************************************************************/
-}
-
-static int help_chn_end_estab1(void* args){
-  (void)args;
-  // finish chn_end_estab1
-  return 0;
+  int msg_size = pack_chn_end_estab1(&token, &pid, &msg);
+  return mt_send_message(&chn->idesc, MT_NTYPE_CHN_END_ESTAB1, msg, msg_size);
 }
 
 static int handle_chn_int_estab2(mt_desc_t* desc, chn_int_estab2_t* token, byte (*pid)[DIGEST_LEN]){
@@ -491,7 +495,28 @@ static int handle_chn_int_estab4(mt_desc_t* desc, chn_int_estab4_t* token, byte 
     return MT_ERROR;
   }
 
-  digestmap_remove(client.chns_transition, (char*)*pid);
+  // check validity of incoming message;
+
+  // prepare nanopayment channel token now
+  mt_wcom_args_t* args = tor_malloc(sizeof(mt_wcom_args_t));
+  args->chn = chn;
+  memcpy(args->pid, *pid, DIGEST_LEN);
+
+  if(!cpuworker_queue_work(WQ_PRI_HIGH, wcom_task, (work_task)help_chn_int_estab4, args))
+    return MT_ERROR;
+  return MT_SUCCESS;
+}
+
+static int help_chn_int_estab4(void* args){
+
+  // extract parameters
+  mt_channel_t* chn = ((mt_wcom_args_t*)args)->chn;
+  byte pid[DIGEST_LEN];
+  memcpy(pid, ((mt_wcom_args_t*)args)->pid, DIGEST_LEN);
+  free(args);
+
+  // save token to channel
+  digestmap_remove(client.chns_transition, (char*)pid);
   smartlist_add(client.chns_estab, chn);
 
   // check validity of incoming message
@@ -507,40 +532,10 @@ static int init_nan_cli_setup1(mt_channel_t* chn, byte (*pid)[DIGEST_LEN]){
   // intiate token
   nan_cli_setup1_t token;
 
-  /****************************************************************/
-  // Wrap this in helper that gets called afterwards
-
-  // ZKP
-
-  // need to figure out this zkp generating business
-  /* // if we have not started making the token then start making it */
-  /* if(chn->zkp_state == MT_ZKP_STATE_NONE){ */
-  /*   mt_desc_t* arg = malloc(sizeof(mt_desc_t)); */
-  /*   memcpy(arg, desc, sizeof(mt_desc_t)); */
-
-  /*   // fn is going to call commit wallet */
-  /*   // reply_fn is going to call notify */
-  /*   printf("got here\n"); */
-  /*   workqueue_entry_t* entry = cpuworker_queue_work(WQ_PRI_HIGH, wallet_make, wallet_reply, arg); */
-  /*   printf("but not here\n"); */
-  /*   if(entry == NULL) */
-  /*     return MT_ERROR; */
-  /*   return MT_SUCCESS; */
-  /* } */
-  /****************************************************************/
-
   // send message
   byte* msg;
   int msg_size = pack_nan_cli_setup1(&token, pid, &msg);
-  mt_send_message(&chn->idesc, MT_NTYPE_NAN_CLI_SETUP1, msg, msg_size);
-
-  return MT_SUCCESS;
-}
-
-static int help_nan_cli_setup1(void* args){
-  (void)args;
-  // finish making setup
-  return 0;
+  return mt_send_message(&chn->idesc, MT_NTYPE_NAN_CLI_SETUP1, msg, msg_size);
 }
 
 static int handle_nan_int_setup2(mt_desc_t* desc, nan_int_setup2_t* token, byte (*pid)[DIGEST_LEN]){
@@ -609,8 +604,6 @@ static int handle_nan_int_setup6(mt_desc_t* desc, nan_int_setup6_t* token, byte 
 /**************************** Nano Establish ****************************/
 
 static int init_nan_cli_estab1(mt_channel_t* chn, byte (*pid)[DIGEST_LEN]){
-
-  // add new protocol to chns_transition
 
   // intiate token
   nan_cli_estab1_t token;
@@ -871,32 +864,35 @@ static int handle_nan_int_close8(mt_desc_t* desc, nan_int_close8_t* token, byte 
   (void)token;
   (void)desc;
 
-  /****************************************************************/
-  // Wrap this in helper that gets called afterwards
-  // ZKP -> callback to nobody?
-
   mt_channel_t* chn = digestmap_get(client.chns_transition, (char*)*pid);
   if(chn == NULL){
     log_debug(LD_MT, "protocol id not recognized");
     return MT_ERROR;
   }
 
-  // check validity incoming message
+  // validate token
 
-  byte digest[DIGEST_LEN];
-  mt_desc2digest(desc, &digest);
-  digestmap_remove(client.chns_transition, (char*)*pid);
+  mt_wcom_args_t* args = tor_malloc(sizeof(mt_wcom_args_t));
+  args->chn = chn;
+  memcpy(args->pid, *pid, DIGEST_LEN);
+
+  if(!cpuworker_queue_work(WQ_PRI_HIGH, wcom_task, (work_task)help_nan_int_close8, args))
+    return MT_ERROR;
+  return MT_SUCCESS;
+}
+
+static int help_nan_int_close8(void* args){
+  mt_channel_t* chn = ((mt_wcom_args_t*)args)->chn;
+  byte pid[DIGEST_LEN];
+  memcpy(pid, ((mt_wcom_args_t*)args)->pid, DIGEST_LEN);
+  free(args);
+
+  digestmap_remove(client.chns_transition, (char*)pid);
   smartlist_add(client.nans_setup, chn);
 
   if(chn->callback.fn != NULL)
     return chn->callback.fn(&chn->callback.dref1, &chn->callback.dref2);
   return MT_SUCCESS;
-  /****************************************************************/
-}
-
-static int help_nan_int_close8(void* args){
-  (void)args;
-  return 0;
 }
 
 /***************************** Helper Functions *************************/
@@ -925,18 +921,15 @@ static int compare_chn_end_data(const void** a, const void** b){
   return MT_SUCCESS;
 }
 
-static workqueue_reply_t wallet_make(void* thread, void* arg){
-  //unpack wallet to components and call make wallet
+static workqueue_reply_t wcom_task(void* thread, void* args){
   (void)thread;
-  (void)arg;
 
-  workqueue_reply_t reply = WQ_RPL_REPLY;
-  return reply;
-}
+  // extract parameters
+  mt_channel_t* chn = ((mt_wcom_args_t*)args)->chn;
+  (void)chn;
 
-static void wallet_reply(void* arg){
-  (void)arg;
-  //extract callback from arg and call it
+  // call mt_commit_wallet here
+  return WQ_RPL_REPLY;
 }
 
 static int mt_pay_notify(mt_desc_t* rdesc, mt_desc_t* idesc){

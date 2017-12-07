@@ -2,6 +2,8 @@
 #include <unistd.h>
 
 #include "or.h"
+#include "workqueue.h"
+#include "cpuworker.h"
 #include "mt_crypto.h"
 #include "mt_tokens.h"
 #include "mt_common.h"
@@ -256,11 +258,25 @@ static int mock_send_message_multidesc(mt_desc_t *desc1, mt_desc_t* desc2, mt_nt
     printf("cli - >rel : nan_cli_estab1\n");
     return mt_rpay_recv_multidesc(&old_desc, desc2, type, msg, size);
   }
+
+  return MT_ERROR;
 }
 
 static int mock_alert_payment(mt_desc_t* desc){
   (void)desc;
   return MT_SUCCESS;
+}
+
+static workqueue_entry_t* mock_cpuworker_queue_work(workqueue_priority_t priority,
+						    workqueue_reply_t (*fn)(void*, void*),
+						    int (*reply_fn)(void*), void* arg){
+  (void)priority;
+  threadpool_t* threadpool = NULL;
+  if(fn(threadpool, arg) != WQ_RPL_REPLY)
+    return NULL;
+  if(reply_fn(arg) != MT_SUCCESS)
+    return NULL;
+  return (workqueue_entry_t*)1;
 }
 
 static void write_file(const char* name, void* buf, int size){
@@ -279,6 +295,7 @@ static void test_mt_paysimple(void *arg){
   MOCK(mt_send_message, mock_send_message);
   MOCK(mt_send_message_multidesc, mock_send_message_multidesc);
   MOCK(mt_alert_payment, mock_alert_payment);
+  MOCK(cpuworker_queue_work, mock_cpuworker_queue_work);
 
   /****************************** Setup **********************************/
 
@@ -468,7 +485,10 @@ static void test_mt_paysimple(void *arg){
 
  done:;
   UNMOCK(mt_send_message);
+  UNMOCK(mt_send_message_multidesc);
   UNMOCK(mt_alert_payment);
+  UNMOCK(cpuworker_queue_work);
+
 
   printf("\n-------------- end paysimple ------------\n\n");
 
