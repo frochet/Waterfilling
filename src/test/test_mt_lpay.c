@@ -1,4 +1,5 @@
 #pragma GCC diagnostic ignored "-Wswitch-enum"
+#pragma GCC diagnostic ignored "-Wstack-protector"
 
 #include <string.h>
 #include <stdio.h>

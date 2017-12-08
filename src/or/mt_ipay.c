@@ -60,7 +60,7 @@ typedef struct {
   byte addr[MT_SZ_ADDR];
 
   mt_desc_t edesc;
-  chn_int_chntok_t chn_token;
+  chn_int_public_t chn_public;
 
   mt_callback_t callback;
 } mt_channel_t;
@@ -73,6 +73,8 @@ typedef struct {
   byte pk[MT_SZ_PK];
   byte sk[MT_SZ_SK];
   byte addr[MT_SZ_ADDR];
+  int mac_balance;
+  int chn_balance;
 
   mt_desc_t ledger;
   int fee;
@@ -80,10 +82,11 @@ typedef struct {
   chn_int_state_t chn_state;
   nan_int_state_t nan_state;
 
-  digestmap_t* chns_setup;       // desc -> chn
-  digestmap_t* chns_estab;       // desc -> chn
+  digestmap_t* chns_setup;       // digest(edesc) -> chn
+  digestmap_t* chns_estab;       // digest(edesc) -> chn
 
   digestmap_t* chns_transition;  // proto_id -> chn
+
 } mt_ipay_t;
 
 
@@ -124,6 +127,7 @@ int mt_ipay_init(void){
   byte sk[MT_SZ_SK];
   mt_desc_t ledger;
   int fee;
+  int int_bal;
 
   /********************************************************************/
   //TODO replace with torrc
@@ -150,6 +154,10 @@ int mt_ipay_init(void){
   tor_assert(fread(&fee, 1, sizeof(fee), fp) == sizeof(fee));
   fclose(fp);
 
+  fp = fopen("mt_config_temp/int_bal", "rb");
+  tor_assert(fread(&int_bal, 1, sizeof(int_bal), fp) == sizeof(int_bal));
+  fclose(fp);
+
   /********************************************************************/
 
 
@@ -160,12 +168,15 @@ int mt_ipay_init(void){
   mt_pk2addr(&intermediary.pk, &intermediary.addr);
   intermediary.ledger = ledger;
   intermediary.fee = fee;
+  intermediary.mac_balance = int_bal;
+  intermediary.chn_balance = 0;
 
   // initialize channel containers
   intermediary.chns_setup = digestmap_new();
   intermediary.chns_estab = digestmap_new();
   intermediary.chns_transition = digestmap_new();
 
+  intermediary.nan_state.map = digestmap_new();
   return MT_SUCCESS;
 }
 
@@ -284,17 +295,35 @@ int mt_ipay_recv(mt_desc_t* desc, mt_ntype_t type, byte* msg, int size){
   return result;
 }
 
+/**
+ * Return the balance of available money to spend as macropayments
+ */
+int mt_ipay_mac_balance(void){
+  return intermediary.mac_balance;
+}
+
+/**
+ * Return the balance of money locked up in channels
+ */
+int mt_ipay_chn_balance(void){
+  return intermediary.chn_balance;
+}
+
 /**************************** Initialize Protocols **********************/
 
 static int init_chn_int_setup(mt_channel_t* chn, byte (*pid)[DIGEST_LEN]){
 
   // initialize setup token
   chn_int_setup_t token;
-  token.val_from = 50 + intermediary.fee;
-  token.val_to = 50;
+  token.val_from = MT_INT_CHN_VAL + intermediary.fee;
+  token.val_to = MT_INT_CHN_VAL;
   memcpy(token.from, intermediary.addr, MT_SZ_ADDR);
   memcpy(token.chn, chn->addr, MT_SZ_ADDR);
   // ignore channel token for now
+
+  // update balances;
+  intermediary.mac_balance -= token.val_from;
+  intermediary.chn_balance += token.val_to;
 
   // send setup message
   byte* msg;
@@ -311,8 +340,6 @@ static int init_chn_int_setup(mt_channel_t* chn, byte (*pid)[DIGEST_LEN]){
 /******************************* Channel Escrow *************************/
 
 static int handle_any_led_confirm(mt_desc_t* desc, any_led_confirm_t* token, byte (*pid)[DIGEST_LEN]){
-  (void)token;
-  (void)desc;
 
   mt_channel_t* chn = digestmap_get(intermediary.chns_transition, (char*)*pid);
   if(chn == NULL){
@@ -320,7 +347,11 @@ static int handle_any_led_confirm(mt_desc_t* desc, any_led_confirm_t* token, byt
     return MT_ERROR;
   }
 
-  // check validity of incoming message
+  if(desc->id != intermediary.ledger.id || desc->party != MT_PARTY_LED)
+    return MT_ERROR;
+
+  if(token->success != MT_CODE_SUCCESS)
+    return MT_ERROR;
 
   // move channel to chns_setup
   byte digest[DIGEST_LEN];
@@ -351,7 +382,7 @@ static int handle_chn_end_estab1(mt_desc_t* desc, chn_end_estab1_t* token, byte 
   mt_crypt_rand(DIGEST_LEN, ipid);
 
   // if existing channel is setup with this address then start establish protocol
-  if((chn = digestmap_remove(intermediary.chns_setup, (char*)digest)) != NULL){
+  if((chn = digestmap_remove(intermediary.chns_setup, (char*)digest))){
     digestmap_set(intermediary.chns_transition, (char*)pid, chn);
     chn->callback.fn = NULL;
 
@@ -403,9 +434,12 @@ static int handle_chn_end_estab3(mt_desc_t* desc, chn_end_estab3_t* token, byte 
 /******************************** Nano Setup ****************************/
 
 static int handle_nan_cli_setup1(mt_desc_t* desc, nan_cli_setup1_t* token, byte (*pid)[DIGEST_LEN]){
-  (void)token;
 
-  // verify token validity
+  byte digest[DIGEST_LEN];
+  mt_nanpub2digest(&token->nan_public, &digest);
+
+  nan_end_state_t* end_state = tor_calloc(1, sizeof(nan_end_state_t));
+  digestmap_set(intermediary.nan_state.map, (char*)digest, end_state);
 
   nan_int_setup2_t reply;
 
@@ -454,6 +488,7 @@ static int handle_nan_cli_setup5(mt_desc_t* desc, nan_cli_setup5_t* token, byte 
 
 static int handle_nan_rel_estab2(mt_desc_t* desc, nan_rel_estab2_t* token, byte (*pid)[DIGEST_LEN]){
   (void)token;
+
   // verify token validity
 
   nan_int_estab3_t reply;
@@ -486,6 +521,7 @@ static int handle_nan_rel_estab4(mt_desc_t* desc, nan_rel_estab4_t* token, byte 
 
 static int handle_nan_cli_destab1(mt_desc_t* desc, nan_cli_destab1_t* token, byte (*pid)[DIGEST_LEN]){
   (void)token;
+
   // verify token validity
 
   nan_int_destab2_t reply;
@@ -503,11 +539,26 @@ static int handle_nan_cli_destab1(mt_desc_t* desc, nan_cli_destab1_t* token, byt
 
 static int handle_nan_cli_dpay1(mt_desc_t* desc, nan_cli_dpay1_t* token, byte (*pid)[DIGEST_LEN]){
   (void)token;
+
   // verify token validity
+
+  byte digest[DIGEST_LEN];
+  mt_nanpub2digest(&token->nan_public, &digest);
+
+  nan_end_state_t* end_state = digestmap_get(intermediary.nan_state.map, (char*)digest);
+  if(!end_state){
+    log_debug(LD_MT, "nanopayment channel not recognized");
+    return MT_ERROR;
+  }
+
+  intermediary.chn_balance += token->nan_public.val_from;
+  end_state->num_payments ++;
 
   nan_int_dpay2_t reply;
 
   // fill out token
+
+  mt_alert_payment(desc);
 
   byte* msg;
   int msg_size = pack_nan_int_dpay2(&reply, pid, &msg);
@@ -523,8 +574,22 @@ static int handle_nan_end_close1(mt_desc_t* desc, nan_end_close1_t* token, byte 
   // verify token validity
 
   nan_int_close2_t reply;
-
   // fill out token
+
+  byte digest[DIGEST_LEN];
+  mt_nanpub2digest(&token->nan_public, &digest);
+
+  nan_end_state_t* end_state = digestmap_get(intermediary.nan_state.map, (char*)digest);
+  if(!end_state){
+    log_debug(LD_MT, "nanopayment channel not recognized");
+    return MT_ERROR;
+  }
+
+  // if channel was NOT a direct payment then update balance
+  if(end_state->num_payments == 0){
+    printf("whyyyy is this happening\n");
+    intermediary.chn_balance += token->total_val;
+  }
 
   byte* msg;
   int msg_size = pack_nan_int_close2(&reply, pid, &msg);

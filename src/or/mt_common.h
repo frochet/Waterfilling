@@ -48,6 +48,11 @@ int mt_pk2addr(byte (*pk)[MT_SZ_PK], byte (*addr_out)[MT_SZ_ADDR]);
 void mt_desc2digest(mt_desc_t* desc, byte (*digest_out)[DIGEST_LEN]);
 
 /**
+ * Convert a moneTor nan_any_public_t into a digest for digestmap_t
+ */
+void mt_nanpub2digest(nan_any_public_t* token, byte (*digest_out)[DIGEST_LEN]);
+
+/**
  * Convert an mt address into a printable hexidecimal c-string
  */
 int mt_addr2hex(byte (*addr)[MT_SZ_ADDR], char (*hex_out)[MT_SZ_ADDR * 2 + 3]);
