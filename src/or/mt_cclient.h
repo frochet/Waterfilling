@@ -64,6 +64,11 @@ intermediary_t* mt_cclient_get_intermediary_from_ocirc(origin_circuit_t* circ);
 
 void mt_cclient_launch_payment(origin_circuit_t* circ);
 
+/**
+ * Interface to send payment message from a client related role
+ */
+int mt_cclient_send_message(mt_desc_t  *desc, mt_ntype_t type,
+    byte* msg, int size);
 /****************************************************************************/
 
 /*

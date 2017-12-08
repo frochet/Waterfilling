@@ -5712,7 +5712,7 @@ typedef enum {
   MT_NTYPE_MIC_CLI_PAY3,	       // to intermediary
   MT_NTYPE_MIC_INT_PAY4,	       // to client
   MT_NTYPE_MIC_CLI_PAY5,	       // to relay
-  MT_NTYPE_MIC_REV_PAY6,	       // to intermediary
+  MT_NTYPE_MIC_REL_PAY6,	       // to intermediary
   MT_NTYPE_MIC_INT_PAY7,	       // to client
   MT_NTYPE_MIC_INT_PAY8,	       // to relay
 

@@ -1335,6 +1335,14 @@ dir_server_mode(const or_options_t *options)
     (server_mode(options) && router_has_bandwidth_to_be_dirserver(options));
 }
 
+/** Return 1 if we are configured to be an intermediary, if not return 0
+ */
+int
+intermediary_mode(const or_options_t *options)
+{
+  return options->Intermediary && server_mode(options);
+}
+
 /** Look at a variety of factors, and return 0 if we don't want to
  * advertise the fact that we have a DirPort open or begindir support, else
  * return 1.

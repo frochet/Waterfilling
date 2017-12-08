@@ -149,7 +149,7 @@ int pack_mic_cli_pay5(mic_cli_pay5_t* token, byte(*pid)[DIGEST_LEN], byte** str_
 }
 
 int pack_mic_rev_pay6(mic_rev_pay6_t* token, byte(*pid)[DIGEST_LEN], byte** str_out){
-    return pack_token(MT_NTYPE_MIC_REV_PAY6, token, sizeof(*token), pid, str_out);
+    return pack_token(MT_NTYPE_MIC_REL_PAY6, token, sizeof(*token), pid, str_out);
 }
 
 int pack_mic_int_pay7(mic_int_pay7_t* token, byte(*pid)[DIGEST_LEN], byte** str_out){
@@ -412,7 +412,7 @@ int unpack_mic_cli_pay5(byte* str, int size, mic_cli_pay5_t* tkn_out, byte(*pid_
 int unpack_mic_rev_pay6(byte* str, int size, mic_rev_pay6_t* tkn_out, byte(*pid_out)[DIGEST_LEN]){
   if(size != sizeof(mt_ntype_t) + sizeof(*tkn_out) + DIGEST_LEN)
     return MT_ERROR;
-  return unpack_token(MT_NTYPE_MIC_REV_PAY6, str, sizeof(*tkn_out), tkn_out, pid_out);
+  return unpack_token(MT_NTYPE_MIC_REL_PAY6, str, sizeof(*tkn_out), tkn_out, pid_out);
 }
 
 int unpack_mic_int_pay7(byte* str, int size, mic_int_pay7_t* tkn_out, byte(*pid_out)[DIGEST_LEN]){

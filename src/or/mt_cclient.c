@@ -438,6 +438,21 @@ mt_cclient_intermediary_circ_has_opened(origin_circuit_t *circ) {
 
   /*XXX MoneTor - What do we do? notify payment, wait to full establishement of all circuits?*/
 }
+
+/**
+ * Sending messages to intermediaries, relays and ledgers
+ */
+
+int
+mt_cclient_send_message(mt_desc_t* desc, mt_ntype_t type,
+    byte* msg, int size) {
+  (void) desc;
+  (void) type;
+  (void) msg;
+  (void) size;
+  return 0;
+}
+
 /*************************** Object creation and cleanup *******************************/
 
 
