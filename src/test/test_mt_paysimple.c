@@ -8,6 +8,8 @@
  * mocked to reroute messages, etc to the corresponding local destinatin.
  */
 
+#pragma GCC diagnostic ignored "-Wstack-protector"
+
 #include <stdio.h>
 #include <unistd.h>
 
@@ -288,7 +290,11 @@ static int mock_send_message_multidesc(mt_desc_t *desc1, mt_desc_t* desc2, mt_nt
  * Mock the alert_payment function
  */
 static int mock_alert_payment(mt_desc_t* desc){
-  (void)desc;
+  int cli_bal = mt_cpay_mac_balance() + mt_cpay_chn_balance();
+  int rel_bal = mt_rpay_mac_balance() + mt_rpay_chn_balance();
+  int int_bal = mt_ipay_mac_balance() + mt_ipay_chn_balance();
+
+  printf("Balances : cli %d; rel %d; int %d\n", cli_bal, rel_bal, int_bal);
   return MT_SUCCESS;
 }
 
@@ -328,12 +334,24 @@ static void test_mt_paysimple(void *arg){
 
   (void)arg;
 
+  // The reply_fn in the mocked cpuworker function returns an int for testing
+  // convenience. This cast is used to avoid warnings in the MOCK command
+  typedef workqueue_entry_t* (*cpuworker_fn)(workqueue_priority_t,
+					     workqueue_reply_t (*)(void*, void*),
+					     void (*)(void*), void*);
   MOCK(mt_send_message, mock_send_message);
   MOCK(mt_send_message_multidesc, mock_send_message_multidesc);
   MOCK(mt_alert_payment, mock_alert_payment);
-  MOCK(cpuworker_queue_work, mock_cpuworker_queue_work);
+  MOCK(cpuworker_queue_work, (cpuworker_fn)mock_cpuworker_queue_work);
 
   /****************************** Setup **********************************/
+
+  // initial balances each party will have
+
+  int mint_val = 100000;
+  int cli_trans_val = 50000;
+  int rel_trans_val = 10000;
+  int int_trans_val = 10000;
 
   // declare values to save to the disk
 
@@ -390,17 +408,19 @@ static void test_mt_paysimple(void *arg){
   write_file("mt_config_temp/cli_pk", cli_pk, MT_SZ_PK);
   write_file("mt_config_temp/cli_sk", cli_sk, MT_SZ_SK);
   write_file("mt_config_temp/cli_desc", &cli_desc, sizeof(mt_desc_t));
+  write_file("mt_config_temp/cli_bal", &cli_trans_val, sizeof(int));
 
   write_file("mt_config_temp/rel_pk", rel_pk, MT_SZ_PK);
   write_file("mt_config_temp/rel_sk", rel_sk, MT_SZ_SK);
   write_file("mt_config_temp/rel_desc", &rel_desc, sizeof(mt_desc_t));
+  write_file("mt_config_temp/rel_bal", &rel_trans_val, sizeof(int));
 
   write_file("mt_config_temp/int_pk", int_pk, MT_SZ_PK);
   write_file("mt_config_temp/int_sk", int_sk, MT_SZ_SK);
   write_file("mt_config_temp/int_desc", &int_desc, sizeof(mt_desc_t));
+  write_file("mt_config_temp/int_bal", &int_trans_val, sizeof(int));
 
   // declare and define addresses for ledger interaction
-
   byte aut_addr[MT_SZ_ADDR];
   byte led_addr[MT_SZ_ADDR];
   byte cli_addr[MT_SZ_ADDR];
@@ -413,23 +433,21 @@ static void test_mt_paysimple(void *arg){
   mt_pk2addr(&rel_pk, &rel_addr);
   mt_pk2addr(&int_pk, &int_addr);
 
-  // initialize payment modules
-
+  // initialize ledger and save relevant "public" values
   tt_assert(mt_lpay_init() == MT_SUCCESS);
+  mt_payment_public_t public = mt_lpay_get_payment_public();
+  write_file("mt_config_temp/fee", &public.fee, sizeof(public.fee));
+  write_file("mt_config_temp/tax", &public.tax, sizeof(public.tax));
+
+  // initialize remaining payment modules
   tt_assert(mt_cpay_init() == MT_SUCCESS);
   tt_assert(mt_ipay_init() == MT_SUCCESS);
   tt_assert(mt_rpay_init() == MT_SUCCESS);
-
-  // extract and save important values in the "public" ledger values
-
-  mt_payment_public_t public = mt_lpay_get_payment_public();
-  write_file("mt_config_temp/fee", &public.fee, sizeof(public.fee));
 
   int result; // generic variable to track function call success/failure
 
   // authority mints money
 
-  int mint_val = 1000 * 100;
   mac_aut_mint_t mint = {.value = mint_val};
   byte mint_id[DIGEST_LEN];
   mt_crypt_rand(DIGEST_LEN, mint_id);
@@ -446,7 +464,6 @@ static void test_mt_paysimple(void *arg){
 
   // send money from authority to client
 
-  int cli_trans_val = 500 * 100;
   mac_any_trans_t cli_trans = {.val_to = cli_trans_val, .val_from = cli_trans_val + public.fee};
   memcpy(cli_trans.from, aut_addr, MT_SZ_ADDR);
   memcpy(cli_trans.to, cli_addr, MT_SZ_ADDR);
@@ -464,7 +481,6 @@ static void test_mt_paysimple(void *arg){
 
   // send money from authority to relay
 
-  int rel_trans_val = 100 * 100;
   mac_any_trans_t rel_trans = {.val_to = rel_trans_val, .val_from = rel_trans_val + public.fee};
   memcpy(rel_trans.from, aut_addr, MT_SZ_ADDR);
   memcpy(rel_trans.to, rel_addr, MT_SZ_ADDR);
@@ -482,7 +498,6 @@ static void test_mt_paysimple(void *arg){
 
   // send money from authority to intermediary
 
-  int int_trans_val = 100 * 100;
   mac_any_trans_t int_trans = {.val_to = int_trans_val, .val_from = int_trans_val + public.fee};
   memcpy(int_trans.from, aut_addr, MT_SZ_ADDR);
   memcpy(int_trans.to, int_addr, MT_SZ_ADDR);
@@ -508,7 +523,7 @@ static void test_mt_paysimple(void *arg){
 
   // send payments to a relay through the intermediary
 
-  for(int i = 0; i < 10; i++){
+  for(int i = 0; i < 20; i++){
     printf("\n");
     memcpy(&cur_desc, &cli_desc, sizeof(mt_desc_t));
     tt_assert(mt_cpay_pay(&rel_desc, &int_desc) == MT_SUCCESS);
@@ -522,7 +537,7 @@ static void test_mt_paysimple(void *arg){
 
   // send direct payments to the intermediary
 
-  for(int i = 0; i < 10; i++){
+  for(int i = 0; i < 20; i++){
     printf("\n");
     memcpy(&cur_desc, &cli_desc, sizeof(mt_desc_t));
     tt_assert(mt_cpay_pay(&int_desc, &int_desc) == MT_SUCCESS);

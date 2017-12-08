@@ -93,6 +93,9 @@ typedef struct {
   byte pk[MT_SZ_PK];
   byte sk[MT_SZ_SK];
   byte addr[MT_SZ_ADDR];
+  int mac_balance;
+  int chn_balance;
+
   mt_desc_t ledger;
   int fee;
 
@@ -135,7 +138,7 @@ static int help_nan_int_close8(void *args);
 // miscallaneous helper functions
 static mt_channel_t* new_channel(void);
 static workqueue_reply_t wcom_task(void* thread, void* arg);
-static void digestmap_smartlist_append(digestmap_t* map, char* key, void* val);
+static void digestmap_smartlist_add(digestmap_t* map, char* key, void* val);
 static void* digestmap_smartlist_pop_last(digestmap_t* map, char* key);
 
 static mt_rpay_t relay;
@@ -151,6 +154,7 @@ int mt_rpay_init(void){
   byte sk[MT_SZ_SK];
   mt_desc_t ledger;
   int fee;
+  int rel_bal;
 
   /********************************************************************/
   //TODO replace with torrc
@@ -177,14 +181,21 @@ int mt_rpay_init(void){
   tor_assert(fread(&fee, 1, sizeof(fee), fp) == sizeof(fee));
   fclose(fp);
 
+  fp = fopen("mt_config_temp/rel_bal", "rb");
+  tor_assert(fread(&rel_bal, 1, sizeof(rel_bal), fp) == sizeof(rel_bal));
+  fclose(fp);
+
   /********************************************************************/
 
   // copy macro-level crypto fields
   memcpy(relay.pp, pp, MT_SZ_PP);
   memcpy(relay.pk, pk, MT_SZ_PK);
   memcpy(relay.sk, sk, MT_SZ_SK);
+  mt_pk2addr(&relay.pk, &relay.addr);
   relay.ledger = ledger;
   relay.fee = fee;
+  relay.mac_balance = rel_bal;
+  relay.chn_balance = 0;
 
   // initiate containers
   relay.chns_setup = digestmap_new();
@@ -312,6 +323,21 @@ int mt_rpay_recv(mt_desc_t* desc, mt_ntype_t type, byte* msg, int size){
   return result;
 }
 
+/**
+ * Return the balance of available money to spend as macropayments
+ */
+int mt_rpay_mac_balance(void){
+  return relay.mac_balance;
+}
+
+/**
+ * Return the balance of money locked up in channels
+ */
+int mt_rpay_chn_balance(void){
+  return relay.chn_balance;
+}
+
+
 /******************************* Channel Escrow *************************/
 
 static int init_chn_end_setup(mt_channel_t* chn, byte (*pid)[DIGEST_LEN]){
@@ -320,11 +346,15 @@ static int init_chn_end_setup(mt_channel_t* chn, byte (*pid)[DIGEST_LEN]){
 
   // initialize setup token
   chn_end_setup_t token;
-  token.val_from = 50 + relay.fee;
-  token.val_to = 50;
+  token.val_from = MT_REL_CHN_VAL + relay.fee;
+  token.val_to = MT_REL_CHN_VAL;
   memcpy(token.from, relay.addr, MT_SZ_ADDR);
   memcpy(token.chn, chn->data.addr, MT_SZ_ADDR);
-  // skip chn_token for now
+  // skip public for now
+
+  // update balances
+  relay.mac_balance -= token.val_from;
+  relay.chn_balance += token.val_to;
 
   // send setup message
   byte* msg;
@@ -340,8 +370,6 @@ static int init_chn_end_setup(mt_channel_t* chn, byte (*pid)[DIGEST_LEN]){
 }
 
 static int handle_any_led_confirm(mt_desc_t* desc, any_led_confirm_t* token, byte (*pid)[DIGEST_LEN]){
-  (void)token;
-  (void)desc;
 
   mt_channel_t* chn = digestmap_get(relay.chns_transition, (char*)*pid);
   if(chn == NULL){
@@ -349,11 +377,16 @@ static int handle_any_led_confirm(mt_desc_t* desc, any_led_confirm_t* token, byt
     return MT_ERROR;
   }
 
-  // check validity of incoming message
+  if(desc->id != relay.ledger.id || desc->party != MT_PARTY_LED)
+    return MT_ERROR;
+
+  if(token->success != MT_CODE_SUCCESS)
+    return MT_ERROR;
+
   byte digest[DIGEST_LEN];
   mt_desc2digest(&chn->idesc, &digest);
   digestmap_remove(relay.chns_transition, (char*)*pid);
-  digestmap_smartlist_append(relay.chns_setup, (char*)digest, chn);
+  digestmap_smartlist_add(relay.chns_setup, (char*)digest, chn);
 
 
   if(chn->callback.fn){
@@ -385,6 +418,7 @@ static int help_chn_end_estab1(void* args){
   free(args);
 
   chn_end_estab1_t token;
+  memcpy(token.addr, chn->data.addr, MT_SZ_ADDR);
 
   // TODO finish making token;
 
@@ -446,7 +480,7 @@ static int help_chn_int_estab4(void* args){
   byte digest[DIGEST_LEN];
   mt_desc2digest(&chn->idesc, &digest);
   digestmap_remove(relay.chns_transition, (char*)pid);
-  digestmap_smartlist_append(relay.chns_estab, (char*)digest, chn);
+  digestmap_smartlist_add(relay.chns_estab, (char*)digest, chn);
 
   if(chn->callback.fn){
     mt_callback_t cb = chn->callback;
@@ -458,11 +492,7 @@ static int help_chn_int_estab4(void* args){
 
 /****************************** Nano Establish **************************/
 
- static int handle_nan_cli_estab1(mt_desc_t* desc, nan_cli_estab1_t* token, byte (*pid)[DIGEST_LEN]){
-  (void)token;
-  (void)desc;
-
-  // check validity of incoming message;
+static int handle_nan_cli_estab1(mt_desc_t* desc, nan_cli_estab1_t* token, byte (*pid)[DIGEST_LEN]){
 
   mt_channel_t* chn;
   byte cdigest[DIGEST_LEN];
@@ -477,6 +507,10 @@ static int help_chn_int_estab4(void* args){
     digestmap_set(relay.chns_transition, (char*)*pid, chn);
     chn->cdesc = *desc;
     chn->callback.fn = NULL;
+
+    // save the nanopayment channel token
+    memcpy(&chn->data.nan_public, &token->nan_public, sizeof(nan_any_public_t));
+    chn->data.nan_state.num_payments = 0;
 
     nan_rel_estab2_t reply;
 
@@ -577,6 +611,19 @@ static int handle_nan_cli_pay1(mt_desc_t* desc, nan_cli_pay1_t* token, byte (*pi
 
   // fill reply with correct values;
 
+  byte digest[DIGEST_LEN];
+  mt_desc2digest(desc, &digest);
+  mt_channel_t* chn = digestmap_get(relay.nans_estab, (char*)digest);
+  if(!chn){
+    log_debug(LD_MT, "client descriptor not recognized");
+    return MT_ERROR;
+  }
+
+  // update channel data
+  relay.chn_balance += chn->data.nan_public.val_to;
+  chn->data.balance += chn->data.nan_public.val_to;
+  chn->data.nan_state.num_payments ++;
+
   mt_alert_payment(desc);
 
   byte* msg;
@@ -598,8 +645,7 @@ static int handle_nan_cli_reqclose1(mt_desc_t* desc, nan_cli_reqclose1_t* token,
   byte digest[DIGEST_LEN];
   mt_desc2digest(desc, &digest);
 
-
-  if((chn = digestmap_remove(relay.nans_estab, (char*)digest)) != NULL){
+  if((chn = digestmap_remove(relay.nans_estab, (char*)digest))){
     digestmap_set(relay.chns_transition, (char*)pid, chn);
     chn->callback = (mt_callback_t){.fn = mt_rpay_recv, .dref1 = *desc};
     chn->callback.arg2 = MT_NTYPE_NAN_CLI_REQCLOSE1;
@@ -627,6 +673,9 @@ static int init_nan_end_close1(mt_channel_t* chn, byte (*pid)[DIGEST_LEN]){
 
   // intiate token
   nan_end_close1_t token;
+  token.total_val = -(chn->data.nan_state.num_payments * chn->data.nan_public.val_to);
+  token.num_payments = chn->data.nan_state.num_payments;
+  memcpy(&token.nan_public, &chn->data.nan_public, sizeof(nan_any_public_t));
 
   // TODO finish making token;
 
@@ -727,7 +776,6 @@ static int handle_nan_int_close8(mt_desc_t* desc, nan_int_close8_t* token, byte 
   if(!cpuworker_queue_work(WQ_PRI_HIGH, wcom_task, (work_task)help_nan_int_close8, args))
     return MT_ERROR;
   return MT_SUCCESS;
-
 }
 
 static int help_nan_int_close8(void *args){
@@ -739,7 +787,7 @@ static int help_nan_int_close8(void *args){
   byte digest[DIGEST_LEN];
   mt_desc2digest(&chn->idesc, &digest);
   digestmap_remove(relay.chns_transition, (char*)pid);
-  digestmap_set(relay.nans_estab, (char*)digest, chn);
+  digestmap_smartlist_add(relay.chns_estab, (char*)digest, chn);
 
   if(chn->callback.fn){
     mt_callback_t cb = chn->callback;
@@ -761,7 +809,7 @@ static mt_channel_t* new_channel(void){
 /**
  * Append a value to the appropriate list in a digestmap of smartlists
  */
-static void digestmap_smartlist_append(digestmap_t* map, char* key, void* val){
+static void digestmap_smartlist_add(digestmap_t* map, char* key, void* val){
   smartlist_t* list = digestmap_get(map, (char*)key);
   if(list == NULL){
     digestmap_set(map, (char*)key, smartlist_new());

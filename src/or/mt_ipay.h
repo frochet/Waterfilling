@@ -19,4 +19,15 @@ int mt_ipay_init(void);
  */
 int mt_ipay_recv(mt_desc_t* desc, mt_ntype_t type, byte* msg, int size);
 
+/**
+ * Return the balance of available money to spend as macropayments
+ */
+int mt_ipay_mac_balance(void);
+
+/**
+ * Return the balance of money locked up in channels
+ */
+int mt_ipay_chn_balance(void);
+
+
 #endif

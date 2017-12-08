@@ -32,9 +32,22 @@ void mt_desc2digest(mt_desc_t* desc, byte (*digest_out)[DIGEST_LEN]){
   byte hash[MT_SZ_HASH];
   byte input[sizeof(uint32_t) + sizeof(desc->party)];
   memcpy(input, &desc->id, sizeof(uint32_t));
-  //printf("%x", *((uint32_t*)input);
   memcpy(input + sizeof(uint32_t), &desc->party, sizeof(desc->party));
-  mt_crypt_hash(input, sizeof(desc), &hash);
+  mt_crypt_hash(input, sizeof(uint32_t) + sizeof(desc->party), &hash);
+  memcpy(*digest_out, hash, DIGEST_LEN);
+}
+
+/**
+ * Convert a moneTor nan_any_public_t into a digest for digestmap_t
+ */
+void mt_nanpub2digest(nan_any_public_t* token, byte (*digest_out)[DIGEST_LEN]){
+  byte hash[MT_SZ_HASH];
+  byte input[sizeof(int) * 3 + MT_SZ_HASH];
+  memcpy(input + sizeof(int) * 0, &token->val_from, sizeof(int));
+  memcpy(input + sizeof(int) * 1, &token->val_to, sizeof(int));
+  memcpy(input + sizeof(int) * 2, &token->num_payments, sizeof(int));
+  memcpy(input + sizeof(int) * 3, &token->hash_tail, MT_SZ_HASH);
+  mt_crypt_hash(input, sizeof(int) * 3 + MT_SZ_HASH, &hash);
   memcpy(*digest_out, hash, DIGEST_LEN);
 }
 

@@ -79,7 +79,7 @@ int transfer(int* bal_from, int* bal_to, int val_from, int val_to, int val_auth)
 int close_channel(chn_led_data_t* data);
 
 // formal protocol algorithm to resolve disputes (this will replaced with algs call)
-void resolve(byte (*pp)[MT_SZ_PP], chn_end_chntok_t T_E, chn_int_chntok_t T_I,
+void resolve(byte (*pp)[MT_SZ_PP], chn_end_public_t T_E, chn_int_public_t T_I,
 	     chn_end_close_t rc_E, chn_int_close_t rc_I, int* end_bal, int*  int_bal);
 
 /**
@@ -159,7 +159,6 @@ int mt_lpay_init(void){
  * done with the request.
  */
 int mt_lpay_recv(mt_desc_t* desc, mt_ntype_t type, byte* msg, int size){
-
   // verify signed message, produce addr to pass into handlers
   byte pk[MT_SZ_PK];
   byte addr[MT_SZ_ADDR];
@@ -348,9 +347,8 @@ int handle_chn_end_setup(chn_end_setup_t* token, byte (*addr)[MT_SZ_ADDR]){
   if(transfer(bal_from, bal_to, token->val_from, token->val_to, ledger.fee) == MT_ERROR){
     return MT_ERROR;
   }
-
   memcpy(data_chn->end_addr, addr, MT_SZ_ADDR);
-  data_chn->end_chn_token = token->chn_token;
+  data_chn->end_public = token->chn_public;
   data_chn->state = MT_LSTATE_INIT;
   return MT_SUCCESS;
 }
@@ -386,7 +384,7 @@ int handle_chn_int_setup(chn_int_setup_t* token, byte (*addr)[MT_SZ_ADDR]){
     return MT_ERROR;
 
   memcpy(data_chn->int_addr, addr, MT_SZ_ADDR);
-  data_chn->int_chn_token = token->chn_token;
+  data_chn->int_public = token->chn_public;
   data_chn->state = MT_LSTATE_OPEN;
   return MT_SUCCESS;
 }
@@ -545,7 +543,7 @@ mt_payment_public_t mt_lpay_get_payment_public(void){
 int transfer(int* bal_from, int* bal_to, int val_from, int val_to, int val_auth){
 
   // check that values make sense
-  if(!(val_from > val_to && val_to > 0))
+  if(!(val_from >= val_to && val_to >= 0))
     return MT_ERROR;
 
   // check that the payer has a sufficient balance
@@ -585,7 +583,7 @@ int close_channel(chn_led_data_t* data){
 
   int* end_bal = NULL;
   int* int_bal = NULL;
-  resolve(&ledger.pp, data->end_chn_token, data->int_chn_token,
+  resolve(&ledger.pp, data->end_public, data->int_public,
 	  data->end_close_token, data->int_close_token, end_bal, int_bal);
 
   if(end_bal != NULL && int_bal != NULL){
@@ -603,7 +601,7 @@ int close_channel(chn_led_data_t* data){
  * Resolve algorithm implemente from the moneTor protocol algorithms. Accepts
  * channel information at closure and makes a determination on the final balances.
  */
-void resolve(byte (*pp)[MT_SZ_PP], chn_end_chntok_t T_E, chn_int_chntok_t T_I,
+void resolve(byte (*pp)[MT_SZ_PP], chn_end_public_t T_E, chn_int_public_t T_I,
 	     chn_end_close_t rc_E, chn_int_close_t rc_I, int* end_bal, int*   int_bal){
 
   (void) pp;

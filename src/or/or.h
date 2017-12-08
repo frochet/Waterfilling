@@ -1,3 +1,4 @@
+
 /* Copyright (c) 2001 Matej Pfajfar.
  * Copyright (c) 2001-2004, Roger Dingledine.
  * Copyright (c) 2004-2006, Roger Dingledine, Nick Mathewson.
@@ -2908,8 +2909,8 @@ typedef struct pay_path_t {
 
   /* Intermediary handling current hop */
   intermediary_identity_t *inter_ident;
-  
-  /* payment marked for close 
+
+  /* payment marked for close
    * This may happen if :
    *  - something went wrong with the establishement
    *  - if the intermediary inter_ident is not reachable
@@ -5589,6 +5590,14 @@ typedef enum {
   MT_CODE_FAILURE,
 } mt_code_t;
 
+//-------------------------- Public Payment Parameters ----------------------//
+
+#define MT_CLI_CHN_VAL 1250
+#define MT_REL_CHN_VAL 0
+#define MT_INT_CHN_VAL MT_CLI_CHN_VAL * 2
+#define MT_NAN_LEN 5
+#define MT_NAN_VAL 100
+
 //-------------------- Cryptographic String Sizes (bytes) -------------------//
 
 #define MT_SZ_HASH 32
@@ -5677,9 +5686,9 @@ typedef enum {
   MT_LTYPE_NAN_END_STATE,       // intermediary nanopayment state
   MT_LTYPE_NAN_END_SECRET,      // end user nanopayment secrets
 
-  MT_LTYPE_CHN_END_CHNTOK,      // end user micropayment channel token
-  MT_LTYPE_CHN_INT_CHNTOK,      // intermediary micropayment channel token
-  MT_LTYPE_NAN_ANY_CHNTOK,      // nanopayment channel token
+  MT_LTYPE_CHN_END_PUBLIC,      // end user micropayment channel token
+  MT_LTYPE_CHN_INT_PUBLIC,      // intermediary micropayment channel token
+  MT_LTYPE_NAN_ANY_PUBLIC,      // nanopayment channel token
   MT_LTYPE_CHN_END_REFUND,      // end user nanopayment refund token
 
   MT_LTYPE_CHN_END_DATA,        // info to maintain channel for end user
@@ -5788,7 +5797,7 @@ typedef struct {
 
 typedef struct {
   // nanochannel tokens -> nanopayment states
-  digestmap_t* state;
+  digestmap_t* map;  // digest(nan_public) -> nan_end_state
 } nan_int_state_t;
 
 typedef struct {
@@ -5811,26 +5820,26 @@ typedef struct {
 typedef struct {
   byte wpk[MT_SZ_PK];
   byte wsk[MT_SZ_SK];
-  byte (*hc_out)[][MT_SZ_HASH];
+  byte hc[MT_NAN_LEN][MT_SZ_HASH];
 } nan_end_secret_t;
 
 typedef struct {
   int balance;
   byte esc_pk[MT_SZ_PK];
   byte commitment[MT_SZ_COM];
-} chn_end_chntok_t;
+} chn_end_public_t;
 
 typedef struct {
   int balance;
   byte pk[MT_SZ_PK];
-} chn_int_chntok_t;
+} chn_int_public_t;
 
 typedef struct {
   int val_from;
   int val_to;
   int num_payments;
   byte hash_tail[MT_SZ_HASH];
-} nan_any_chntok_t;
+} nan_any_public_t;
 
 typedef struct {
   mt_code_t refund_code;
@@ -5841,7 +5850,7 @@ typedef struct {
   byte conditional[MT_SZ_PK];
 
   // blank if refund for micropayment
-  nan_any_chntok_t channel_token;
+  nan_any_public_t channel_token;
 
   // partial blind sig on everything but the code
   byte sig[MT_SZ_SIG];
@@ -5860,11 +5869,11 @@ typedef struct {
   byte addr[MT_SZ_ADDR];
   int balance;
 
-  mic_end_wallet_t wallet;
+  mic_end_wallet_t chn_wallet;
   chn_end_secret_t chn_secret;
-  chn_end_chntok_t chn_token;
+  chn_end_public_t chn_public;
 
-  nan_any_chntok_t nan_token;
+  nan_any_public_t nan_public;
   nan_end_state_t nan_state;
   nan_end_secret_t nan_secret;
   chn_end_refund_t refund;
@@ -5896,7 +5905,7 @@ typedef struct {
   int val_to;
   byte from[MT_SZ_ADDR];
   byte chn[MT_SZ_ADDR];
-  chn_end_chntok_t chn_token;
+  chn_end_public_t chn_public;
 
   byte pk[MT_SZ_PK];
   byte sig[MT_SZ_SIG];
@@ -5907,7 +5916,7 @@ typedef struct {
   int val_to;
   byte from[MT_SZ_ADDR];
   byte chn[MT_SZ_ADDR];
-  chn_int_chntok_t chn_token;
+  chn_int_public_t chn_public;
 
   byte pk[MT_SZ_PK];
   byte sig[MT_SZ_SIG];
@@ -5980,8 +5989,8 @@ typedef struct {
   int end_balance;
   int int_balance;
 
-  chn_end_chntok_t end_chn_token;
-  chn_int_chntok_t int_chn_token;
+  chn_end_public_t end_public;
+  chn_int_public_t int_public;
 
   chn_end_close_t end_close_token;
   chn_int_close_t int_close_token;
@@ -6063,7 +6072,7 @@ typedef struct {
   byte nwpk[MT_SZ_PK];
   byte wcom[MT_SZ_COM];
   byte zkp[MT_SZ_ZKP];
-  nan_any_chntok_t chntok;
+  nan_any_public_t nan_public;
 } nan_cli_setup1_t;
 
 typedef struct {
@@ -6087,7 +6096,7 @@ typedef struct {
 } nan_int_setup6_t;
 
 typedef struct {
-  nan_any_chntok_t chntok;
+  nan_any_public_t nan_public;
 } nan_cli_estab1_t;
 
 typedef struct {
@@ -6095,7 +6104,7 @@ typedef struct {
   byte rel_nwpk[MT_SZ_PK];
   byte nwcom[MT_SZ_COM];
   byte zkp[MT_SZ_ZKP];
-  nan_any_chntok_t chntok;
+  nan_any_public_t nan_public;
 } nan_rel_estab2_t;
 
 typedef struct {
@@ -6132,7 +6141,7 @@ typedef struct {
 } nan_rel_reqclose2_t;
 
 typedef struct {
-  byte preimage[MT_SZ_HASH];
+  nan_any_public_t nan_public;
 } nan_cli_destab1_t;
 
 typedef struct {
@@ -6140,6 +6149,7 @@ typedef struct {
 } nan_int_destab2_t;
 
 typedef struct {
+  nan_any_public_t nan_public;
   byte preimage[MT_SZ_HASH];
 } nan_cli_dpay1_t;
 
@@ -6151,8 +6161,8 @@ typedef struct {
   byte wpk[MT_SZ_PK];
   byte wcom[MT_SZ_COM];
   byte zkp[MT_SZ_ZKP];
-  nan_any_chntok_t chntok;
-  int total_value;
+  nan_any_public_t nan_public;
+  int total_val;
   int num_payments;
   byte preimage[MT_SZ_HASH];
 } nan_end_close1_t;
