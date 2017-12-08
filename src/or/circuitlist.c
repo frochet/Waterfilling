@@ -983,6 +983,13 @@ circuit_free(circuit_t *circ)
       tor_free(ocirc->socks_password);
     }
     addr_policy_list_free(ocirc->prepend_policy);
+
+    if (ocirc->ppath) {
+      mt_cclient_general_circuit_free(ocirc);
+    }
+    if (ocirc->inter_ident) {
+      mt_cclient_intermediary_circuit_free(ocirc);
+    }
   } else {
     or_circuit_t *ocirc = TO_OR_CIRCUIT(circ);
     /* Remember cell statistics for this circuit before deallocating. */
@@ -2040,6 +2047,11 @@ circuit_about_to_free(circuit_t *circ)
   }
   if (circ->purpose == CIRCUIT_PURPOSE_R_INTERMEDIARY) {
     mt_crelay_intermediary_circ_has_closed(TO_ORIGIN_CIRCUIT(circ));
+  }
+  /* Notify payment controller when a general circuit has closed */
+  if (get_options()->EnablePayment && 
+      circ->purpose == CIRCUIT_PURPOSE_C_GENERAL) {
+    mt_cclient_general_circ_has_closed(TO_ORIGIN_CIRCUIT(circ));
   }
 
   /* Notify the HS subsystem for any intro point circuit closing so it can be

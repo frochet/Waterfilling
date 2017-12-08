@@ -130,6 +130,19 @@ void monetor_run_scheduled_events(time_t now) {
 
 }
 
+/**
+ * Returns a description of this desc. Mostly used for log
+ * purpose
+ *
+ * XXX MoneTor Todo
+ */
+
+const char* mt_desc_describe(mt_desc_t* desc) {
+  (void) desc;
+  return "";
+}
+
+
 MOCK_IMPL(int, mt_send_message, (mt_desc_t *desc, mt_ntype_t type, byte* msg, int size)) {
   (void) desc;
   (void) type;

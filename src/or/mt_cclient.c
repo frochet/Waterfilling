@@ -100,6 +100,9 @@ intermediary_need_cleanup(intermediary_t *intermediary, time_t now) {
         inter) {
       if (tor_memeq(intermediary->identity->identity,
             inter->identity->identity, DIGEST_LEN)){
+        byte id[DIGEST_LEN];
+        mt_desc2digest(&intermediary->desc, &id);
+        digestmap_remove(desc2circ, (char*) id);
         SMARTLIST_DEL_CURRENT(intermediaries, inter);
         intermediary_free(intermediary);
         log_info(LD_MT, "MoneTor: Removing intermediary from list %ld",
@@ -145,17 +148,26 @@ mt_cclient_launch_payment(origin_circuit_t* circ) {
     memcpy(exit->inter_ident->identity, intermediary_e->identity->identity,
         DIGEST_LEN);
   }
+  log_info(LD_MT, "MoneTor - Adding circ's descs %s to digestmap",
+      mt_desc_describe(&circ->ppath->desc));
   /* Adding new elements to digestmap */
   byte id[DIGEST_LEN];
   mt_desc2digest(&circ->ppath->desc, &id);
   digestmap_set(desc2circ, (char*) id, circ);
+  log_info(LD_MT, "MoneTor - Adding circ's descs %s to digestmap",
+      mt_desc_describe(&middle->desc));
   mt_desc2digest(&middle->desc, &id);
   digestmap_set(desc2circ, (char*) id, circ);
+  log_info(LD_MT, "MoneTor - Adding circ's descs %s to digestmap",
+      mt_desc_describe(&exit->desc));
   mt_desc2digest(&exit->desc, &id);
   digestmap_set(desc2circ, (char*) id, circ);
   // XXX MoneTor - what to do with retVal
   /*Now, notify payment module that we have to start a payment*/
   int retVal;
+  log_info(LD_MT, "MoneTor - Calling payment module for direct payment"
+      " with param %s and %s", mt_desc_describe(&circ->ppath->desc),
+      mt_desc_describe(&circ->ppath->desc));
   /* Direct payment to the guard */
   retVal = mt_cpay_pay(&circ->ppath->desc, &circ->ppath->desc);
   if (retVal < 0) {
@@ -163,11 +175,17 @@ mt_cclient_launch_payment(origin_circuit_t* circ) {
     circ->ppath->p_marked_for_close = 1;
     // If first one marked for close, do we close the others?
   }
+  log_info(LD_MT, "MoneTor - Calling payment module for direct payment"
+      " with param %s and %s", mt_desc_describe(&middle->desc),
+      mt_desc_describe(&intermediary_g->desc));
   /* Payment to the middle relay involving intermediary */
   retVal = mt_cpay_pay(&middle->desc, &intermediary_g->desc);
   if (retVal < 0) {
     middle->p_marked_for_close = 1;
   }
+  log_info(LD_MT, "MoneTor - Calling payment module for direct payment"
+      " with param %s and %s", mt_desc_describe(&exit->desc),
+      mt_desc_describe(&intermediary_e->desc));
   /* Payment to the exit relay involving intermediary */
   retVal = mt_cpay_pay(&exit->desc, &intermediary_e->desc);
   if (retVal < 0) {
@@ -204,7 +222,7 @@ choose_intermediaries(time_t now, smartlist_t *exclude_list) {
       flags);
   
   if (!node) {
-    log_warn(LD_MT, "Something went wrong, we did not select any intermediary");
+    log_warn(LD_MT, "MoneTor - Something went wrong, we did not select any intermediary");
     goto err;
   }
   log_info(LD_MT, "MoneTor: Chosen relay %s as intermediary", node_describe(node));
@@ -352,6 +370,10 @@ run_cclient_scheduled_events(time_t now) {
  * XXX MoneTor -- TODO here: general_circuit_has_closed()
  */
 
+void mt_cclient_general_circ_has_closed(origin_circuit_t *circ) {
+  (void) circ;
+}
+
 
 /**
  * We got notified that a CIRCUIT_PURPOSE_C_INTERMEDIARY has closed
@@ -402,7 +424,8 @@ void mt_cclient_intermediary_circ_has_closed(origin_circuit_t *circ) {
 /**
  * We got notified that a CIRCUIT_PURPOSE_C_INTERMEDIARY has opened
  */
-void mt_cclient_intermediary_circ_has_opened(origin_circuit_t *circ) {
+void 
+mt_cclient_intermediary_circ_has_opened(origin_circuit_t *circ) {
   (void)circ;
   log_info(LD_MT, "MoneTor: Yay! intermediary circuit opened");
   /* reset circuit_retries counter */
@@ -417,6 +440,32 @@ void mt_cclient_intermediary_circ_has_opened(origin_circuit_t *circ) {
 }
 /*************************** Object creation and cleanup *******************************/
 
+
+static void
+pay_path_free(pay_path_t* ppath) {
+  if (!ppath)
+    return;
+  tor_free(ppath->inter_ident);
+  /* Recursive call to explore the linked list */
+  pay_path_free(ppath->next);
+}
+
+/*
+ * XXX MoneTor - Todo: call them in appropriate place
+ */
+void 
+mt_cclient_general_circuit_free(origin_circuit_t* circ) {
+  if (!circ)
+    return;
+  pay_path_free(circ->ppath);
+}
+
+void 
+mt_cclient_intermediary_circuit_free(origin_circuit_t* circ) {
+  if (!circ)
+    return;
+  tor_free(circ->inter_ident);
+}
 
 /**
  * Allocate on the heap a new intermediary and returns the pointer

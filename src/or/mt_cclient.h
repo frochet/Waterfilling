@@ -7,6 +7,8 @@
  */
 
 
+void mt_cclient_general_circ_has_closed(origin_circuit_t *circ);
+
 void mt_cclient_intermediary_circ_has_closed(origin_circuit_t *circ);
 
 void mt_cclient_intermediary_circ_has_opened(origin_circuit_t *circ);
@@ -63,6 +65,17 @@ intermediary_t* mt_cclient_get_intermediary_from_ocirc(origin_circuit_t* circ);
 void mt_cclient_launch_payment(origin_circuit_t* circ);
 
 /****************************************************************************/
+
+/*
+ * Free payment related stuff holded by a general circuit
+ */
+void mt_cclient_general_circuit_free(origin_circuit_t* circ);
+
+/*
+ * Freem payment related stuff holded by an intermediary circuit
+ */
+void mt_cclient_intermediary_circuit_free(origin_circuit_t* circ);
+
 
 void mt_cclient_init(void);
 

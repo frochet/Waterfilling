@@ -90,6 +90,11 @@ int mt_check_enough_fund(void);
 void monetor_run_scheduled_events(time_t now);
 
 
+/**
+ * gives a string description of this mt_desc_t*
+ */
+const char* mt_desc_describe(mt_desc_t *desc);
+
 /************ Tor - Payment event interface *********************/
 
 MOCK_DECL(int, mt_send_message, (mt_desc_t *desc, mt_ntype_t type, byte* msg, int size));
