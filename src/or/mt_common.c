@@ -160,6 +160,20 @@ const char* mt_desc_describe(mt_desc_t* desc) {
   return "";
 }
 
+/**
+ * Pack the relay header containing classical relay_header_t
+ * and our payment header
+ */
+
+void relay_pheader_pack(uint8_t *dest, const relay_header_t* rh,
+    relay_pheader_t* rph) {
+  set_uint8(dest, rh->command);
+  set_uint16(dest+1, htons(rh->recognized));
+  set_uint16(dest+3, htons(rh->stream_id));
+  memcpy(dest+5, rh->integrity, 4);
+  set_uint16(dest+9, htons(rh->length));
+  set_uint8(dest+10, rph->pcommand);
+}
 
 MOCK_IMPL(int, mt_send_message, (mt_desc_t *desc, mt_ntype_t type,
       byte* msg, int size)) {
@@ -210,6 +224,7 @@ MOCK_IMPL(int, mt_send_message, (mt_desc_t *desc, mt_ntype_t type,
         // XXX Todo new file related to authdir
         return 0;
       }
+      break;
     /* Sending from intermediary */
     case MT_NTYPE_CHN_INT_ESTAB2:
     case MT_NTYPE_CHN_INT_ESTAB4:
@@ -235,7 +250,8 @@ MOCK_IMPL(int, mt_send_message, (mt_desc_t *desc, mt_ntype_t type,
         //todo
         return 0;
       }
-    /* Sending from any of them */
+      break;
+      /* Sending from any of them */
     case MT_NTYPE_MAC_ANY_TRANS:
       if (intermediary_mode(get_options())) {
         return 0;
@@ -252,8 +268,9 @@ MOCK_IMPL(int, mt_send_message, (mt_desc_t *desc, mt_ntype_t type,
 
     default:
       log_warn(LD_MT, "MoneTor - Unrecognized type");
+      return -1;
   }
-  return 0;
+  return -1;
 }
 
 MOCK_IMPL(int, mt_send_message_multidesc, (mt_desc_t *desc1, mt_desc_t* desc2, mt_ntype_t type, byte* msg, int size)) {

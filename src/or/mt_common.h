@@ -96,6 +96,13 @@ void monetor_run_scheduled_events(time_t now);
 
 
 /**
+ * Pack the relay header containing classical relay_header_t
+ * and our payment header
+ */
+void relay_pheader_pack(uint8_t *dest, const relay_header_t* rh,
+    relay_pheader_t* rph);
+
+/**
  * gives a string description of this mt_desc_t*
  */
 const char* mt_desc_describe(mt_desc_t *desc);

@@ -64,6 +64,7 @@
 #include "geoip.h"
 #include "hs_cache.h"
 #include "main.h"
+#include "mt_common.h"
 #include "networkstatus.h"
 #include "nodelist.h"
 #include "onion.h"
@@ -672,6 +673,35 @@ relay_command_to_string(uint8_t command)
                    (unsigned)command);
       return buf;
   }
+}
+
+MOCK_IMPL(int,
+relay_send_pcommand_from_edge_,(origin_circuit_t* circ, uint8_t relay_pcommand,
+                                const char *payload, size_t payload_len,
+                                const char *filename, int lineno))
+{
+
+  cell_t cell;
+  relay_header_t rh;
+  relay_pheader_t rph;
+  memset(&cell, 0, sizeof(cell_t));
+  memset(&rh, 0, sizeof(relay_header_t));
+  memset(&rph, 0, sizeof(relay_pheader_t));
+  //XXX MoneTor TODOrh.command = 
+  rh.stream_id = 0;
+  rh.length = payload_len+RELAY_PHEADER_SIZE;
+  rph.pcommand = relay_pcommand;
+  relay_pheader_pack(cell.payload, &rh, &rph);
+  memcpy(cell.payload+RELAY_HEADER_SIZE+RELAY_PHEADER_SIZE, payload, payload_len);
+  
+  if (TO_CIRCUIT(circ)->n_chan) {
+    /* Update client timestamp to give priority */
+    channel_timestamp_client(TO_CIRCUIT(circ)->n_chan);
+  }
+  log_debug(LD_MT, "MoneTor - Packaging cell type %d", relay_pcommand);
+
+  return circuit_package_relay_cell(&cell, TO_CIRCUIT(circ), CELL_DIRECTION_OUT,
+      circ->cpath, 0,filename, lineno);
 }
 
 /** Make a relay cell out of <b>relay_command</b> and <b>payload</b>, and send

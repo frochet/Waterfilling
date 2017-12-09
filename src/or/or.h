@@ -1016,6 +1016,10 @@ static inline int get_circ_id_size(int wide_circ_ids)
 #define RELAY_HEADER_SIZE (1+2+2+4+2)
 /** Largest number of bytes that can fit in a relay cell payload. */
 #define RELAY_PAYLOAD_SIZE (CELL_PAYLOAD_SIZE-RELAY_HEADER_SIZE)
+/* Number of bytes in the payment's header */
+#define RELAY_PHEADER_SIZE 1
+/* Largest number of bytes that can fit in a payment cell */
+#define RELAY_PPAYLOAD_SIZE (CELL_PAYLOAD_SIZE-RELAY_PHEADER_SIZE-RELAY_HEADER_SIZE)
 
 /** Identifies a circuit on an or_connection */
 typedef uint32_t circid_t;
@@ -1216,6 +1220,13 @@ typedef struct {
   char integrity[4]; /**< Used to tell whether cell is corrupted. */
   uint16_t length; /**< How long is the payload body? */
 } relay_header_t;
+
+/** Beginning of a RELAY_PAYMENT cell payload. */
+
+typedef struct {
+  uint8_t pcommand; /** Payment command */
+
+} relay_pheader_t;
 
 typedef struct socks_request_t socks_request_t;
 

@@ -1,6 +1,7 @@
 
 #include "or.h"
 #include "config.h"
+#include "channel.h"
 #include "mt_cclient.h"
 #include "mt_common.h"
 #include "mt_cpay.h"
@@ -11,8 +12,9 @@
 #include "circuitbuild.h"
 #include "circuitlist.h"
 #include "circuituse.h"
-#include "torlog.h"
+#include "relay.h"
 #include "router.h"
+#include "torlog.h"
 #include "main.h"
 
 
@@ -446,11 +448,15 @@ mt_cclient_intermediary_circ_has_opened(origin_circuit_t *circ) {
 int
 mt_cclient_send_message(mt_desc_t* desc, mt_ntype_t type,
     byte* msg, int size) {
-  (void) desc;
-  (void) type;
-  (void) msg;
-  (void) size;
-  return 0;
+  /*defensive prog from payment module*/
+  tor_assert(size <= RELAY_PPAYLOAD_SIZE);
+  /* init and stuff */
+  byte id[DIGEST_LEN];
+  mt_desc2digest(desc, &id);
+  origin_circuit_t* circ = digestmap_get(desc2circ, (char*) id);
+  tor_assert(circ);
+  return relay_send_pcommand_from_edge(circ, (uint8_t) type,
+      (const char*) msg, size);
 }
 
 /*************************** Object creation and cleanup *******************************/
