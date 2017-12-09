@@ -95,6 +95,7 @@ typedef struct {
   byte addr[MT_SZ_ADDR];
   int mac_balance;
   int chn_balance;
+  int chn_number;
 
   mt_desc_t ledger;
   int fee;
@@ -196,6 +197,7 @@ int mt_rpay_init(void){
   relay.fee = fee;
   relay.mac_balance = rel_bal;
   relay.chn_balance = 0;
+  relay.chn_number = 0;
 
   // initiate containers
   relay.chns_setup = digestmap_new();
@@ -337,6 +339,13 @@ int mt_rpay_chn_balance(void){
   return relay.chn_balance;
 }
 
+/**
+ * Return the number of channels currently open
+ */
+int mt_rpay_chn_number(void){
+  return relay.chn_number;
+}
+
 
 /******************************* Channel Escrow *************************/
 
@@ -352,7 +361,8 @@ static int init_chn_end_setup(mt_channel_t* chn, byte (*pid)[DIGEST_LEN]){
   memcpy(token.chn, chn->data.addr, MT_SZ_ADDR);
   // skip public for now
 
-  // update balances
+  // update local data
+  relay.chn_number ++;
   relay.mac_balance -= token.val_from;
   relay.chn_balance += token.val_to;
 

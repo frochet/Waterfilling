@@ -81,8 +81,8 @@ static int mock_send_message(mt_desc_t *desc, mt_ntype_t type, byte* msg, int si
     case MT_NTYPE_MIC_CLI_PAY5:
       type_str = "mic_cli_pay5";
       break;
-    case MT_NTYPE_MIC_REV_PAY6:
-      type_str = "mic_rev_pay6";
+    case MT_NTYPE_MIC_REL_PAY6:
+      type_str = "mic_rel_pay6";
       break;
     case MT_NTYPE_MIC_INT_PAY7:
       type_str = "mic_int_pay7";
@@ -348,10 +348,10 @@ static void test_mt_paysimple(void *arg){
 
   // initial balances each party will have
 
-  int mint_val = 100000;
-  int cli_trans_val = 50000;
-  int rel_trans_val = 10000;
-  int int_trans_val = 10000;
+  int mint_val = (MT_CLI_CHN_VAL + MT_REL_CHN_VAL + MT_INT_CHN_VAL) * 20;
+  int cli_trans_val = (MT_CLI_CHN_VAL + MT_FEE) * 10;
+  int rel_trans_val = (MT_REL_CHN_VAL + MT_FEE) * 10;
+  int int_trans_val = (MT_INT_CHN_VAL + MT_FEE) * 10;
 
   // declare values to save to the disk
 
@@ -521,9 +521,12 @@ static void test_mt_paysimple(void *arg){
 
   /**************************** Protocol Tests ***************************/
 
+  int num_pay = 20;
+  int num_dpay = 20;
+
   // send payments to a relay through the intermediary
 
-  for(int i = 0; i < 20; i++){
+  for(int i = 0; i < num_pay; i++){
     printf("\n");
     memcpy(&cur_desc, &cli_desc, sizeof(mt_desc_t));
     tt_assert(mt_cpay_pay(&rel_desc, &int_desc) == MT_SUCCESS);
@@ -537,7 +540,7 @@ static void test_mt_paysimple(void *arg){
 
   // send direct payments to the intermediary
 
-  for(int i = 0; i < 20; i++){
+  for(int i = 0; i < num_dpay; i++){
     printf("\n");
     memcpy(&cur_desc, &cli_desc, sizeof(mt_desc_t));
     tt_assert(mt_cpay_pay(&int_desc, &int_desc) == MT_SUCCESS);
@@ -548,6 +551,24 @@ static void test_mt_paysimple(void *arg){
   printf("\n");
   memcpy(&cur_desc, &cli_desc, sizeof(mt_desc_t));
   tt_assert(mt_cpay_close(&int_desc, &int_desc) == MT_SUCCESS);
+
+  // make sure channel balances are what we expect them to be;
+
+  int cli_bal = mt_cpay_mac_balance() + mt_cpay_chn_balance();
+  int rel_bal = mt_rpay_mac_balance() + mt_rpay_chn_balance();
+  int int_bal = mt_ipay_mac_balance() + mt_ipay_chn_balance();
+
+  int MT_NAN_TAX = MT_NAN_VAL * public.tax / 100;
+  int cli_exp = cli_trans_val - (num_pay + num_dpay) * (MT_NAN_VAL + MT_NAN_TAX);
+  int rel_exp = rel_trans_val + num_pay * MT_NAN_VAL;
+  int int_exp = int_trans_val + num_pay * MT_NAN_TAX + num_dpay * (MT_NAN_VAL + MT_NAN_TAX);
+  cli_exp -= mt_cpay_chn_number() * MT_FEE;
+  rel_exp -= mt_rpay_chn_number() * MT_FEE;
+  int_exp -= mt_ipay_chn_number() * MT_FEE;
+
+  tt_assert(cli_bal == cli_exp);
+  tt_assert(rel_bal == rel_exp);
+  tt_assert(int_bal == int_exp);
 
   printf("\n-------------- end paysimple ------------\n\n");
 

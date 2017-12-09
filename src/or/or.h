@@ -5592,11 +5592,11 @@ typedef enum {
 
 //-------------------------- Public Payment Parameters ----------------------//
 
-#define MT_CLI_CHN_VAL 1250
-#define MT_REL_CHN_VAL 0
-#define MT_INT_CHN_VAL MT_CLI_CHN_VAL * 2
-#define MT_NAN_LEN 5
 #define MT_NAN_VAL 100
+#define MT_NAN_LEN 5
+#define MT_CLI_CHN_VAL 105 * 1000
+#define MT_REL_CHN_VAL 0
+#define MT_INT_CHN_VAL 100 * 1000
 
 //-------------------- Cryptographic String Sizes (bytes) -------------------//
 

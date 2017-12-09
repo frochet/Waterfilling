@@ -29,5 +29,9 @@ int mt_ipay_mac_balance(void);
  */
 int mt_ipay_chn_balance(void);
 
+/**
+ * Return the number of channels currently open
+ */
+int mt_ipay_chn_number(void);
 
 #endif

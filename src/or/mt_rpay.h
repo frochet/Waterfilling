@@ -38,5 +38,9 @@ int mt_rpay_mac_balance(void);
  */
 int mt_rpay_chn_balance(void);
 
+/**
+ * Return the number of channels currently open
+ */
+int mt_rpay_chn_number(void);
 
 #endif

@@ -75,6 +75,7 @@ typedef struct {
   byte addr[MT_SZ_ADDR];
   int mac_balance;
   int chn_balance;
+  int chn_number;
 
   mt_desc_t ledger;
   int fee;
@@ -170,6 +171,7 @@ int mt_ipay_init(void){
   intermediary.fee = fee;
   intermediary.mac_balance = int_bal;
   intermediary.chn_balance = 0;
+  intermediary.chn_number = 0;
 
   // initialize channel containers
   intermediary.chns_setup = digestmap_new();
@@ -309,6 +311,13 @@ int mt_ipay_chn_balance(void){
   return intermediary.chn_balance;
 }
 
+/**
+ * Return the number of channels currently open
+ */
+int mt_ipay_chn_number(void){
+  return intermediary.chn_number;
+}
+
 /**************************** Initialize Protocols **********************/
 
 static int init_chn_int_setup(mt_channel_t* chn, byte (*pid)[DIGEST_LEN]){
@@ -321,7 +330,8 @@ static int init_chn_int_setup(mt_channel_t* chn, byte (*pid)[DIGEST_LEN]){
   memcpy(token.chn, chn->addr, MT_SZ_ADDR);
   // ignore channel token for now
 
-  // update balances;
+  // update local data;
+  intermediary.chn_number ++;
   intermediary.mac_balance -= token.val_from;
   intermediary.chn_balance += token.val_to;
 
@@ -587,7 +597,6 @@ static int handle_nan_end_close1(mt_desc_t* desc, nan_end_close1_t* token, byte 
 
   // if channel was NOT a direct payment then update balance
   if(end_state->num_payments == 0){
-    printf("whyyyy is this happening\n");
     intermediary.chn_balance += token->total_val;
   }
 

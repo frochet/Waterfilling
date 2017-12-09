@@ -98,6 +98,7 @@ typedef struct {
   byte addr[MT_SZ_ADDR];
   int mac_balance;
   int chn_balance;
+  int chn_number;
 
   mt_desc_t ledger;
   int fee;
@@ -110,6 +111,7 @@ typedef struct {
   digestmap_t* nans_estab;        // digest(rdesc) -> channel
   digestmap_t* nans_destab;       // digest(rdesc) -> channel
   digestmap_t* nans_reqclosed;    // digest(rdesc) -> channel
+  smartlist_t* chns_spent;
 
   // special container to hold channels in the middle of a protocol
   digestmap_t* chns_transition;   // pid -> channel
@@ -223,6 +225,7 @@ int mt_cpay_init(void){
   client.tax = tax;
   client.mac_balance = cli_bal;
   client.chn_balance = 0;
+  client.chn_number = 0;
 
   // initialize channel containers
   client.chns_setup = smartlist_new();
@@ -231,6 +234,7 @@ int mt_cpay_init(void){
   client.nans_estab = digestmap_new();
   client.nans_destab = digestmap_new();
   client.nans_reqclosed = digestmap_new();
+  client.chns_spent = smartlist_new();
   client.chns_transition = digestmap_new();
 
   // TODO generate new channels
@@ -304,13 +308,16 @@ static int pay_helper(mt_desc_t* rdesc, mt_desc_t* idesc){
   }
 
   // set up channel if possible; callback pay_helper
-  if(1){
+  if(client.mac_balance >= MT_CLI_CHN_VAL + client.fee){
     chn = new_channel();
     digestmap_set(client.chns_transition, (char*)pid, chn);
     chn->idesc = *idesc;    // set channel intermediary
     chn->callback = (mt_callback_t){.fn = pay_helper, .dref1 = *rdesc};
     return init_chn_end_setup(chn, &pid);
   }
+  printf("insufficient funds to create new channel\n");
+  log_debug(LD_MT, "insufficient funds to create new channel");
+  return MT_ERROR;
 }
 
 /**
@@ -333,7 +340,6 @@ static int dpay_helper(mt_desc_t* rdesc, mt_desc_t* idesc){
   // if maximum payments reached then close the current channel
   if((chn = digestmap_remove(client.nans_estab, (char*)digest)) &&
      chn->data.nan_state.num_payments == chn->data.nan_public.num_payments){
-    printf("why am i here?\n");
     mt_cpay_close(rdesc, idesc);
   }
 
@@ -367,11 +373,16 @@ static int dpay_helper(mt_desc_t* rdesc, mt_desc_t* idesc){
   }
 
   // setup channel if possible; callback dpay_helper
-  chn = new_channel();
-  digestmap_set(client.chns_transition, (char*)pid, chn);
-  chn->idesc = *idesc;
-  chn->callback = (mt_callback_t){.fn = dpay_helper, .dref1 = *rdesc};
-  return init_chn_end_setup(chn, &pid);
+  if(client.mac_balance >= MT_CLI_CHN_VAL + client.fee){
+    chn = new_channel();
+    digestmap_set(client.chns_transition, (char*)pid, chn);
+    chn->idesc = *idesc;
+    chn->callback = (mt_callback_t){.fn = dpay_helper, .dref1 = *rdesc};
+    return init_chn_end_setup(chn, &pid);
+  }
+
+  log_debug(LD_MT, "insufficient funds to create new channel");
+  return MT_ERROR;
 }
 
 /**
@@ -547,6 +558,13 @@ int mt_cpay_chn_balance(void){
   return client.chn_balance;
 }
 
+/**
+ * Return the number of channels currently open
+ */
+int mt_cpay_chn_number(void){
+  return client.chn_number;
+}
+
 
 /******************************* Channel Setup **************************/
 
@@ -557,13 +575,17 @@ static int init_chn_end_setup(mt_channel_t* chn, byte (*pid)[DIGEST_LEN]){
   chn_end_setup_t token;
   token.val_from = MT_CLI_CHN_VAL + client.fee;
   token.val_to = MT_CLI_CHN_VAL;
+  token.val_from = 105 * 30 + 5;
+  token.val_to = 105 * 30;
   memcpy(token.from, client.addr, MT_SZ_ADDR);
   memcpy(token.chn, chn->data.addr, MT_SZ_ADDR);
   // skip public for now
 
-  // update balances
+  // update local data
+  client.chn_number ++;
   client.mac_balance -= token.val_from;
   client.chn_balance += token.val_to;
+  chn->data.balance = token.val_to;
 
   // send setup message
   byte* msg;
@@ -708,8 +730,8 @@ static int init_nan_cli_setup1(mt_channel_t* chn, byte (*pid)[DIGEST_LEN]){
 
   // make token
   nan_cli_setup1_t token;
-  token.nan_public.val_to = MT_NAN_VAL;
   token.nan_public.val_from = MT_NAN_VAL + (MT_NAN_VAL * client.tax) / 100;
+  token.nan_public.val_to = MT_NAN_VAL;
   token.nan_public.num_payments = MT_NAN_LEN;
   memcpy(token.nan_public.hash_tail, chn->data.nan_secret.hc[0], MT_SZ_HASH);
 
@@ -1110,7 +1132,13 @@ static int help_nan_int_close8(void* args){
   free(args);
 
   digestmap_remove(client.chns_transition, (char*)pid);
-  smartlist_add(client.chns_estab, chn);
+  //smartlist_add(client.chns_estab, chn);
+
+  // if sufficient funds left then move channel to establish state, otherwise move to spent
+  if(chn->data.balance >= MT_NAN_LEN * (MT_NAN_VAL + (MT_NAN_VAL * client.tax) / 100))
+    smartlist_add(client.chns_estab, chn);
+  else
+    smartlist_add(client.chns_spent, chn);
 
   if(chn->callback.fn)
     return chn->callback.fn(&chn->callback.dref1, &chn->callback.dref2);
