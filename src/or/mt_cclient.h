@@ -67,8 +67,13 @@ void mt_cclient_launch_payment(origin_circuit_t* circ);
 /**
  * Interface to send payment message from a client related role
  */
-int mt_cclient_send_message(mt_desc_t  *desc, mt_ntype_t type,
+int mt_cclient_send_message(mt_desc_t  *desc, uint8_t command, mt_ntype_t type,
     byte* msg, int size);
+
+void mt_cclient_process_received_relaycell(origin_circuit_t *circ, relay_header_t *rh,
+   relay_pheader_t *rph, const uint8_t *payload);
+
+void mt_cclient_process_received_directpaymentcell(origin_circuit_t *, cell_t *cell);
 /****************************************************************************/
 
 /*

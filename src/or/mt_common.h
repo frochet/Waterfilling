@@ -102,10 +102,29 @@ void monetor_run_scheduled_events(time_t now);
 void relay_pheader_pack(uint8_t *dest, const relay_header_t* rh,
     relay_pheader_t* rph);
 
+
+/** Unpack the network order buffer src into relay_pheader_t
+ * struct
+ */
+void relay_pheader_unpack(relay_pheader_t *desc, const uint8_t *src);
+
 /**
  * gives a string description of this mt_desc_t*
  */
 const char* mt_desc_describe(mt_desc_t *desc);
+
+
+/** Interface to the payment module to send a payment cell.
+ *  This function dispaches to the right controller.
+ */
+void mt_process_received_relaycell(circuit_t *circ, relay_header_t* rh,
+    relay_pheader_t *rph, const uint8_t* payload);
+
+/** Interface to the payment module
+ * Dispatches to client controller or Intermediary controller
+ */
+
+int mt_process_received_directpaymentcell(circuit_t *circ, cell_t *cell);
 
 /************ Tor - Payment event interface *********************/
 

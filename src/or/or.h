@@ -608,6 +608,7 @@ typedef enum {
 #define RELAY_COMMAND_INTRO_ESTABLISHED 38
 #define RELAY_COMMAND_RENDEZVOUS_ESTABLISHED 39
 #define RELAY_COMMAND_INTRODUCE_ACK 40
+#define RELAY_COMMAND_MT 41 /*MoneTor payment*/
 
 /* Reasons why an OR connection is closed. */
 #define END_OR_CONN_REASON_DONE           1
@@ -950,6 +951,7 @@ typedef enum {
 #define CELL_CREATE2 10
 #define CELL_CREATED2 11
 #define CELL_PADDING_NEGOTIATE 12
+#define CELL_PAYMENT 13
 
 #define CELL_VPADDING 128
 #define CELL_CERTS 129
@@ -1017,7 +1019,7 @@ static inline int get_circ_id_size(int wide_circ_ids)
 /** Largest number of bytes that can fit in a relay cell payload. */
 #define RELAY_PAYLOAD_SIZE (CELL_PAYLOAD_SIZE-RELAY_HEADER_SIZE)
 /* Number of bytes in the payment's header */
-#define RELAY_PHEADER_SIZE 1
+#define RELAY_PHEADER_SIZE (1+2)
 /* Largest number of bytes that can fit in a payment cell */
 #define RELAY_PPAYLOAD_SIZE (CELL_PAYLOAD_SIZE-RELAY_PHEADER_SIZE-RELAY_HEADER_SIZE)
 
@@ -1225,7 +1227,7 @@ typedef struct {
 
 typedef struct {
   uint8_t pcommand; /** Payment command */
-
+  uint16_t length; /** How long is the payload */
 } relay_pheader_t;
 
 typedef struct socks_request_t socks_request_t;

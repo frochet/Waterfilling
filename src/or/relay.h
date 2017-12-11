@@ -26,7 +26,8 @@ relay_send_command_from_edge_,(streamid_t stream_id, circuit_t *circ,
                                size_t payload_len, crypt_path_t *cpath_layer,
                                const char *filename, int lineno));
 MOCK_DECL(int,
-relay_send_pcommand_from_edge_,(origin_circuit_t* circ, uint8_t relay_pcommand,
+relay_send_pcommand_from_edge_,(origin_circuit_t* circ, uint8_t relay_command,
+                                uint8_t relay_pcommand,
                                 const char *payload, size_t payload_len,
                                 const char *filename, int lineno));
 
@@ -37,9 +38,9 @@ relay_send_pcommand_from_edge_,(origin_circuit_t* circ, uint8_t relay_pcommand,
   relay_send_command_from_edge_((stream_id), (circ), (relay_command),   \
                                 (payload), (payload_len), (cpath_layer), \
                                 __FILE__, __LINE__)
-#define relay_send_pcommand_from_edge(circ, relay_pcommand, payload, \
+#define relay_send_pcommand_from_edge(circ, relay_command, relay_pcommand, payload, \
                                       payload_len)     \
-  relay_send_pcommand_from_edge_((circ), (relay_pcommand), (payload),     \
+  relay_send_pcommand_from_edge_((circ), (relay_command), (relay_pcommand), (payload),     \
                                  (payload_len), __FILE__, __LINE__)
 
 int connection_edge_send_command(edge_connection_t *fromconn,

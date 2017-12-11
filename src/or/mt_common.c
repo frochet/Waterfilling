@@ -12,6 +12,7 @@
 
 #include "or.h"
 #include "config.h"
+#include "compat.h"
 #include "mt_crypto.h" // only needed for the defined byte array sizes
 #include "mt_common.h"
 #include "mt_cclient.h"
@@ -175,23 +176,88 @@ void relay_pheader_pack(uint8_t *dest, const relay_header_t* rh,
   set_uint8(dest+10, rph->pcommand);
 }
 
+/** Unpack the network order buffer src into relay_pheader_t
+ * struct
+ */
+void relay_pheader_unpack(relay_pheader_t *dest, const uint8_t *src) {
+  dest->pcommand = get_uint8(src);
+}
+
+/** Called when we get a MoneTor cell on circuit circ.
+ *  gets the right mt_desc_t and dispatch to the right
+ *  payment module
+ */
+
+void mt_process_received_relaycell(circuit_t *circ, relay_header_t* rh,
+    relay_pheader_t* rph, const uint8_t* payload) {
+  (void) circ;
+  (void) rh;
+  (void) rph;
+  (void) payload;
+  
+  if (authdir_mode(get_options())) {
+  }
+  else if (intermediary_mode(get_options())) {
+  }
+  else if (server_mode(get_options())) {
+
+  }
+  else {
+    /* Client mode with one origin circuit */
+    if (CIRCUIT_IS_ORIGIN(circ)) {
+      /*everything's ok */
+      mt_cclient_process_received_relaycell(TO_ORIGIN_CIRCUIT(circ), rh, rph, payload);
+    }
+    else {
+      log_warn(LD_MT, "Receiving a payment cell on a non-origin circuit. dafuk?");
+      return;
+    }
+  }
+}
+
+int mt_process_received_directpaymentcell(circuit_t *circ, cell_t *cell) {
+  if (server_mode(get_options())) {
+  }
+  else {
+    /* Should in client mode with an origin circuit */
+    if (CIRCUIT_IS_ORIGIN(circ)) {
+      /* everything's ok, let's proceed */
+
+      mt_cclient_process_received_directpaymentcell(TO_ORIGIN_CIRCUIT(circ), cell);
+    }
+    else {
+      return -1;
+    }
+  }
+  /* if we reach this, everything is ok */
+  return 0;
+}
+
+/** Interface to the payment module to send a payment cell.
+ *  This function dispaches to the right controller.
+ */
+
 MOCK_IMPL(int, mt_send_message, (mt_desc_t *desc, mt_ntype_t type,
       byte* msg, int size)) {
  
   switch (type) {
+    uint8_t command;
     /* sending Client related message */
+    case MT_NTYPE_NAN_CLI_DESTAB1:
+    case MT_NTYPE_NAN_CLI_DPAY1:
+      command = CELL_PAYMENT;
+      return mt_cclient_send_message(desc, command, type, msg, size);
     case MT_NTYPE_MIC_CLI_PAY1:
     case MT_NTYPE_MIC_CLI_PAY3:
     case MT_NTYPE_MIC_CLI_PAY5:
     case MT_NTYPE_NAN_CLI_SETUP1:
     case MT_NTYPE_NAN_CLI_SETUP3:
     case MT_NTYPE_NAN_CLI_SETUP5:
-    case MT_NTYPE_NAN_CLI_DPAY1:
     case MT_NTYPE_NAN_CLI_ESTAB1:
-    case MT_NTYPE_NAN_CLI_DESTAB1:
     case MT_NTYPE_NAN_CLI_PAY1:
     case MT_NTYPE_NAN_CLI_REQCLOSE1:
-      return mt_cclient_send_message(desc, type, msg, size);
+      command = RELAY_COMMAND_MT;
+      return mt_cclient_send_message(desc, command, type, msg, size);
     /* Sending relay related message */
     case MT_NTYPE_MIC_REL_PAY2:
     case MT_NTYPE_MIC_REL_PAY6:
@@ -200,7 +266,8 @@ MOCK_IMPL(int, mt_send_message, (mt_desc_t *desc, mt_ntype_t type,
     case MT_NTYPE_NAN_REL_ESTAB6:
     case MT_NTYPE_NAN_REL_PAY2:
     case MT_NTYPE_NAN_REL_REQCLOSE2:
-      return mt_crelay_send_message(desc, type, msg, size);
+      command = RELAY_COMMAND_MT;
+      return mt_crelay_send_message(desc, command, type, msg, size);
     /* Sending to intermediary from client or server */
     case MT_NTYPE_CHN_END_ESTAB1:
     case MT_NTYPE_CHN_END_ESTAB3:
@@ -211,12 +278,13 @@ MOCK_IMPL(int, mt_send_message, (mt_desc_t *desc, mt_ntype_t type,
     case MT_NTYPE_CHN_END_SETUP:
     case MT_NTYPE_CHN_END_CLOSE:
     case MT_NTYPE_CHN_END_CASHOUT:
+      command = RELAY_COMMAND_MT;
       /* check server mode*/
       if (server_mode(get_options())) {
-        return mt_crelay_send_message(desc, type, msg, size);
+        return mt_crelay_send_message(desc, command, type, msg, size);
       }
       else {
-        return mt_cclient_send_message(desc, type, msg, size);
+        return mt_cclient_send_message(desc, command, type, msg, size);
       }
     /* Sending from authority */
     case MT_NTYPE_MAC_AUT_MINT:
@@ -247,23 +315,34 @@ MOCK_IMPL(int, mt_send_message, (mt_desc_t *desc, mt_ntype_t type,
     case MT_NTYPE_CHN_INT_REQCLOSE:
     case MT_NTYPE_CHN_INT_CASHOUT:
       if (intermediary_mode(get_options())) {
+        command = RELAY_COMMAND_MT;
         //todo
         return 0;
+      }
+      else if (server_mode(get_options())) {
+        /* Should match Direct payments */
+        command = CELL_PAYMENT;
+        // todo
+        return 0;
+      }
+      else {
+        log_warn(LD_MT, "Cannot handle type %d", (uint8_t)type);
       }
       break;
       /* Sending from any of them */
     case MT_NTYPE_MAC_ANY_TRANS:
+      command = RELAY_COMMAND_MT;
       if (intermediary_mode(get_options())) {
         return 0;
       }
       else if (server_mode(get_options())) {
-        return mt_crelay_send_message(desc, type, msg, size);
+        return mt_crelay_send_message(desc, command, type, msg, size);
       }
       else if (authdir_mode(get_options())) {
         return 0;
       }
       else {
-        return mt_cclient_send_message(desc, type, msg, size);
+        return mt_cclient_send_message(desc, command, type, msg, size);
       }
 
     default:
