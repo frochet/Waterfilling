@@ -676,7 +676,8 @@ relay_command_to_string(uint8_t command)
 }
 
 MOCK_IMPL(int,
-relay_send_pcommand_from_edge_,(origin_circuit_t* circ, uint8_t relay_pcommand,
+relay_send_pcommand_from_edge_,(origin_circuit_t* circ, uint8_t relay_command,
+                                uint8_t relay_pcommand,
                                 const char *payload, size_t payload_len,
                                 const char *filename, int lineno))
 {
@@ -687,12 +688,13 @@ relay_send_pcommand_from_edge_,(origin_circuit_t* circ, uint8_t relay_pcommand,
   memset(&cell, 0, sizeof(cell_t));
   memset(&rh, 0, sizeof(relay_header_t));
   memset(&rph, 0, sizeof(relay_pheader_t));
-  //XXX MoneTor TODOrh.command = 
+  rh.command = relay_command;
   rh.stream_id = 0;
   rh.length = payload_len+RELAY_PHEADER_SIZE;
   rph.pcommand = relay_pcommand;
+  rph.length = payload_len;
   relay_pheader_pack(cell.payload, &rh, &rph);
-  memcpy(cell.payload+RELAY_HEADER_SIZE+RELAY_PHEADER_SIZE, payload, payload_len);
+  memcpy(cell.payload+RELAY_HEADER_SIZE+RELAY_PHEADER_SIZE, payload, rph.length);
   
   if (TO_CIRCUIT(circ)->n_chan) {
     /* Update client timestamp to give priority */
@@ -1592,6 +1594,7 @@ connection_edge_process_relay_cell(cell_t *cell, circuit_t *circ,
 {
   static int num_seen=0;
   relay_header_t rh;
+  relay_pheader_t rph;
   unsigned domain = layer_hint?LD_APP:LD_EXIT;
   int reason;
   int optimistic_data = 0; /* Set to 1 if we receive data on a stream
@@ -1979,6 +1982,12 @@ connection_edge_process_relay_cell(cell_t *cell, circuit_t *circ,
       rend_process_relay_cell(circ, layer_hint,
                               rh.command, rh.length,
                               cell->payload+RELAY_HEADER_SIZE);
+      return 0;
+    case RELAY_COMMAND_MT:
+      
+      relay_pheader_unpack(&rph, cell->payload+RELAY_HEADER_SIZE);
+      mt_process_received_relaycell(circ, &rh, &rph, 
+          cell->payload+RELAY_HEADER_SIZE+RELAY_PHEADER_SIZE);
       return 0;
   }
   log_fn(LOG_PROTOCOL_WARN, LD_PROTOCOL,

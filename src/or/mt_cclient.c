@@ -446,17 +446,47 @@ mt_cclient_intermediary_circ_has_opened(origin_circuit_t *circ) {
  */
 
 int
-mt_cclient_send_message(mt_desc_t* desc, mt_ntype_t type,
+mt_cclient_send_message(mt_desc_t* desc, uint8_t command, mt_ntype_t type,
     byte* msg, int size) {
-  /*defensive prog from payment module*/
-  tor_assert(size <= RELAY_PPAYLOAD_SIZE);
-  /* init and stuff */
-  byte id[DIGEST_LEN];
-  mt_desc2digest(desc, &id);
-  origin_circuit_t* circ = digestmap_get(desc2circ, (char*) id);
-  tor_assert(circ);
-  return relay_send_pcommand_from_edge(circ, (uint8_t) type,
-      (const char*) msg, size);
+  if (command == RELAY_COMMAND_MT) {
+    /*defensive prog from payment module*/
+    tor_assert(size <= RELAY_PPAYLOAD_SIZE);
+    /* init and stuff */
+    byte id[DIGEST_LEN];
+    mt_desc2digest(desc, &id);
+    origin_circuit_t* circ = digestmap_get(desc2circ, (char*) id);
+    tor_assert(circ);
+    return relay_send_pcommand_from_edge(circ, command, (uint8_t) type,
+        (const char*) msg, size);
+  }
+  else if (command == CELL_PAYMENT) {
+    tor_assert(size <= CELL_PAYLOAD_SIZE-RELAY_PHEADER_SIZE);
+    // XXX MoneTor todo
+    return 0;
+  }
+  else {
+    log_warn(LD_MT, "Unrecognized command %d", command);
+  }
+  return -1;
+}
+
+/** Process received micro, nano payment cells from either relay, intermediary
+ * or ledger - Call the payment module and decides what
+ * to do upon failure
+ */
+void
+mt_cclient_process_received_relaycell(origin_circuit_t *circ, relay_header_t *rh,
+    relay_pheader_t *rph, const uint8_t *payload) {
+  (void) circ;
+  (void) rh;
+  (void) rph;
+  (void) payload;
+}
+
+void
+mt_cclient_process_received_directpaymentcell(origin_circuit_t *circ, cell_t *cell) {
+  (void) circ;
+  (void) cell;
 }
 
 /*************************** Object creation and cleanup *******************************/
