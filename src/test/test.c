@@ -1212,6 +1212,7 @@ struct testgroup_t testgroups[] = {
   { "mt_common/", mt_common_tests },
   { "mt_crypto/", mt_crypto_tests },
   { "mt_lpay/", mt_lpay_tests },
+  { "mt_paymulti/", mt_paymulti_tests },
   { "mt_paysimple/", mt_paysimple_tests },
   { "mt_tokens/", mt_tokens_tests },
   { "nodelist/", nodelist_tests },

@@ -5604,10 +5604,10 @@ typedef enum {
 //-------------------------- Public Payment Parameters ----------------------//
 
 #define MT_NAN_VAL 100
-#define MT_NAN_LEN 5
+#define MT_NAN_LEN 50
 #define MT_CLI_CHN_VAL 105 * 1000
 #define MT_REL_CHN_VAL 0
-#define MT_INT_CHN_VAL 100 * 1000
+#define MT_INT_CHN_VAL 200 * 1000
 
 //-------------------- Cryptographic String Sizes (bytes) -------------------//
 
@@ -5631,13 +5631,13 @@ typedef enum {
 // TODO: remove the Tor-based structs; these are only here so the test compile
 //       we obviously do not need them after integration with Tor
 
-#define MT_PAYLOAD_SIZE 497
+/* #define MT_PAYLOAD_SIZE 497 */
 
 
-typedef int (*mt_set_prem)(mt_desc_t);
-//typedef int (*mt_open_conn(/*some notion of a unique idenity (ED5519 idenity??*/);
-typedef int (*mt_send_cells)(mt_desc_t, cell_t*, int);
-typedef int (*mt_close_conn)(mt_desc_t);
+/* typedef int (*mt_set_prem)(mt_desc_t); */
+/* //typedef int (*mt_open_conn(/\*some notion of a unique idenity (ED5519 idenity??*\/); */
+/* typedef int (*mt_send_cells)(mt_desc_t, cell_t*, int); */
+/* typedef int (*mt_close_conn)(mt_desc_t); */
 
 //---------------------------- Controller States ----------------------------//
 
@@ -5879,6 +5879,7 @@ typedef struct {
   byte sk[MT_SZ_SK];
   byte addr[MT_SZ_ADDR];
   int balance;
+  int int_balance;
 
   mic_end_wallet_t chn_wallet;
   chn_end_secret_t chn_secret;
@@ -6023,6 +6024,7 @@ typedef struct {
 } chn_end_estab1_t;
 
 typedef struct {
+  int balance;
   mt_code_t verified;
 } chn_int_estab2_t;
 

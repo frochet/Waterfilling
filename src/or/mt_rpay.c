@@ -104,6 +104,7 @@ typedef struct {
   digestmap_t* chns_setup;       // digest(idesc) -> smartlist of channels
   digestmap_t* chns_estab;       // digest(idesc) -> smartlist of channels
   digestmap_t* nans_estab;       // digest(cdesc) -> channel
+  smartlist_t* chns_spent;
 
   // special container to hold channels in the middle of a protocol
   digestmap_t* chns_transition;  // pid -> channel
@@ -203,6 +204,7 @@ int mt_rpay_init(void){
   relay.chns_setup = digestmap_new();
   relay.chns_estab = digestmap_new();
   relay.nans_estab = digestmap_new();
+  relay.chns_spent = smartlist_new();
   relay.chns_transition = digestmap_new();
   relay.clis_idesc = digestmap_new();
 
@@ -346,6 +348,31 @@ int mt_rpay_chn_number(void){
   return relay.chn_number;
 }
 
+/**
+ * Delete the state of the payment module
+ */
+int mt_rpay_clear(void){
+  // Need to implement
+  tor_assert(0);
+}
+
+/**
+ * Export the state of the payment module into a serialized malloc'd byte string
+ */
+int mt_rpay_export(byte** export_out){
+  *export_out = tor_malloc(sizeof(relay));
+  memcpy(*export_out, &relay, sizeof(relay));
+  return sizeof(relay);
+}
+
+/**
+ * Overwrite the current payment module state with the provided string state
+ */
+int mt_rpay_import(byte* import){
+  memcpy(&relay, import, sizeof(relay));
+  return MT_SUCCESS;
+}
+
 
 /******************************* Channel Escrow *************************/
 
@@ -374,8 +401,8 @@ static int init_chn_end_setup(mt_channel_t* chn, byte (*pid)[DIGEST_LEN]){
 					     &chn->data.pk, &chn->data.sk, &signed_msg);
 
   int result = mt_send_message(&relay.ledger, MT_NTYPE_CHN_END_SETUP, signed_msg, signed_msg_size);
-  free(msg);
-  free(signed_msg);
+  tor_free(msg);
+  tor_free(signed_msg);
   return result;
 }
 
@@ -398,10 +425,11 @@ static int handle_any_led_confirm(mt_desc_t* desc, any_led_confirm_t* token, byt
   digestmap_remove(relay.chns_transition, (char*)*pid);
   digestmap_smartlist_add(relay.chns_setup, (char*)digest, chn);
 
-
   if(chn->callback.fn){
     mt_callback_t cb = chn->callback;
-    return cb.fn(&cb.dref1, cb.arg2, cb.arg3, cb.arg4);
+    int result = cb.fn(&cb.dref1, cb.arg2, cb.arg3, cb.arg4);
+    //tor_free(cb.arg3);
+    return result;
   }
   return MT_SUCCESS;
 }
@@ -425,7 +453,7 @@ static int help_chn_end_estab1(void* args){
   mt_channel_t* chn = ((mt_wcom_args_t*)args)->chn;
   byte pid[DIGEST_LEN];
   memcpy(pid, ((mt_wcom_args_t*)args)->pid, DIGEST_LEN);
-  free(args);
+  tor_free(args);
 
   chn_end_estab1_t token;
   memcpy(token.addr, chn->data.addr, MT_SZ_ADDR);
@@ -436,13 +464,19 @@ static int help_chn_end_estab1(void* args){
   byte* msg;
   int msg_size = pack_chn_end_estab1(&token, &pid, &msg);
   int result = mt_send_message(&chn->idesc, MT_NTYPE_CHN_END_ESTAB1, msg, msg_size);
-  free(msg);
+  tor_free(msg);
   return result;
 }
 
 static int handle_chn_int_estab2(mt_desc_t* desc, chn_int_estab2_t* token, byte (*pid)[DIGEST_LEN]){
-  (void)token;
   (void)desc;
+
+  mt_channel_t* chn = digestmap_get(relay.chns_transition, (char*)*pid);
+  if(chn == NULL){
+    log_debug(LD_MT, "protocol id not recognized");
+    return MT_ERROR;
+  }
+  chn->data.int_balance = token->balance;
 
   // check validity of incoming message;
 
@@ -453,7 +487,7 @@ static int handle_chn_int_estab2(mt_desc_t* desc, chn_int_estab2_t* token, byte 
   byte* msg;
   int msg_size = pack_chn_end_estab3(&reply, pid, &msg);
   int result = mt_send_message(desc, MT_NTYPE_CHN_END_ESTAB3, msg, msg_size);
-  free(msg);
+  tor_free(msg);
   return result;
 }
 
@@ -485,7 +519,7 @@ static int help_chn_int_estab4(void* args){
   mt_channel_t* chn = ((mt_wcom_args_t*)args)->chn;
   byte pid[DIGEST_LEN];
   memcpy(pid, ((mt_wcom_args_t*)args)->pid, DIGEST_LEN);
-  free(args);
+  tor_free(args);
 
   byte digest[DIGEST_LEN];
   mt_desc2digest(&chn->idesc, &digest);
@@ -494,7 +528,9 @@ static int help_chn_int_estab4(void* args){
 
   if(chn->callback.fn){
     mt_callback_t cb = chn->callback;
-    return cb.fn(&cb.dref1, cb.arg2, cb.arg3, cb.arg4);
+    int result = cb.fn(&cb.dref1, cb.arg2, cb.arg3, cb.arg4);
+    tor_free(cb.arg3);
+    return result;
   }
   return MT_SUCCESS;
 }
@@ -503,7 +539,6 @@ static int help_chn_int_estab4(void* args){
 /****************************** Nano Establish **************************/
 
 static int handle_nan_cli_estab1(mt_desc_t* desc, nan_cli_estab1_t* token, byte (*pid)[DIGEST_LEN]){
-
   mt_channel_t* chn;
   byte cdigest[DIGEST_LEN];
   mt_desc2digest(desc, &cdigest);
@@ -512,8 +547,15 @@ static int handle_nan_cli_estab1(mt_desc_t* desc, nan_cli_estab1_t* token, byte 
   byte idigest[DIGEST_LEN];
   mt_desc2digest(intermediary, &idigest);
 
-  // we have a free channel with this intermediary
+  // we have a tor_free channel with this intermediary
   if((chn = digestmap_smartlist_pop_last(relay.chns_estab, (char*)idigest))){
+
+    // if the channel doesn't have enough money then move it to spent and retry
+    if(chn->data.int_balance < token->nan_public.val_to * token->nan_public.num_payments){
+      smartlist_add(relay.chns_spent, chn);
+      return handle_nan_cli_estab1(desc, token, pid);
+    }
+
     digestmap_set(relay.chns_transition, (char*)*pid, chn);
     chn->cdesc = *desc;
     chn->callback.fn = NULL;
@@ -528,7 +570,7 @@ static int handle_nan_cli_estab1(mt_desc_t* desc, nan_cli_estab1_t* token, byte 
     byte* msg;
     int msg_size = pack_nan_rel_estab2(&reply, pid, &msg);
     int result = mt_send_message(&chn->idesc, MT_NTYPE_NAN_REL_ESTAB2, msg, msg_size);
-    free(msg);
+    tor_free(msg);
     return result;
   }
 
@@ -540,10 +582,7 @@ static int handle_nan_cli_estab1(mt_desc_t* desc, nan_cli_estab1_t* token, byte 
     digestmap_set(relay.chns_transition, (char*)rpid, chn);
     chn->callback = (mt_callback_t){.fn = mt_rpay_recv, .dref1 = *desc, .arg2 = MT_NTYPE_NAN_CLI_ESTAB1};
     chn->callback.arg4 = pack_nan_cli_estab1(token, pid, &chn->callback.arg3);
-    byte* msg = chn->callback.arg3;
-    int result = init_chn_end_estab1(chn, &rpid);
-    free(msg);
-    return result;
+    return init_chn_end_estab1(chn, &rpid);
   }
 
   // setup a new channel with the intermediary
@@ -552,10 +591,7 @@ static int handle_nan_cli_estab1(mt_desc_t* desc, nan_cli_estab1_t* token, byte 
   chn->idesc = *intermediary;
   chn->callback = (mt_callback_t){.fn = mt_rpay_recv, .dref1 = *desc, .arg2 = MT_NTYPE_NAN_CLI_ESTAB1};
   chn->callback.arg4 = pack_nan_cli_estab1(token, pid, &chn->callback.arg3);
-  byte* msg = chn->callback.arg3;
-  int result = init_chn_end_setup(chn, &rpid);
-  free(msg);
-  return result;
+  return init_chn_end_setup(chn, &rpid);
 }
 
 static int handle_nan_int_estab3(mt_desc_t* desc, nan_int_estab3_t* token, byte (*pid)[DIGEST_LEN]){
@@ -577,7 +613,7 @@ static int handle_nan_int_estab3(mt_desc_t* desc, nan_int_estab3_t* token, byte 
   byte* msg;
   int msg_size = pack_nan_rel_estab4(&reply, pid, &msg);
   int result = mt_send_message(desc, MT_NTYPE_NAN_REL_ESTAB4, msg, msg_size);
-  free(msg);
+  tor_free(msg);
   return result;
 }
 
@@ -605,7 +641,7 @@ static int handle_nan_int_estab5(mt_desc_t* desc, nan_int_estab5_t* token, byte 
   byte* msg;
   int msg_size = pack_nan_rel_estab6(&reply, pid, &msg);
   int result = mt_send_message(&chn->cdesc, MT_NTYPE_NAN_REL_ESTAB6, msg, msg_size);
-  free(msg);
+  tor_free(msg);
   return result;
 }
 
@@ -639,7 +675,7 @@ static int handle_nan_cli_pay1(mt_desc_t* desc, nan_cli_pay1_t* token, byte (*pi
   byte* msg;
   int msg_size = pack_nan_rel_pay2(&reply, pid, &msg);
   int result = mt_send_message(desc, MT_NTYPE_NAN_REL_PAY2, msg, msg_size);
-  free(msg);
+  tor_free(msg);
   return result;
 }
 
@@ -660,10 +696,7 @@ static int handle_nan_cli_reqclose1(mt_desc_t* desc, nan_cli_reqclose1_t* token,
     chn->callback = (mt_callback_t){.fn = mt_rpay_recv, .dref1 = *desc};
     chn->callback.arg2 = MT_NTYPE_NAN_CLI_REQCLOSE1;
     chn->callback.arg4 = pack_nan_cli_reqclose1(token, pid, &chn->callback.arg3);
-    byte* msg = chn->callback.arg3;
-    int result = init_nan_end_close1(chn, pid);
-    free(msg);
-    return result;
+    return init_nan_end_close1(chn, pid);
   }
 
   nan_rel_reqclose2_t reply;
@@ -673,7 +706,7 @@ static int handle_nan_cli_reqclose1(mt_desc_t* desc, nan_cli_reqclose1_t* token,
   byte* msg;
   int msg_size = pack_nan_rel_reqclose2(&reply, pid, &msg);
   int result = mt_send_message(desc, MT_NTYPE_NAN_REL_REQCLOSE2, msg, msg_size);
-  free(msg);
+  tor_free(msg);
   return result;
 }
 
@@ -693,7 +726,7 @@ static int init_nan_end_close1(mt_channel_t* chn, byte (*pid)[DIGEST_LEN]){
   byte* msg;
   int msg_size = pack_nan_end_close1(&token, pid, &msg);
   int result = mt_send_message(&chn->idesc, MT_NTYPE_NAN_END_CLOSE1, msg, msg_size);
-  free(msg);
+  tor_free(msg);
   return result;
 }
 
@@ -716,7 +749,7 @@ static int handle_nan_int_close2(mt_desc_t* desc, nan_int_close2_t* token, byte 
   byte* msg;
   int msg_size = pack_nan_end_close3(&reply, pid, &msg);
   int result = mt_send_message(desc, MT_NTYPE_NAN_END_CLOSE3, msg, msg_size);
-  free(msg);
+  tor_free(msg);
   return result;
 }
 
@@ -739,7 +772,7 @@ static int handle_nan_int_close4(mt_desc_t* desc, nan_int_close4_t* token, byte 
   byte* msg;
   int msg_size = pack_nan_end_close5(&reply, pid, &msg);
   int result = mt_send_message(desc, MT_NTYPE_NAN_END_CLOSE5, msg, msg_size);
-  free(msg);
+  tor_free(msg);
   return result;
 }
 
@@ -762,7 +795,7 @@ static int handle_nan_int_close6(mt_desc_t* desc, nan_int_close6_t* token, byte 
   byte* msg;
   int msg_size = pack_nan_end_close7(&reply, pid, &msg);
   int result = mt_send_message(desc, MT_NTYPE_NAN_END_CLOSE7, msg, msg_size);
-  free(msg);
+  tor_free(msg);
   return result;
 }
 
@@ -792,7 +825,7 @@ static int help_nan_int_close8(void *args){
   mt_channel_t* chn = ((mt_wcom_args_t*)args)->chn;
   byte pid[DIGEST_LEN];
   memcpy(pid, ((mt_wcom_args_t*)args)->pid, DIGEST_LEN);
-  free(args);
+  tor_free(args);
 
   byte digest[DIGEST_LEN];
   mt_desc2digest(&chn->idesc, &digest);
@@ -801,7 +834,9 @@ static int help_nan_int_close8(void *args){
 
   if(chn->callback.fn){
     mt_callback_t cb = chn->callback;
-    return cb.fn(&cb.dref1, cb.arg2, cb.arg3, cb.arg4);
+    int result = cb.fn(&cb.dref1, cb.arg2, cb.arg3, cb.arg4);
+    tor_free(cb.arg3);
+    return result;
   }
   return MT_SUCCESS;
 }

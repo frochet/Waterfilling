@@ -109,10 +109,31 @@ const char* mt_desc_describe(mt_desc_t *desc);
 
 /************ Tor - Payment event interface *********************/
 
+/**
+ * Send a message to the given descriptor
+ */
 MOCK_DECL(int, mt_send_message, (mt_desc_t *desc, mt_ntype_t type, byte* msg, int size));
 
+/**
+ * Send a message to the given descriptor attaching info about a 2nd descriptor
+ */
 MOCK_DECL(int, mt_send_message_multidesc, (mt_desc_t *desc1, mt_desc_t* desc2, mt_ntype_t type, byte* msg, int size));
 
+/**
+ * Alert the relay controller that a payment was received by the specified client
+ */
 MOCK_DECL(int, mt_alert_payment, (mt_desc_t *desc));
+
+/**
+ * Inform the controller of the success of an mt_cpay_pay() protocol
+ */
+MOCK_DECL(int, mt_pay_success, (mt_desc_t *rdesc, mt_desc_t* idesc, int success));
+
+/**
+ * Inform the controller of the success of an mt_cpay_close() protocol
+ */
+MOCK_DECL(int, mt_close_success, (mt_desc_t *rdesc, mt_desc_t* idesc, int success));
+
+
 
 #endif

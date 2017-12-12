@@ -6,6 +6,8 @@
  * frequently as the scheme is expanded
  */
 
+#pragma GCC diagnostic ignored "-Wswitch-enum"
+
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
@@ -177,7 +179,7 @@ void relay_pheader_pack(uint8_t *dest, const relay_header_t* rh,
 
 MOCK_IMPL(int, mt_send_message, (mt_desc_t *desc, mt_ntype_t type,
       byte* msg, int size)) {
- 
+
   switch (type) {
     /* sending Client related message */
     case MT_NTYPE_MIC_CLI_PAY1:
@@ -284,5 +286,19 @@ MOCK_IMPL(int, mt_send_message_multidesc, (mt_desc_t *desc1, mt_desc_t* desc2, m
 
 MOCK_IMPL(int, mt_alert_payment, (mt_desc_t *desc)) {
   (void) desc;
+  return 0;
+}
+
+MOCK_IMPL(int, mt_pay_success, (mt_desc_t *rdesc, mt_desc_t* idesc, int success)){
+  (void)rdesc;
+  (void)idesc;
+  (void)success;
+  return 0;
+}
+
+MOCK_IMPL(int, mt_close_success, (mt_desc_t *rdesc, mt_desc_t* idesc, int success)){
+  (void)rdesc;
+  (void)idesc;
+  (void)success;
   return 0;
 }

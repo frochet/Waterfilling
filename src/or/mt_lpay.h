@@ -47,9 +47,20 @@ mt_payment_public_t mt_lpay_get_payment_public(void);
 
 /********************** Instance Management ***********************/
 
+/**
+ * Delete the state of the payment module
+ */
 int mt_lpay_clear(void);
-int mt_lpay_export(byte** ledger);
-int mt_lpay_import(byte* ledger);
+
+/**
+ * Export the state of the payment module into a serialized malloc'd byte string
+ */
+int mt_lpay_export(byte** export_out);
+
+/**
+ * Overwrite the current payment module state with the provided string state
+ */
+int mt_lpay_import(byte* import);
 
 /*********************** Testing Functions ************************/
 

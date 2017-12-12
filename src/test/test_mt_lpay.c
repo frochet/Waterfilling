@@ -15,38 +15,12 @@
 int send_intercept_1;
 int send_intercept_2;
 
-int send_msg(mt_desc_t desc, mt_ntype_t type, byte* msg, int size);
-int send_msg(mt_desc_t desc, mt_ntype_t type, byte* msg, int size){
+static int mock_send_message(mt_desc_t *desc, mt_ntype_t type, byte* msg, int size){
   (void)desc;
   (void)type;
   (void)msg;
   (void)size;
-  return 0;
-  /*
-  byte pk_discard[MT_SZ_PK];
-
-  switch(token_type(cells)){
-    case MT_NTYPE_MAC_LED_DATA:;
-      mac_led_data_t mac_data;
-      int c_led_data_t mac_data_size = unpack_mac_led_data(cells, &mac_data, &pk_discard);
-      send_intercept_1 = mac_data.balance;
-      break;
-    case MT_NTYPE_CHN_LED_DATA:;
-      chn_led_data_t chn_data;
-      int n_led_data_t chn_data_size = unpack_chn_led_data(cells, &chn_data, &pk_discard);
-      send_intercept_1 = chn_data.end_balance;
-      send_intercept_2 = chn_data.int_balance;
-      break;
-    default:
-      tt_assert(1 == 2);
-      }*/
-  return 0;
-}
-
-int close_conn(mt_desc_t desc);
-int close_conn(mt_desc_t desc){
-  (void)desc;
-  return 0;
+  return MT_SUCCESS;
 }
 
 static int send_ledger(byte (*pk)[MT_SZ_PK], byte (*sk)[MT_SZ_SK], mt_desc_t* desc, mt_ntype_t type, void* tkn){
@@ -96,13 +70,13 @@ static int send_ledger(byte (*pk)[MT_SZ_PK], byte (*sk)[MT_SZ_SK], mt_desc_t* de
   int signed_msg_size = mt_create_signed_msg(packed_msg, packed_msg_size, pk, sk, &signed_msg);
 
   if(signed_msg_size == MT_ERROR){
-    free(packed_msg);
+    tor_free(packed_msg);
     return MT_ERROR;
   }
 
   int result = mt_lpay_recv(desc, type, signed_msg, signed_msg_size);
-  free(packed_msg);
-  free(signed_msg);
+  tor_free(packed_msg);
+  tor_free(signed_msg);
 
   return result;
 }
@@ -111,6 +85,8 @@ static int send_ledger(byte (*pk)[MT_SZ_PK], byte (*sk)[MT_SZ_SK], mt_desc_t* de
 static void test_mt_lpay(void *arg)
 {
   (void)arg;
+
+  MOCK(mt_send_message, mock_send_message);
 
   //----------------------------------- Setup ---------------------------------//
 
@@ -313,6 +289,8 @@ static void test_mt_lpay(void *arg)
 
  done:;
   tt_assert(mt_lpay_clear() == MT_SUCCESS);
+
+  UNMOCK(mt_send_message);
 }
 
 struct testcase_t mt_lpay_tests[] = {

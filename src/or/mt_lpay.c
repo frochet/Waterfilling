@@ -248,10 +248,14 @@ int mt_lpay_recv(mt_desc_t* desc, mt_ntype_t type, byte* msg, int size){
   byte* response_msg;
   int response_size = pack_any_led_confirm(&response, &pid, &response_msg);
 
-  result = mt_send_message(desc, MT_NTYPE_ANY_LED_CONFIRM, response_msg, response_size);
+  if(mt_send_message(desc, MT_NTYPE_ANY_LED_CONFIRM, response_msg, response_size) != MT_SUCCESS){
+    tor_free(raw_msg);
+    tor_free(response_msg);
+    return MT_ERROR;
+  }
 
-  free(raw_msg);
-  free(response_msg);
+  tor_free(raw_msg);
+  tor_free(response_msg);
   return result;
 }
 
@@ -621,20 +625,18 @@ int mt_lpay_clear(void){
   void* val;
   digestmap_iter_t* i;
 
-  // free all mac accounts
+  // tor_free all mac accounts
   for(i = digestmap_iter_init(ledger.mac_accounts); !(digestmap_iter_done(i)); ){
     digestmap_iter_get(i, &key, &val);
-
     i = digestmap_iter_next_rmv(ledger.mac_accounts, i);
-    free(val);
+    tor_free(val);
   }
 
-  // free all channel accounts
+  // tor_free all channel accounts
   for(i = digestmap_iter_init(ledger.chn_accounts); !(digestmap_iter_done(i)); ){
     digestmap_iter_get(i, &key, &val);
-
     i = digestmap_iter_next_rmv(ledger.chn_accounts, i);
-    free(val);
+    tor_free(val);
   }
 
   // overwrite ledger state with zeros

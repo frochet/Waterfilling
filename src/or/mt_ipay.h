@@ -34,4 +34,22 @@ int mt_ipay_chn_balance(void);
  */
 int mt_ipay_chn_number(void);
 
+/********************** Instance Management ***********************/
+
+/**
+ * Delete the state of the payment module
+ */
+int mt_ipay_clear(void);
+
+/**
+ * Export the state of the payment module into a serialized malloc'd byte string
+ */
+int mt_ipay_export(byte** export_out);
+
+/**
+ * Overwrite the current payment module state with the provided string state
+ */
+int mt_ipay_import(byte* import);
+
+
 #endif

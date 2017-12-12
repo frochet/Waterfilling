@@ -33,12 +33,12 @@ static mt_desc_t rel_desc;
 static mt_desc_t int_desc;
 
 // needed so send_message can track where the current message should be coming from
-static mt_desc_t cur_desc;
-static mt_desc_t old_desc;
+static mt_desc_t src_desc;
+static mt_desc_t dst_desc;
 
 /**
  * Pass a payment module call of <b>send_message<\b> to the given local instance
- * of a payment module. The variables <b>cur_desc<\b> and <b>old_desc<\b> are
+ * of a payment module. The variables <b>dst_desc<\b> and <b>src_desc<\b> are
  * used to track where messages are coming from and going to in order to route
  * messages properly.
  */
@@ -46,8 +46,8 @@ static int mock_send_message(mt_desc_t *desc, mt_ntype_t type, byte* msg, int si
 
   mt_desc_t temp_desc;
   memcpy(&temp_desc, desc, sizeof(mt_desc_t));
-  memcpy(&old_desc, &cur_desc, sizeof(mt_desc_t));
-  memcpy(&cur_desc, &temp_desc, sizeof(mt_desc_t));
+  memcpy(&src_desc, &dst_desc, sizeof(mt_desc_t));
+  memcpy(&dst_desc, &temp_desc, sizeof(mt_desc_t));
 
   const char* type_str;
   const char* party_str;
@@ -219,7 +219,7 @@ static int mock_send_message(mt_desc_t *desc, mt_ntype_t type, byte* msg, int si
   }
 
   // assign a string for logging purposes
-  switch(old_desc.party){
+  switch(src_desc.party){
     case MT_PARTY_AUT:
       party_str = "aut";
       break;
@@ -238,29 +238,29 @@ static int mock_send_message(mt_desc_t *desc, mt_ntype_t type, byte* msg, int si
   }
 
   // invoke the corresponding recv call and log
-  if(cur_desc.id == aut_desc.id && cur_desc.party == MT_PARTY_AUT){
+  if(dst_desc.id == aut_desc.id && dst_desc.party == MT_PARTY_AUT){
     printf("%s -> aut : %s\n", party_str, type_str);
     return MT_SUCCESS;
   }
 
-  if(cur_desc.id == led_desc.id && cur_desc.party == MT_PARTY_LED){
+  if(dst_desc.id == led_desc.id && dst_desc.party == MT_PARTY_LED){
     printf("%s -> led : %s\n", party_str, type_str);
-    return mt_lpay_recv(&old_desc, type, msg, size);
+    return mt_lpay_recv(&src_desc, type, msg, size);
   }
 
-  if(cur_desc.id == cli_desc.id && cur_desc.party == MT_PARTY_CLI){
+  if(dst_desc.id == cli_desc.id && dst_desc.party == MT_PARTY_CLI){
     printf("%s -> cli : %s\n", party_str, type_str);
-    return mt_cpay_recv(&old_desc, type, msg, size);
+    return mt_cpay_recv(&src_desc, type, msg, size);
   }
 
-  if(cur_desc.id == rel_desc.id && cur_desc.party == MT_PARTY_REL){
+  if(dst_desc.id == rel_desc.id && dst_desc.party == MT_PARTY_REL){
     printf("%s -> rel : %s\n", party_str, type_str);
-    return mt_rpay_recv(&old_desc, type, msg, size);
+    return mt_rpay_recv(&src_desc, type, msg, size);
   }
 
-  if(cur_desc.id == int_desc.id && cur_desc.party == MT_PARTY_INT){
+  if(dst_desc.id == int_desc.id && dst_desc.party == MT_PARTY_INT){
     printf("%s -> int : %s\n", party_str, type_str);
-    return mt_ipay_recv(&old_desc, type, msg, size);
+    return mt_ipay_recv(&src_desc, type, msg, size);
   }
 
   printf("ERROR: descriptor not recognized\n");
@@ -273,14 +273,14 @@ static int mock_send_message(mt_desc_t *desc, mt_ntype_t type, byte* msg, int si
 static int mock_send_message_multidesc(mt_desc_t *desc1, mt_desc_t* desc2, mt_ntype_t type, byte* msg, int size){
   mt_desc_t temp_desc;
   memcpy(&temp_desc, desc1, sizeof(mt_desc_t));
-  memcpy(&old_desc, &cur_desc, sizeof(mt_desc_t));
-  memcpy(&cur_desc, &temp_desc, sizeof(mt_desc_t));
+  memcpy(&src_desc, &dst_desc, sizeof(mt_desc_t));
+  memcpy(&dst_desc, &temp_desc, sizeof(mt_desc_t));
 
-  if(cur_desc.id == rel_desc.id
-     && cur_desc.party == MT_PARTY_REL
+  if(dst_desc.id == rel_desc.id
+     && dst_desc.party == MT_PARTY_REL
      && type == MT_NTYPE_NAN_CLI_ESTAB1){
     printf("cli - >rel : nan_cli_estab1\n");
-    return mt_rpay_recv_multidesc(&old_desc, desc2, type, msg, size);
+    return mt_rpay_recv_multidesc(&src_desc, desc2, type, msg, size);
   }
 
   return MT_ERROR;
@@ -290,6 +290,8 @@ static int mock_send_message_multidesc(mt_desc_t *desc1, mt_desc_t* desc2, mt_nt
  * Mock the alert_payment function
  */
 static int mock_alert_payment(mt_desc_t* desc){
+  (void)desc;
+
   int cli_bal = mt_cpay_mac_balance() + mt_cpay_chn_balance();
   int rel_bal = mt_rpay_mac_balance() + mt_rpay_chn_balance();
   int int_bal = mt_ipay_mac_balance() + mt_ipay_chn_balance();
@@ -356,6 +358,7 @@ static void test_mt_paysimple(void *arg){
   // declare values to save to the disk
 
   byte pp[MT_SZ_PP];
+
   byte aut_pk[MT_SZ_PK];
   byte aut_sk[MT_SZ_SK];
   aut_desc.party = MT_PARTY_AUT;
@@ -458,7 +461,7 @@ static void test_mt_paysimple(void *arg){
   int signed_mint_size = mt_create_signed_msg(packed_mint, packed_mint_size,
 					      &aut_pk, &aut_sk, &signed_mint);
 
-  memcpy(&cur_desc, &aut_desc, sizeof(mt_desc_t));
+  memcpy(&dst_desc, &aut_desc, sizeof(mt_desc_t));
   result = mt_send_message(&led_desc, MT_NTYPE_MAC_AUT_MINT, signed_mint, signed_mint_size);
   tt_assert(result == MT_SUCCESS);
 
@@ -475,7 +478,7 @@ static void test_mt_paysimple(void *arg){
   int packed_cli_trans_size = pack_mac_any_trans(&cli_trans, &cli_trans_id, &packed_cli_trans);
   int signed_cli_trans_size = mt_create_signed_msg(packed_cli_trans, packed_cli_trans_size,
 						   &aut_pk, &aut_sk, &signed_cli_trans);
-  memcpy(&cur_desc, &aut_desc, sizeof(mt_desc_t));
+  memcpy(&dst_desc, &aut_desc, sizeof(mt_desc_t));
   result = mt_send_message(&led_desc, MT_NTYPE_MAC_ANY_TRANS, signed_cli_trans, signed_cli_trans_size);
   tt_assert(result == MT_SUCCESS);
 
@@ -492,7 +495,7 @@ static void test_mt_paysimple(void *arg){
   int packed_rel_trans_size = pack_mac_any_trans(&rel_trans, &rel_trans_id, &packed_rel_trans);
   int signed_rel_trans_size = mt_create_signed_msg(packed_rel_trans, packed_rel_trans_size,
 						   &aut_pk, &aut_sk, &signed_rel_trans);
-  memcpy(&cur_desc, &aut_desc, sizeof(mt_desc_t));
+  memcpy(&dst_desc, &aut_desc, sizeof(mt_desc_t));
   result = mt_send_message(&led_desc, MT_NTYPE_MAC_ANY_TRANS, signed_rel_trans, signed_rel_trans_size);
   tt_assert(result == MT_SUCCESS);
 
@@ -509,7 +512,7 @@ static void test_mt_paysimple(void *arg){
   int packed_int_trans_size = pack_mac_any_trans(&int_trans, &int_trans_id, &packed_int_trans);
   int signed_int_trans_size = mt_create_signed_msg(packed_int_trans, packed_int_trans_size,
 						   &aut_pk, &aut_sk, &signed_int_trans);
-  memcpy(&cur_desc, &aut_desc, sizeof(mt_desc_t));
+  memcpy(&dst_desc, &aut_desc, sizeof(mt_desc_t));
   result = mt_send_message(&led_desc, MT_NTYPE_MAC_ANY_TRANS, signed_int_trans, signed_int_trans_size);
   tt_assert(result == MT_SUCCESS);
 
@@ -528,28 +531,28 @@ static void test_mt_paysimple(void *arg){
 
   for(int i = 0; i < num_pay; i++){
     printf("\n");
-    memcpy(&cur_desc, &cli_desc, sizeof(mt_desc_t));
+    memcpy(&dst_desc, &cli_desc, sizeof(mt_desc_t));
     tt_assert(mt_cpay_pay(&rel_desc, &int_desc) == MT_SUCCESS);
   }
 
   // close the channel
 
   printf("\n");
-  memcpy(&cur_desc, &cli_desc, sizeof(mt_desc_t));
+  memcpy(&dst_desc, &cli_desc, sizeof(mt_desc_t));
   tt_assert(mt_cpay_close(&rel_desc, &int_desc) == MT_SUCCESS);
 
   // send direct payments to the intermediary
 
   for(int i = 0; i < num_dpay; i++){
     printf("\n");
-    memcpy(&cur_desc, &cli_desc, sizeof(mt_desc_t));
+    memcpy(&dst_desc, &cli_desc, sizeof(mt_desc_t));
     tt_assert(mt_cpay_pay(&int_desc, &int_desc) == MT_SUCCESS);
   }
 
   // close the channel
 
   printf("\n");
-  memcpy(&cur_desc, &cli_desc, sizeof(mt_desc_t));
+  memcpy(&dst_desc, &cli_desc, sizeof(mt_desc_t));
   tt_assert(mt_cpay_close(&int_desc, &int_desc) == MT_SUCCESS);
 
   // make sure channel balances are what we expect them to be;
@@ -574,19 +577,21 @@ static void test_mt_paysimple(void *arg){
 
  done:;
 
+  tor_assert(mt_lpay_clear() == MT_SUCCESS);
+
   UNMOCK(mt_send_message);
   UNMOCK(mt_send_message_multidesc);
   UNMOCK(mt_alert_payment);
   UNMOCK(cpuworker_queue_work);
 
-  free(signed_mint);
-  free(packed_mint);
-  free(packed_cli_trans);
-  free(signed_cli_trans);
-  free(packed_rel_trans);
-  free(signed_rel_trans);
-  free(packed_int_trans);
-  free(signed_int_trans);
+  tor_free(signed_mint);
+  tor_free(packed_mint);
+  tor_free(packed_cli_trans);
+  tor_free(signed_cli_trans);
+  tor_free(packed_rel_trans);
+  tor_free(signed_rel_trans);
+  tor_free(packed_int_trans);
+  tor_free(signed_int_trans);
 }
 
 struct testcase_t mt_paysimple_tests[] = {
