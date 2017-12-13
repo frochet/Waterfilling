@@ -692,9 +692,9 @@ relay_send_pcommand_from_edge_,(origin_circuit_t* circ, uint8_t relay_command,
   rh.stream_id = 0;
   rh.length = payload_len+RELAY_PHEADER_SIZE;
   rph.pcommand = relay_pcommand;
-  rph.length = payload_len;
+  rph.length = payload_len-1;
   relay_pheader_pack(cell.payload, &rh, &rph);
-  memcpy(cell.payload+RELAY_HEADER_SIZE+RELAY_PHEADER_SIZE, payload, rph.length);
+  memcpy(cell.payload+RELAY_HEADER_SIZE+RELAY_PHEADER_SIZE, payload+1, rph.length);
   
   if (TO_CIRCUIT(circ)->n_chan) {
     /* Update client timestamp to give priority */

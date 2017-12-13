@@ -374,7 +374,10 @@ run_cclient_scheduled_events(time_t now) {
  */
 
 void mt_cclient_general_circ_has_closed(origin_circuit_t *circ) {
-  (void) circ;
+  if (circ->ppath) {
+    log_info(LD_MT, "a general circuit has closed");
+    // verify what to do.. ? notify payment module?
+  }
 }
 
 
@@ -449,20 +452,33 @@ mt_cclient_intermediary_circ_has_opened(origin_circuit_t *circ) {
 int
 mt_cclient_send_message(mt_desc_t* desc, uint8_t command, mt_ntype_t type,
     byte* msg, int size) {
+  /* init and stuff */
+  byte id[DIGEST_LEN];
+  mt_desc2digest(desc, &id);
+  origin_circuit_t* circ = digestmap_get(desc2circ, (char*) id);
+  tor_assert(circ);
   if (command == RELAY_COMMAND_MT) {
     /*defensive prog from payment module*/
     tor_assert(size <= RELAY_PPAYLOAD_SIZE);
-    /* init and stuff */
-    byte id[DIGEST_LEN];
-    mt_desc2digest(desc, &id);
-    origin_circuit_t* circ = digestmap_get(desc2circ, (char*) id);
-    tor_assert(circ);
     return relay_send_pcommand_from_edge(circ, command, (uint8_t) type,
         (const char*) msg, size);
   }
   else if (command == CELL_PAYMENT) {
     tor_assert(size <= CELL_PAYLOAD_SIZE-RELAY_PHEADER_SIZE);
     // XXX MoneTor todo
+    cell_t cell;
+    relay_pheader_t rph;
+    memset(&cell, 0, sizeof(cell_t));
+    memset(&rph, 0, sizeof(relay_pheader_t));
+    cell.circ_id = TO_CIRCUIT(circ)->n_circ_id;
+    cell.command = command;
+    rph.pcommand = type;
+    rph.length = size-1;
+    direct_pheader_pack(cell.payload, &rph);
+    memcpy(cell.payload+RELAY_PHEADER_SIZE, msg+1, rph.length);
+    log_info(LD_MT, "Adding cell payment %d to queue", rph.pcommand);
+    cell_queue_append_packed_copy(NULL, &TO_CIRCUIT(circ)->n_chan_cells, 0, &cell,
+        TO_CIRCUIT(circ)->n_chan->wide_circ_ids, 0);
     return 0;
   }
   else {
@@ -488,7 +504,7 @@ mt_cclient_process_received_relaycell(origin_circuit_t *circ, relay_header_t *rh
     memcpy(msg, payload, rph->length);
     log_info(LD_MT, "Processed a cell sent by our intermediary %s - calling mt_ipay_recv",
         extend_info_describe(intermediary->ei));
-    if (mt_ipay_recv(desc, rph->pcommand, msg, rph->length) < 0) {
+    if (mt_cpay_recv(desc, rph->pcommand, msg, rph->length) < 0) {
       // XXX Do we mark this circuit for close and complain about
       // intermediary?
       // XXX Do we notify all general circuit that the payment will not complete?
@@ -528,10 +544,14 @@ mt_cclient_process_received_relaycell(origin_circuit_t *circ, relay_header_t *rh
 /** Process a direct payment cell sent by our guard
  */
 void
-mt_cclient_process_received_directpaymentcell(origin_circuit_t *circ, cell_t *cell) {
+mt_cclient_process_received_directpaymentcell(origin_circuit_t *circ, cell_t *cell, 
+    relay_pheader_t *rph) {
   tor_assert(circ->ppath);
-  
-  (void) cell;
+  mt_desc_t *desc = &circ->ppath->desc;
+  if (mt_cpay_recv(desc, rph->pcommand, cell->payload+RELAY_PHEADER_SIZE,
+        rph->length) < 0) {
+    // XXX MoneTor what to do if we fail here?
+  }
 }
 
 /*************************** Object creation and cleanup *******************************/

@@ -183,7 +183,13 @@ void relay_pheader_pack(uint8_t *dest, const relay_header_t* rh,
  */
 void relay_pheader_unpack(relay_pheader_t *dest, const uint8_t *src) {
   dest->pcommand = get_uint8(src);
+  dest->length = ntohs(get_uint16(src+1));
 }
+
+void direct_pheader_pack(uint8_t *dest, relay_pheader_t *rph) {
+  set_uint8(dest, rph->pcommand);
+  set_uint16(dest+1, htons(rph->length));
+}  
 
 /** Called when we get a MoneTor cell on circuit circ.
  *  gets the right mt_desc_t and dispatch to the right
@@ -220,6 +226,10 @@ void mt_process_received_relaycell(circuit_t *circ, relay_header_t* rh,
  */
 
 int mt_process_received_directpaymentcell(circuit_t *circ, cell_t *cell) {
+  
+  relay_pheader_t rph;
+  relay_pheader_unpack(&rph, cell->payload);
+
   if (server_mode(get_options())) {
   }
   else {
@@ -227,7 +237,7 @@ int mt_process_received_directpaymentcell(circuit_t *circ, cell_t *cell) {
     if (CIRCUIT_IS_ORIGIN(circ)) {
       /* everything's ok, let's proceed */
 
-      mt_cclient_process_received_directpaymentcell(TO_ORIGIN_CIRCUIT(circ), cell);
+      mt_cclient_process_received_directpaymentcell(TO_ORIGIN_CIRCUIT(circ), cell, &rph);
     }
     else {
       return -1;

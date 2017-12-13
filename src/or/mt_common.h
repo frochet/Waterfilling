@@ -108,6 +108,9 @@ void relay_pheader_pack(uint8_t *dest, const relay_header_t* rh,
  */
 void relay_pheader_unpack(relay_pheader_t *desc, const uint8_t *src);
 
+
+void direct_pheader_pack(uint8_t *dest, relay_pheader_t *rph);
+
 /**
  * gives a string description of this mt_desc_t*
  */
