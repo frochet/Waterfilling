@@ -32,7 +32,7 @@
 #define REL_NUM 8
 #define INT_NUM 4
 
-#define SIZE_CIRC 3
+#define REL_CONNS 4
 
 typedef struct {
   mt_desc_t desc;
@@ -173,7 +173,7 @@ static workqueue_entry_t* mock_cpuworker_queue_work(workqueue_priority_t priorit
 static int mock_pay_success(mt_desc_t* rdesc, mt_desc_t* idesc, int success){
   (void)success;
 
-  // as long as there is still time keep making payments
+  // as long as there is still time keep making payments, otherwise close
   if(sim_time < max_time){
 
     event_t* event = tor_malloc(sizeof(event_t));
@@ -184,6 +184,16 @@ static int mock_pay_success(mt_desc_t* rdesc, mt_desc_t* idesc, int success){
 
     smartlist_add(event_queue, event);
   }
+  else {
+    event_t* event = tor_malloc(sizeof(event_t));
+    event->type = CALL_CLOSE;
+    event->src = cur_desc;
+    event->desc1 = *rdesc;
+    event->desc2 = *idesc;
+
+    smartlist_add(event_queue, event);
+  }
+
   return MT_SUCCESS;
 }
 
@@ -443,6 +453,51 @@ static int compare_random(const void **a, const void **b){
   return -1;
 }
 
+static void set_up_main_loop(void){
+    MAP_FOREACH(digestmap_, cli_ctx, const char*, digest, context_t*, ctx){
+    mt_cpay_import(ctx->state);
+    tor_free(ctx->state);
+
+    // populate random subset of relays
+    mt_desc_t unique_rel_descs[REL_CONNS];
+    int index = 0;
+    while(index < REL_CONNS){
+
+      mt_desc_t relay = ((context_t*)digestmap_rand(rel_ctx))->desc;
+      unique_rel_descs[index] = relay;
+
+      for(int j = 0; j < index; j++){
+	if(unique_rel_descs[j].id == relay.id){
+	  index--;
+	}
+      }
+      index++;
+    }
+
+    // make indirect payments
+    for(int i = 0; i < REL_CONNS; i++){
+      event_t* event = tor_malloc(sizeof(event_t));
+      event->type = CALL_PAY;
+      event->src = ctx->desc;
+      event->desc1 = unique_rel_descs[i];
+      event->desc2 = ((context_t*)digestmap_rand(int_ctx))->desc;
+      smartlist_add(event_queue, event);
+    }
+
+    // make direct payments
+
+    event_t* event = tor_malloc(sizeof(event_t));
+    event->type = CALL_PAY;
+    event->src = ctx->desc;
+    event->desc1 = ((context_t*)digestmap_rand(int_ctx))->desc;
+    event->desc2 = event->desc1;
+    smartlist_add(event_queue, event);
+
+    mt_cpay_export(&ctx->state);
+  } MAP_FOREACH_END;
+
+}
+
 static int do_main_loop_once(void){
 
   // shuffle events for fun
@@ -463,15 +518,21 @@ static int do_main_loop_once(void){
 
   context_t* ctx;
 
-  // update expected balances
-  if(event->type == CALL_PAY){
-    byte int_digest[DIGEST_LEN];
-    mt_desc2digest(&event->desc2, &int_digest);
+  byte int_digest[DIGEST_LEN];
+  mt_desc2digest(&event->desc2, &int_digest);
+  int MT_NAN_TAX = MT_NAN_VAL * public.tax / 100;
 
-    int MT_NAN_TAX = MT_NAN_VAL * public.tax / 100;
+  // update expected balances for pay
+  if(event->type == CALL_PAY && memcmp(dst_digest, int_digest, DIGEST_LEN) != 0){
     *(int*)digestmap_get(exp_balance, (char*)src_digest) -= MT_NAN_VAL + MT_NAN_TAX;
     *(int*)digestmap_get(exp_balance, (char*)dst_digest) += MT_NAN_VAL;
     *(int*)digestmap_get(exp_balance, (char*)int_digest) += MT_NAN_TAX;
+  }
+
+  // update expected balances for direct pay
+  if(event->type == CALL_PAY && memcmp(dst_digest, int_digest, DIGEST_LEN) == 0){
+    *(int*)digestmap_get(exp_balance, (char*)src_digest) -= MT_NAN_VAL + MT_NAN_TAX;
+    *(int*)digestmap_get(exp_balance, (char*)int_digest) += MT_NAN_VAL + MT_NAN_TAX;
   }
 
   switch(event->type){
@@ -480,7 +541,7 @@ static int do_main_loop_once(void){
       mt_cpay_import(ctx->state);
       tor_free(ctx->state);
       cur_desc = event->src;
-      printf("cli (%02d) : call pay\n", (int)event->src.id);
+      printf("cli (%02d) : call pay (%02d)\n", (int)event->src.id, (int)event->desc1.id);
       result = mt_cpay_pay(&event->desc1, &event->desc2);
       mt_cpay_export(&ctx->state);
       break;
@@ -490,7 +551,7 @@ static int do_main_loop_once(void){
       mt_cpay_import(ctx->state);
       tor_free(ctx->state);
       cur_desc = event->src;
-      printf("cli (%02d) : call close\n", (int)event->src.id);
+      printf("cli (%02d) : call close (%02d)\n", (int)event->src.id, (int)event->desc1.id);
       result = mt_cpay_close(&event->desc1, &event->desc2);
       mt_cpay_export(&ctx->state);
       break;
@@ -601,6 +662,9 @@ static void test_mt_paymulti(void *arg){
 
   // seed random number so we get repeatable results
   srand(42);
+
+  // make sure we have enough relays to connect to
+  tt_assert(REL_NUM >= REL_CONNS);
 
   int result;
 
@@ -827,23 +891,17 @@ static void test_mt_paymulti(void *arg){
 
   printf("\n");
 
-  // begin chain of pay requests
+  // start events
+  set_up_main_loop();
 
-  MAP_FOREACH(digestmap_, cli_ctx, const char*, digest, context_t*, ctx){
-    mt_cpay_import(ctx->state);
-    tor_free(ctx->state);
+  // main loop
+  while(smartlist_len(event_queue) > 0){
+    tt_assert(do_main_loop_once() == MT_SUCCESS);
+  }
 
-    for(int i = 0; i < SIZE_CIRC; i++){
-      event_t* event = tor_malloc(sizeof(event_t));
-      event->type = CALL_PAY;
-      event->src = ctx->desc;
-      event->desc1 = ((context_t*)digestmap_rand(rel_ctx))->desc;
-      event->desc2 = ((context_t*)digestmap_rand(int_ctx))->desc;
-      smartlist_add(event_queue, event);
-    }
-
-    mt_cpay_export(&ctx->state);
-  } MAP_FOREACH_END;
+  // do it again
+  sim_time = 0;
+  set_up_main_loop();
 
   while(smartlist_len(event_queue) > 0){
     tt_assert(do_main_loop_once() == MT_SUCCESS);
@@ -869,7 +927,7 @@ static void test_mt_paymulti(void *arg){
     mt_ipay_import(ctx->state);
     int bal =  mt_ipay_mac_balance() + mt_ipay_chn_balance();
     int exp = *(int*)digestmap_get(exp_balance, digest) - public.fee * mt_ipay_chn_number();
-    tor_assert(bal < exp);
+    tor_assert(bal == exp);
   } MAP_FOREACH_END;
 
  done:;
