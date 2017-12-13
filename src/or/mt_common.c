@@ -188,15 +188,12 @@ void relay_pheader_unpack(relay_pheader_t *dest, const uint8_t *src) {
 /** Called when we get a MoneTor cell on circuit circ.
  *  gets the right mt_desc_t and dispatch to the right
  *  payment module
+ *
+ *  layer_hint allows us to know which relay sent us this cell
  */
 
 void mt_process_received_relaycell(circuit_t *circ, relay_header_t* rh,
-    relay_pheader_t* rph, const uint8_t* payload) {
-  (void) circ;
-  (void) rh;
-  (void) rph;
-  (void) payload;
-  
+    relay_pheader_t* rph, crypt_path_t *layer_hint, const uint8_t* payload) {
   if (authdir_mode(get_options())) {
   }
   else if (intermediary_mode(get_options())) {
@@ -208,7 +205,7 @@ void mt_process_received_relaycell(circuit_t *circ, relay_header_t* rh,
     /* Client mode with one origin circuit */
     if (CIRCUIT_IS_ORIGIN(circ)) {
       /*everything's ok */
-      mt_cclient_process_received_relaycell(TO_ORIGIN_CIRCUIT(circ), rh, rph, payload);
+      mt_cclient_process_received_relaycell(TO_ORIGIN_CIRCUIT(circ), rh, rph, layer_hint, payload);
     }
     else {
       log_warn(LD_MT, "Receiving a payment cell on a non-origin circuit. dafuk?");
@@ -216,6 +213,11 @@ void mt_process_received_relaycell(circuit_t *circ, relay_header_t* rh,
     }
   }
 }
+
+/*
+ * Called when we got a peer-level MoneTor cell on this circ. No onion-decryption
+ * had to be performed.  cell must contain the plaintext 
+ */
 
 int mt_process_received_directpaymentcell(circuit_t *circ, cell_t *cell) {
   if (server_mode(get_options())) {

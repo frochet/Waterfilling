@@ -118,7 +118,7 @@ const char* mt_desc_describe(mt_desc_t *desc);
  *  This function dispaches to the right controller.
  */
 void mt_process_received_relaycell(circuit_t *circ, relay_header_t* rh,
-    relay_pheader_t *rph, const uint8_t* payload);
+    relay_pheader_t *rph, crypt_path_t* layer_hint, const uint8_t* payload);
 
 /** Interface to the payment module
  * Dispatches to client controller or Intermediary controller
