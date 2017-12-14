@@ -68,6 +68,7 @@ LIBTOR_A_SOURCES = \
 	src/or/main.c					\
 	src/or/microdesc.c				\
   src/or/mt_cclient.c       \
+  src/or/mt_cintermediary.c        \
   src/or/mt_cpay.c        \
   src/or/mt_common.c        \
   src/or/mt_crelay.c        \
@@ -217,6 +218,7 @@ ORHEADERS = \
 	src/or/main.h					\
 	src/or/microdesc.h				\
   src/or/mt_cclient.h         \
+  src/or/mt_cintermediary.h         \
   src/or/mt_cpay.h        \
   src/or/mt_common.h        \
   src/or/mt_crelay.h        \
