@@ -13,12 +13,14 @@
 #include <stdio.h>
 
 #include "or.h"
+#include "buffers.h"
 #include "config.h"
 #include "compat.h"
 #include "mt_crypto.h" // only needed for the defined byte array sizes
 #include "mt_common.h"
 #include "mt_cclient.h"
 #include "mt_crelay.h"
+#include "mt_tokens.h"
 #include "router.h"
 
 /**
@@ -199,7 +201,9 @@ void direct_pheader_pack(uint8_t *dest, relay_pheader_t *rph) {
  */
 
 void mt_process_received_relaycell(circuit_t *circ, relay_header_t* rh,
-    relay_pheader_t* rph, crypt_path_t *layer_hint, const uint8_t* payload) {
+    relay_pheader_t* rph, crypt_path_t *layer_hint, uint8_t* payload) {
+  (void) rh; //need to refactor
+  size_t msg_len = mt_token_get_size_of(rph->pcommand);
   if (authdir_mode(get_options())) {
   }
   else if (intermediary_mode(get_options())) {
@@ -210,11 +214,62 @@ void mt_process_received_relaycell(circuit_t *circ, relay_header_t* rh,
   else {
     /* Client mode with one origin circuit */
     if (CIRCUIT_IS_ORIGIN(circ)) {
-      /*everything's ok */
-      mt_cclient_process_received_relaycell(TO_ORIGIN_CIRCUIT(circ), rh, rph, layer_hint, payload);
+      if (msg_len > RELAY_PPAYLOAD_SIZE) {
+        if (circ->purpose == CIRCUIT_PURPOSE_C_GENERAL) {
+          // get right ppath
+          origin_circuit_t *ocirc = TO_ORIGIN_CIRCUIT(circ);
+          pay_path_t *ppath = ocirc->ppath;
+          crypt_path_t *cpath = ocirc->cpath;
+          do {
+            cpath = cpath->next;
+            ppath = ppath->next;
+          } while (cpath != layer_hint);
+          /* We have the right hop  -- get the buffer */
+          buf_add(ppath->buf, (char*) payload, rph->length);
+          if (buf_datalen(ppath->buf) == msg_len) {
+            /*We can now process the received message*/
+            byte *msg = tor_malloc(msg_len);
+            buf_get_bytes(ppath->buf, (char*) msg, msg_len);
+            buf_clear(ppath->buf);
+            mt_cclient_process_received_msg(ocirc, layer_hint, rph->pcommand, msg, msg_len);
+          }
+          else {
+            log_info(LD_MT, "Buffering one received payment cell of type %hhx"
+                " current buf datalen: %lu", rph->pcommand, buf_datalen(ppath->buf));
+            return;
+          }
+        }
+        else if (circ->purpose == CIRCUIT_PURPOSE_C_INTERMEDIARY) {
+          origin_circuit_t *ocirc = TO_ORIGIN_CIRCUIT(circ);
+          intermediary_t *intermediary = mt_cclient_get_intermediary_from_ocirc(ocirc);
+          buf_add(intermediary->buf, (char*) payload, rph->length);
+          if (buf_datalen(intermediary->buf) == msg_len) {
+            byte *msg = tor_malloc(msg_len);
+            buf_get_bytes(intermediary->buf, (char*) msg, msg_len);
+            buf_clear(intermediary->buf);
+            mt_cclient_process_received_msg(ocirc, layer_hint, rph->pcommand, msg, msg_len);
+          }
+          else {
+            log_info(LD_MT, "Buffering one received payment cell of type %hhx"
+                " current buf datalen on the intermediary: %lu",
+                rph->pcommand, buf_datalen(intermediary->buf));
+            return;
+          }
+        }
+        else {
+          // XXX ledger stuff
+        }
+      }
+      else {
+        /* Yay no need to buffer */
+        tor_assert(rph->length == msg_len);
+        mt_cclient_process_received_msg(TO_ORIGIN_CIRCUIT(circ), layer_hint, rph->pcommand,
+            payload, rph->length);
+      }
     }
     else {
-      log_warn(LD_MT, "Receiving a payment cell on a non-origin circuit. dafuk?");
+      /* defensive prog */
+      log_warn(LD_MT, "Receiving a client payment cell on a non-origin circuit. dafuk?");
       return;
     }
   }

@@ -1,6 +1,7 @@
 
 #include "or.h"
 #include "config.h"
+#include "buffers.h"
 #include "mt_cclient.h"
 #include "mt_common.h"
 #include "mt_cpay.h"
@@ -15,6 +16,7 @@
 #include "circuituse.h"
 #include "relay.h"
 #include "router.h"
+#include "scheduler.h"
 #include "torlog.h"
 #include "main.h"
 
@@ -466,7 +468,6 @@ mt_cclient_send_message(mt_desc_t* desc, uint8_t command, mt_ntype_t type,
   }
   else if (command == CELL_PAYMENT) {
     tor_assert(size <= CELL_PAYLOAD_SIZE-RELAY_PHEADER_SIZE);
-    // XXX MoneTor todo
     cell_t cell;
     relay_pheader_t rph;
     memset(&cell, 0, sizeof(cell_t));
@@ -480,12 +481,9 @@ mt_cclient_send_message(mt_desc_t* desc, uint8_t command, mt_ntype_t type,
     log_info(LD_MT, "Adding cell payment %d to queue", rph.pcommand);
     cell_queue_append_packed_copy(NULL, &TO_CIRCUIT(circ)->n_chan_cells, 0, &cell,
         TO_CIRCUIT(circ)->n_chan->wide_circ_ids, 0);
-    /* We flush if we have no cells in this queue */
-    if (!channel_has_queued_writes(TO_CIRCUIT(circ)->n_chan)) {
-      log_info(LD_MT, "Flushing payment cell");
-      // XXX CHECK THAT IT IS THE RIGHT WAY
-      channel_flush_from_first_active_circuit(TO_CIRCUIT(circ)->n_chan, 1);
-    }
+    
+    update_circuit_on_cmux(TO_CIRCUIT(circ), CELL_DIRECTION_OUT);
+    scheduler_channel_has_waiting_cells(TO_CIRCUIT(circ)->n_chan);
     return 0;
   }
   else {
@@ -494,31 +492,29 @@ mt_cclient_send_message(mt_desc_t* desc, uint8_t command, mt_ntype_t type,
   return -1;
 }
 
-/** Process received micro, nano payment cells from either relay, intermediary
+/** Process received msg from either relay, intermediary
  * or ledger - Call the payment module and decides what
  * to do upon failure
  */
 void
-mt_cclient_process_received_relaycell(origin_circuit_t *circ, relay_header_t *rh,
-    relay_pheader_t *rph, crypt_path_t *layer_hint, const uint8_t *payload) {
-  (void) rh; //no need - refactor code?
+mt_cclient_process_received_msg(origin_circuit_t *circ, crypt_path_t *layer_hint, 
+    mt_ntype_t pcommand, byte *msg, size_t msg_len) {
   mt_desc_t *desc;
   /*What type of node sent us this cell? relay, intermediary or ledger? */
   if (TO_CIRCUIT(circ)->purpose == CIRCUIT_PURPOSE_C_INTERMEDIARY) {
     intermediary_t *intermediary = mt_cclient_get_intermediary_from_ocirc(circ);
     desc = &intermediary->desc;
-    byte *msg = tor_malloc(rph->length);
-    memcpy(msg, payload, rph->length);
     log_info(LD_MT, "Processed a cell sent by our intermediary %s - calling mt_ipay_recv",
         extend_info_describe(intermediary->ei));
-    // XXX Buffering cells?
-    if (mt_cpay_recv(desc, rph->pcommand, msg, rph->length) < 0) {
+    // XXX Buffering cells? - We should do this in mt_common
+    if (mt_cpay_recv(desc, pcommand, msg, msg_len) < 0) {
+      log_info(LD_MT, "Payment module returned -1 for mt_ntype_t %d", pcommand);
       // XXX Do we mark this circuit for close and complain about
       // intermediary?
       // XXX Do we notify all general circuit that the payment will not complete?
 
     }
-    tor_free(msg);
+    /*tor_free(msg);*/ //should be freed by mt_common
   }
   else if (TO_CIRCUIT(circ)->purpose == CIRCUIT_PURPOSE_C_GENERAL) {
 
@@ -534,16 +530,15 @@ mt_cclient_process_received_relaycell(origin_circuit_t *circ, relay_header_t *rh
     } while (cpath != layer_hint);
     /* get the right desc */
     desc = &ppath->desc;
-    byte *msg = tor_malloc(rph->length);
-    memcpy(msg, payload, rph->length);
     //XXX todo Buffering cells
     log_info(LD_MT, "Processed a cell sent by relay linked to desc %s - calling mt_cpay_recv",
         mt_desc_describe(desc));
-    if (mt_cpay_recv(desc, rph->pcommand, msg, rph->length) < 0) {
+    if (mt_cpay_recv(desc, pcommand, msg, msg_len) < 0) {
       /* De we retry or close? Let's assume easiest things -> we close*/
+      log_info(LD_MT, "Payment module returned -1 for mt_ntype_t %d", pcommand);
       ppath->p_marked_for_close = 1;
     }
-    tor_free(msg);
+    /*tor_free(msg);*/ // should be freed by mt_common
   }
   else {
     log_warn(LD_MT, "intermediary circuit not implemented yet");
@@ -571,6 +566,7 @@ pay_path_free(pay_path_t* ppath) {
   if (!ppath)
     return;
   tor_free(ppath->inter_ident);
+  buf_free(ppath->buf);
   /* Recursive call to explore the linked list */
   pay_path_free(ppath->next);
 }
@@ -610,6 +606,7 @@ intermediary_new(const node_t *node, extend_info_t *ei, time_t now) {
   intermediary->desc.party = MT_PARTY_INT;
   intermediary->chosen_at = now;
   intermediary->ei = ei;
+  intermediary->buf = buf_new_with_capacity(RELAY_PPAYLOAD_SIZE);
   return intermediary;
 }
 
@@ -619,5 +616,6 @@ intermediary_free(intermediary_t *intermediary) {
     return;
   if (intermediary->ei)
     extend_info_free(intermediary->ei);
+  buf_free(intermediary->buf);
   tor_free(intermediary);
 }

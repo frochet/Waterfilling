@@ -617,3 +617,7 @@ int unpack_token(mt_ntype_t type, byte* str, int tkn_size, void* tkn_out, byte(*
   memcpy(*pid_out, str + sizeof(mt_ntype_t) + tkn_size, DIGEST_LEN);
   return MT_SUCCESS;
 }
+
+size_t mt_token_get_size_of(mt_ntype_t type) {
+  return 0; // XXX todo
+}

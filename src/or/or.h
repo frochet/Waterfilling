@@ -989,6 +989,8 @@ typedef enum {
 
 /** Number of bytes in a cell, minus cell header. */
 #define CELL_PAYLOAD_SIZE 509
+/** Number of bytes in a direct payment cells, minus headers */
+#define CELL_PPAYLOAD_SIZE 506
 /** Number of bytes in a cell transmitted over the network, in the longest
  * form */
 #define CELL_MAX_NETWORK_SIZE 514
@@ -2944,6 +2946,10 @@ typedef struct pay_path_t {
 
   /* Payment descriptor for the relay at that hop*/
   mt_desc_t desc;
+
+  /*buf containing cell payloads if we need multiple
+   * cells for a mt_type_t */
+  struct buf_t *buf;
 
   struct pay_path_t *next;
   struct pay_path_t *prev;

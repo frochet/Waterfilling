@@ -16,7 +16,9 @@ void mt_cclient_intermediary_circ_has_opened(origin_circuit_t *circ);
 #define MAX_INTERMEDIARY_LINKED_TO_MIDDLE 1
 #define MAX_INTERMEDIARY_LINKED_TO_EXIT 1
 //XXX MoneTor - define following as the sum of the two above
-#define MAX_INTERMEDIARY_CHOSEN 2 // XXX MoneTor - do we need backup intermediaries?
+
+// XXX MoneTor - do we need backup intermediaries?
+#define MAX_INTERMEDIARY_CHOSEN 2
 
 
 
@@ -70,10 +72,12 @@ void mt_cclient_launch_payment(origin_circuit_t* circ);
 int mt_cclient_send_message(mt_desc_t  *desc, uint8_t command, mt_ntype_t type,
     byte* msg, int size);
 
-void mt_cclient_process_received_relaycell(origin_circuit_t *circ, relay_header_t *rh,
-   relay_pheader_t *rph, crypt_path_t *layer_hint, const uint8_t *payload);
+void mt_cclient_process_received_msg(origin_circuit_t *circ,
+    crypt_path_t *layer_hint, mt_ntype_t type, byte *msg, size_t
+    msg_len);
 
-void mt_cclient_process_received_directpaymentcell(origin_circuit_t *, cell_t *cell,
+void mt_cclient_process_received_directpaymentcell(origin_circuit_t
+    *, cell_t *cell,
     relay_pheader_t *rph);
 /****************************************************************************/
 
