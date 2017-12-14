@@ -1,11 +1,11 @@
 
 #include "or.h"
 #include "config.h"
-#include "channel.h"
 #include "mt_cclient.h"
 #include "mt_common.h"
 #include "mt_cpay.h"
 #include "mt_ipay.h"
+#include "channel.h"
 #include "nodelist.h"
 #include "routerlist.h"
 #include "util.h"
@@ -459,8 +459,9 @@ mt_cclient_send_message(mt_desc_t* desc, uint8_t command, mt_ntype_t type,
   tor_assert(circ);
   if (command == RELAY_COMMAND_MT) {
     /*defensive prog from payment module*/
-    tor_assert(size <= RELAY_PPAYLOAD_SIZE);
-    return relay_send_pcommand_from_edge(circ, command, (uint8_t) type,
+    /*tor_assert(size <= RELAY_PPAYLOAD_SIZE);*/
+    // XXX Sending many cells depending of size
+    return relay_send_pcommand_from_edge(TO_CIRCUIT(circ), command, (uint8_t) type,
         (const char*) msg, size);
   }
   else if (command == CELL_PAYMENT) {
@@ -479,6 +480,12 @@ mt_cclient_send_message(mt_desc_t* desc, uint8_t command, mt_ntype_t type,
     log_info(LD_MT, "Adding cell payment %d to queue", rph.pcommand);
     cell_queue_append_packed_copy(NULL, &TO_CIRCUIT(circ)->n_chan_cells, 0, &cell,
         TO_CIRCUIT(circ)->n_chan->wide_circ_ids, 0);
+    /* We flush if we have no cells in this queue */
+    if (!channel_has_queued_writes(TO_CIRCUIT(circ)->n_chan)) {
+      log_info(LD_MT, "Flushing payment cell");
+      // XXX CHECK THAT IT IS THE RIGHT WAY
+      channel_flush_from_first_active_circuit(TO_CIRCUIT(circ)->n_chan, 1);
+    }
     return 0;
   }
   else {
@@ -504,6 +511,7 @@ mt_cclient_process_received_relaycell(origin_circuit_t *circ, relay_header_t *rh
     memcpy(msg, payload, rph->length);
     log_info(LD_MT, "Processed a cell sent by our intermediary %s - calling mt_ipay_recv",
         extend_info_describe(intermediary->ei));
+    // XXX Buffering cells?
     if (mt_cpay_recv(desc, rph->pcommand, msg, rph->length) < 0) {
       // XXX Do we mark this circuit for close and complain about
       // intermediary?
@@ -528,6 +536,7 @@ mt_cclient_process_received_relaycell(origin_circuit_t *circ, relay_header_t *rh
     desc = &ppath->desc;
     byte *msg = tor_malloc(rph->length);
     memcpy(msg, payload, rph->length);
+    //XXX todo Buffering cells
     log_info(LD_MT, "Processed a cell sent by relay linked to desc %s - calling mt_cpay_recv",
         mt_desc_describe(desc));
     if (mt_cpay_recv(desc, rph->pcommand, msg, rph->length) < 0) {

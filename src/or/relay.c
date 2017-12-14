@@ -675,8 +675,14 @@ relay_command_to_string(uint8_t command)
   }
 }
 
+/**
+ *
+ * Payload may contain way more bytes than RELAY_PPAYLOAD_SIZE
+ * If this is true, then we send multiple cells
+ */
+
 MOCK_IMPL(int,
-relay_send_pcommand_from_edge_,(origin_circuit_t* circ, uint8_t relay_command,
+relay_send_pcommand_from_edge_,(circuit_t* circ, uint8_t relay_command,
                                 uint8_t relay_pcommand,
                                 const char *payload, size_t payload_len,
                                 const char *filename, int lineno))
@@ -685,36 +691,79 @@ relay_send_pcommand_from_edge_,(origin_circuit_t* circ, uint8_t relay_command,
   cell_t cell;
   relay_header_t rh;
   relay_pheader_t rph;
+  crypt_path_t *cpath_layer; /* if we're origin => circ->cpath*/
+  cell_direction_t cell_direction;
   memset(&cell, 0, sizeof(cell_t));
   memset(&rh, 0, sizeof(relay_header_t));
   memset(&rph, 0, sizeof(relay_pheader_t));
+  if (CIRCUIT_IS_ORIGIN(circ)) {
+    cell.circ_id = circ->n_circ_id;
+    cell_direction = CELL_DIRECTION_OUT;
+    cpath_layer = TO_ORIGIN_CIRCUIT(circ)->cpath;
+  }
+  else {
+    cell.circ_id = TO_OR_CIRCUIT(circ)->p_circ_id;
+    cell_direction = CELL_DIRECTION_IN;
+    cpath_layer = NULL;
+  }
   rh.command = relay_command;
   rh.stream_id = 0;
-  rh.length = payload_len+RELAY_PHEADER_SIZE;
   rph.pcommand = relay_pcommand;
-  rph.length = payload_len-1;
-  relay_pheader_pack(cell.payload, &rh, &rph);
-  memcpy(cell.payload+RELAY_HEADER_SIZE+RELAY_PHEADER_SIZE, payload+1, rph.length);
-  
-  if (TO_CIRCUIT(circ)->n_chan) {
-    /* Update client timestamp to give priority */
-    channel_timestamp_client(TO_CIRCUIT(circ)->n_chan);
-  }
-  log_debug(LD_MT, "MoneTor - Packaging cell type %d", relay_pcommand);
+  /* If we have a payment cell with less than RELAY_PPAYLOAD_SIZE
+   * then we can package the cell*/
+  if (payload_len <= RELAY_PPAYLOAD_SIZE) {
+    rh.length = payload_len+RELAY_PHEADER_SIZE;
+    rph.length = payload_len;
+    relay_pheader_pack(cell.payload, &rh, &rph);
+    memcpy(cell.payload+RELAY_HEADER_SIZE+RELAY_PHEADER_SIZE, payload, rph.length);
+    if (cell_direction == CELL_DIRECTION_OUT && circ->n_chan) {
+      /* Update client timestamp to give priority */
+      channel_timestamp_client(circ->n_chan);
+    }
+    log_debug(LD_MT, "MoneTor - Packaging cell type %d", relay_pcommand);
 
-  return circuit_package_relay_cell(&cell, TO_CIRCUIT(circ), CELL_DIRECTION_OUT,
-      circ->cpath, 0,filename, lineno);
+    return circuit_package_relay_cell(&cell, circ, cell_direction,
+        cpath_layer, 0, filename, lineno);
+  }
+  else {
+    int nbr_cells = payload_len/RELAY_PPAYLOAD_SIZE + 1;
+    log_info(LD_MT, "Payload is larger than RELAY_PPAYLOAD_SIZE,"
+        " we are about to send %d cells", nbr_cells);
+    int payload_remains = payload_len;
+    for (int i = 0; i < nbr_cells; i++) {
+      if (i == nbr_cells) {
+        rh.length = payload_remains+RELAY_PHEADER_SIZE;
+        rph.length = payload_remains;
+      }
+      else {
+        rh.length = RELAY_PAYLOAD_SIZE;
+        rph.length = RELAY_PPAYLOAD_SIZE;
+      }
+      relay_pheader_pack(cell.payload, &rh, &rph);
+      memcpy(cell.payload+RELAY_HEADER_SIZE+RELAY_PHEADER_SIZE,
+          payload+i*RELAY_PPAYLOAD_SIZE, rph.length);
+      if (circuit_package_relay_cell(&cell, circ, cell_direction,
+            cpath_layer, 0, filename, lineno) < 0) {
+        log_info(LD_MT, "We are packaging several cells at once"
+            " and one packaging failed ...");
+        return -1;
+      }
+      payload_remains -= rph.length;
+    }
+    tor_assert(payload_remains == 0);
+    return 0;
+  }
 }
 
-/** Make a relay cell out of <b>relay_command</b> and <b>payload</b>, and send
- * it onto the open circuit <b>circ</b>. <b>stream_id</b> is the ID on
- * <b>circ</b> for the stream that's sending the relay cell, or 0 if it's a
- * control cell.  <b>cpath_layer</b> is NULL for OR->OP cells, or the
- * destination hop for OP->OR cells.
- *
- * If you can't send the cell, mark the circuit for close and return -1. Else
- * return 0.
- */
+  /** Make a relay cell out of <b>relay_command</b> and <b>payload</b>, and send
+   * it onto the open circuit <b>circ</b>. <b>stream_id</b> is the ID on
+   * <b>circ</b> for the stream that's sending the relay cell, or 0 if it's a
+   * control cell.  <b>cpath_layer</b> is NULL for OR->OP cells, or the
+   * destination hop for OP->OR cells.
+   *
+   * If you can't send the cell, mark the circuit for close and return -1. Else
+   * return 0.
+   */
 MOCK_IMPL(int,
 relay_send_command_from_edge_,(streamid_t stream_id, circuit_t *circ,
                                uint8_t relay_command, const char *payload,
