@@ -726,7 +726,11 @@ relay_send_pcommand_from_edge_,(circuit_t* circ, uint8_t relay_command,
         cpath_layer, 0, filename, lineno);
   }
   else {
-    int nbr_cells = payload_len/RELAY_PPAYLOAD_SIZE + 1;
+    int nbr_cells;
+    if (payload_len % RELAY_PPAYLOAD_SIZE == 0)
+      nbr_cells = payload_len/RELAY_PPAYLOAD_SIZE;
+    else
+      nbr_cells = payload_len/RELAY_PPAYLOAD_SIZE + 1;
     log_info(LD_MT, "Payload is larger than RELAY_PPAYLOAD_SIZE,"
         " we are about to send %d cells", nbr_cells);
     int payload_remains = payload_len;

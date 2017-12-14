@@ -467,7 +467,8 @@ mt_cclient_send_message(mt_desc_t* desc, uint8_t command, mt_ntype_t type,
         (const char*) msg, size);
   }
   else if (command == CELL_PAYMENT) {
-    tor_assert(size <= CELL_PAYLOAD_SIZE-RELAY_PHEADER_SIZE);
+    //XXX fix following code. msg can be >
+    /*tor_assert(size <= CELL_PAYLOAD_SIZE-RELAY_PHEADER_SIZE);*/
     cell_t cell;
     relay_pheader_t rph;
     memset(&cell, 0, sizeof(cell_t));
@@ -475,13 +476,27 @@ mt_cclient_send_message(mt_desc_t* desc, uint8_t command, mt_ntype_t type,
     cell.circ_id = TO_CIRCUIT(circ)->n_circ_id;
     cell.command = command;
     rph.pcommand = type;
-    rph.length = size-1;
-    direct_pheader_pack(cell.payload, &rph);
-    memcpy(cell.payload+RELAY_PHEADER_SIZE, msg+1, rph.length);
-    log_info(LD_MT, "Adding cell payment %d to queue", rph.pcommand);
-    cell_queue_append_packed_copy(NULL, &TO_CIRCUIT(circ)->n_chan_cells, 0, &cell,
-        TO_CIRCUIT(circ)->n_chan->wide_circ_ids, 0);
-    
+    int nbr_cells;
+    if (size % CELL_PPAYLOAD_SIZE == 0)
+      nbr_cells = size/CELL_PPAYLOAD_SIZE;
+    else
+      nbr_cells = size/CELL_PPAYLOAD_SIZE + 1;
+    int remaining_payload = size;
+    for (int i = 0; i < nbr_cells; i++) {
+      if (remaining_payload <= CELL_PPAYLOAD_SIZE) {
+        rph.length = remaining_payload;
+      }
+      else {
+        rph.length = CELL_PPAYLOAD_SIZE;
+      }
+      direct_pheader_pack(cell.payload, &rph);
+      memcpy(cell.payload+RELAY_PHEADER_SIZE, msg+i*CELL_PPAYLOAD_SIZE, rph.length);
+      remaining_payload -= rph.length;
+      log_info(LD_MT, "Adding cell payment %hhx to queue", rph.pcommand);
+      cell_queue_append_packed_copy(NULL, &TO_CIRCUIT(circ)->n_chan_cells, 0, &cell,
+          TO_CIRCUIT(circ)->n_chan->wide_circ_ids, 0);
+    }
+    tor_assert(remaining_payload == 0);
     update_circuit_on_cmux(TO_CIRCUIT(circ), CELL_DIRECTION_OUT);
     scheduler_channel_has_waiting_cells(TO_CIRCUIT(circ)->n_chan);
     return 0;
