@@ -658,7 +658,87 @@ size_t mt_token_get_size_of(mt_ntype_t type) {
       return sizeof(nan_cli_setup1_t)+strlen;
     case MT_NTYPE_NAN_INT_SETUP2:
       return sizeof(nan_int_setup2_t)+strlen;
-    default: 
+    case MT_NTYPE_NAN_CLI_SETUP3:
+      return sizeof(nan_cli_setup3_t)+strlen;
+    case MT_NTYPE_NAN_INT_SETUP4:
+      return sizeof(nan_int_setup4_t)+strlen;
+    case MT_NTYPE_NAN_CLI_SETUP5:
+      return sizeof(nan_cli_setup5_t)+strlen;
+    case MT_NTYPE_NAN_INT_SETUP6:
+      return sizeof(nan_int_setup6_t)+strlen;
+    case MT_NTYPE_NAN_CLI_DESTAB1:
+      return sizeof(nan_cli_destab1_t)+strlen;
+    case MT_NTYPE_NAN_INT_DESTAB2:
+      return sizeof(nan_int_destab2_t)+strlen;
+    case MT_NTYPE_NAN_CLI_DPAY1:
+      return sizeof(nan_cli_dpay1_t)+strlen;
+    case MT_NTYPE_NAN_INT_DPAY2:
+      return sizeof(nan_int_dpay2_t)+strlen;
+    case MT_NTYPE_NAN_CLI_ESTAB1:
+      return sizeo(nan_cli_estab1_t)+strlen;
+    case MT_NTYPE_NAN_REL_ESTAB2:
+      return sizeof(nan_rel_estab2_t)+strlen;
+    case MT_NTYPE_NAN_INT_ESTAB3:
+      return sizeof(nan_int_estab3_t)+strlen;
+    case MT_NTYPE_NAN_REL_ESTAB4:
+      return sizeof(nan_rel_estab4_t)+strlen;
+    case MT_NTYPE_NAN_INT_ESTAB5:
+      return sizeof(nan_int_estab5_t)+strlen;
+    case MT_NTYPE_NAN_REL_ESTAB6:
+      return sizeof(nan_rel_estab6_t)+strlen;
+    case MT_NTYPE_NAN_CLI_PAY1:
+      return sizeof(nan_cli_pay1_t)+strlen;
+    case MT_NTYPE_NAN_REL_PAY2:
+      return sizeof(nan_rel_pay2_t)+strlen;
+    case MT_NTYPE_NAN_CLI_REQCLOSE1:
+      return sizeof(nan_cli_reqclose1_t)+strlen;
+    case MT_NTYPE_NAN_REL_REQCLOSE2:
+      return sizeof(nan_rel_reqclose2_t)+strlen;
+    case MT_NTYPE_NAN_END_CLOSE1:
+      return sizeof(nan_end_close1_t)+strlen;
+    case MT_NTYPE_NAN_INT_CLOSE2:
+      return sizeof(nan_int_close2_t)+strlen;
+    case MT_NTYPE_NAN_END_CLOSE3:
+      return sizeof(nan_end_close3_t)+strlen;
+    case MT_NTYPE_NAN_INT_CLOSE4:
+      return sizeof(nan_int_close4_t)+strlen;
+    case MT_NTYPE_NAN_END_CLOSE5:
+      return sizeof(nan_end_close5_t)+strlen;
+    case MT_NTYPE_NAN_INT_CLOSE6:
+      return sizeof(nan_int_close6_t)+strlen;
+    case MT_NTYPE_NAN_END_CLOSE7:
+      return sizeof(nan_end_close7_t)+strlen;
+    case MT_NTYPE_NAN_INT_CLOSE8:
+      return sizeof(nan_int_close8_t)+strlen;
+    case MT_NTYPE_MAC_AUT_MINT:
+      return sizeof(mac_aut_mint_t)+strlen;
+    case MT_NTYPE_MAC_ANY_TRANS:
+      return sizeof(mac_any_trans_t)+strlen;
+    case MT_NTYPE_CHN_END_SETUP:
+      return sizeof(chn_end_setup_t)+strlen;
+    case MT_NTYPE_CHN_INT_SETUP:
+      return sizeof(chn_int_setup_t)+strlen;
+    case MT_NTYPE_CHN_INT_REQCLOSE:
+      return sizeof(chn_int_reqclose_t)+strlen;
+    case MT_NTYPE_CHN_END_CLOSE:
+      return sizeof(chn_end_close_t)+strlen;
+    case MT_NTYPE_CHN_INT_CLOSE:
+      return sizeof(chn_int_close_t)+strlen;
+    case MT_NTYPE_CHN_END_CASHOUT:
+      return sizeof(chn_end_cashout_t)+strlen;
+    case MT_NTYPE_CHN_INT_CASHOUT:
+      return sizeof(chn_int_cashout_t)+strlen;
+    case MT_NTYPE_ANY_LED_CONFIRM:
+      return sizeof(any_led_confirm_t)+strlen;
+    case MT_NTYPE_MAC_LED_DATA:
+      return sizeof(mac_led_data_t)+strlen;
+    case MT_NTYPE_CHN_LED_DATA:
+      return sizeof(chn_led_data_t)+strlen;
+    case MT_NTYPE_MAC_LED_QUERY:
+      return sizeof(mac_led_query_t)+strlen;
+    case MT_NTYPE_CHN_LED_QUERY:
+      return sizeof(chn_led_query_t)+strlen;
+    default:
       log_info(LD_MT, "BUG - unknown type %hhx", type);
       return 0;
   }
