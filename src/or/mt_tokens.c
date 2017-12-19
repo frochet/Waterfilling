@@ -148,7 +148,7 @@ int pack_mic_cli_pay5(mic_cli_pay5_t* token, byte(*pid)[DIGEST_LEN], byte** str_
     return pack_token(MT_NTYPE_MIC_CLI_PAY5, token, sizeof(*token), pid, str_out);
 }
 
-int pack_mic_rev_pay6(mic_rev_pay6_t* token, byte(*pid)[DIGEST_LEN], byte** str_out){
+int pack_mic_rel_pay6(mic_rel_pay6_t* token, byte(*pid)[DIGEST_LEN], byte** str_out){
     return pack_token(MT_NTYPE_MIC_REL_PAY6, token, sizeof(*token), pid, str_out);
 }
 
@@ -409,7 +409,7 @@ int unpack_mic_cli_pay5(byte* str, int size, mic_cli_pay5_t* tkn_out, byte(*pid_
   return unpack_token(MT_NTYPE_MIC_CLI_PAY5, str, sizeof(*tkn_out), tkn_out, pid_out);
 }
 
-int unpack_mic_rev_pay6(byte* str, int size, mic_rev_pay6_t* tkn_out, byte(*pid_out)[DIGEST_LEN]){
+int unpack_mic_rel_pay6(byte* str, int size, mic_rel_pay6_t* tkn_out, byte(*pid_out)[DIGEST_LEN]){
   if(size != sizeof(mt_ntype_t) + sizeof(*tkn_out) + DIGEST_LEN)
     return MT_ERROR;
   return unpack_token(MT_NTYPE_MIC_REL_PAY6, str, sizeof(*tkn_out), tkn_out, pid_out);
@@ -618,6 +618,48 @@ int unpack_token(mt_ntype_t type, byte* str, int tkn_size, void* tkn_out, byte(*
   return MT_SUCCESS;
 }
 
+/*
+ * This function shoud return the payload size of a given mt_ntype_t.
+ * This should match the size of data sent through the network minus
+ * the size of the header.
+ */
+
 size_t mt_token_get_size_of(mt_ntype_t type) {
-  return 0; // XXX todo
+  //Used of test unit - To change later
+  size_t strlen = sizeof(mt_ntype_t)+DIGEST_LEN;
+  switch(type) {
+    case MT_NTYPE_CHN_END_ESTAB1:
+      return sizeof(chn_end_estab1_t)+strlen;
+    case MT_NTYPE_CHN_END_ESTAB3:
+      return sizeof(chn_end_estab3_t)+strlen;
+    case MT_NTYPE_CHN_INT_ESTAB2:
+      return sizeof(chn_int_estab2_t)+strlen;
+    case MT_NTYPE_CHN_INT_ESTAB4:
+      return sizeof(chn_int_estab4_t)+strlen;
+    case MT_NTYPE_CHN_END_SETUP:
+      return sizeof(chn_end_setup_t)+strlen;
+    case MT_NTYPE_MIC_CLI_PAY1:
+      return sizeof(mic_cli_pay1_t)+strlen;
+    case MT_NTYPE_MIC_REL_PAY2:
+      return sizeof(mic_rel_pay2_t)+strlen;
+    case MT_NTYPE_MIC_CLI_PAY3:
+      return sizeof(mic_cli_pay3_t)+strlen;
+    case MT_NTYPE_MIC_INT_PAY4:
+      return sizeof(mic_int_pay4_t)+strlen;
+    case MT_NTYPE_MIC_CLI_PAY5:
+      return sizeof(mic_cli_pay5_t)+strlen;
+    case MT_NTYPE_MIC_REL_PAY6:
+      return sizeof(mic_rel_pay6_t)+strlen;
+    case MT_NTYPE_MIC_INT_PAY7:
+      return sizeof(mic_int_pay7_t)+strlen;
+    case MT_NTYPE_MIC_INT_PAY8:
+      return sizeof(mic_int_pay8_t)+strlen;
+    case MT_NTYPE_NAN_CLI_SETUP1:
+      return sizeof(nan_cli_setup1_t)+strlen;
+    case MT_NTYPE_NAN_INT_SETUP2:
+      return sizeof(nan_int_setup2_t)+strlen;
+    default: 
+      log_info(LD_MT, "BUG - unknown type %hhx", type);
+      return 0;
+  }
 }

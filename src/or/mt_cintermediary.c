@@ -3,6 +3,8 @@
 #include "mt_common.h"
 #include "container.h"
 
+/**
+ */
 
 static digestmap_t *desc2circ = NULL;
 

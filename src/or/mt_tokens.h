@@ -52,7 +52,7 @@ int pack_mic_rel_pay2(mic_rel_pay2_t* tkn, byte(*pid)[DIGEST_LEN], byte** str_ou
 int pack_mic_cli_pay3(mic_cli_pay3_t* tkn, byte(*pid)[DIGEST_LEN], byte** str_out);
 int pack_mic_int_pay4(mic_int_pay4_t* tkn, byte(*pid)[DIGEST_LEN], byte** str_out);
 int pack_mic_cli_pay5(mic_cli_pay5_t* tkn, byte(*pid)[DIGEST_LEN], byte** str_out);
-int pack_mic_rev_pay6(mic_rev_pay6_t* tkn, byte(*pid)[DIGEST_LEN], byte** str_out);
+int pack_mic_rel_pay6(mic_rel_pay6_t* tkn, byte(*pid)[DIGEST_LEN], byte** str_out);
 int pack_mic_int_pay7(mic_int_pay7_t* tkn, byte(*pid)[DIGEST_LEN], byte** str_out);
 int pack_mic_int_pay8(mic_int_pay8_t* tkn, byte(*pid)[DIGEST_LEN], byte** str_out);
 int pack_nan_cli_setup1(nan_cli_setup1_t* tkn, byte(*pid)[DIGEST_LEN], byte** str_out);
@@ -116,7 +116,7 @@ int unpack_mic_rel_pay2(byte* str, int size, mic_rel_pay2_t* tkn_out, byte(*pid_
 int unpack_mic_cli_pay3(byte* str, int size, mic_cli_pay3_t* tkn_out, byte(*pid_out)[DIGEST_LEN]);
 int unpack_mic_int_pay4(byte* str, int size, mic_int_pay4_t* tkn_out, byte(*pid_out)[DIGEST_LEN]);
 int unpack_mic_cli_pay5(byte* str, int size, mic_cli_pay5_t* tkn_out, byte(*pid_out)[DIGEST_LEN]);
-int unpack_mic_rev_pay6(byte* str, int size, mic_rev_pay6_t* tkn_out, byte(*pid_out)[DIGEST_LEN]);
+int unpack_mic_rel_pay6(byte* str, int size, mic_rel_pay6_t* tkn_out, byte(*pid_out)[DIGEST_LEN]);
 int unpack_mic_int_pay7(byte* str, int size, mic_int_pay7_t* tkn_out, byte(*pid_out)[DIGEST_LEN]);
 int unpack_mic_int_pay8(byte* str, int size, mic_int_pay8_t* tkn_out, byte(*pid_out)[DIGEST_LEN]);
 int unpack_nan_cli_setup1(byte* str, int size, nan_cli_setup1_t* tkn_out, byte(*pid_out)[DIGEST_LEN]);

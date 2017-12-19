@@ -511,9 +511,9 @@ mt_cclient_send_message(mt_desc_t* desc, uint8_t command, mt_ntype_t type,
  * or ledger - Call the payment module and decides what
  * to do upon failure
  */
-void
-mt_cclient_process_received_msg(origin_circuit_t *circ, crypt_path_t *layer_hint, 
-    mt_ntype_t pcommand, byte *msg, size_t msg_len) {
+MOCK_IMPL(void,
+mt_cclient_process_received_msg, (origin_circuit_t *circ, crypt_path_t *layer_hint, 
+    mt_ntype_t pcommand, byte *msg, size_t msg_len)) {
   mt_desc_t *desc;
   /*What type of node sent us this cell? relay, intermediary or ledger? */
   if (TO_CIRCUIT(circ)->purpose == CIRCUIT_PURPOSE_C_INTERMEDIARY) {

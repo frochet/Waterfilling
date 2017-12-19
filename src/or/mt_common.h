@@ -17,6 +17,8 @@
 #define INTERMEDIARY_REACHABLE_MAYBE 2
 #define INTERMEDIARY_MAX_RETRIES 3
 
+#define INTERMEDIARY_COOKIE_LEN 16
+
 typedef struct intermediary_t {
   intermediary_identity_t* identity;
   char nickname[MAX_HEX_NICKNAME_LEN+1];
@@ -37,7 +39,7 @@ typedef struct intermediary_t {
   /*buffer payment cells received by this intermediary
    *if we get multiple cells for one mt_ntype_t */
   struct buf_t *buf;
-
+  
 } intermediary_t;
 
 /**
@@ -123,8 +125,8 @@ const char* mt_desc_describe(mt_desc_t *desc);
 /** Interface to the payment module to send a payment cell.
  *  This function dispaches to the right controller.
  */
-void mt_process_received_relaycell(circuit_t *circ, relay_header_t* rh,
-    relay_pheader_t *rph, crypt_path_t* layer_hint, uint8_t* payload);
+MOCK_DECL(void, mt_process_received_relaycell, (circuit_t *circ, relay_header_t* rh,
+    relay_pheader_t *rph, crypt_path_t* layer_hint, uint8_t* payload));
 
 /** Interface to the payment module
  * Dispatches to client controller or Intermediary controller

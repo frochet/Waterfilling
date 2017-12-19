@@ -1,3 +1,6 @@
+#define TOR_CHANNEL_INTERNAL_
+#define CIRCUITBUILD_PRIVATE
+
 #include <string.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -5,7 +8,12 @@
 #include "test.h"
 #include "or.h"
 #include "mt_crypto.h"
+#include "mt_tokens.h"
 #include "mt_common.h"
+#include "mt_cclient.h"
+#include "circuitbuild.h"
+#include "circuitlist.h"
+#include "buffers.h"
 
 static void test_mt_common(void *arg)
 {
@@ -70,9 +78,77 @@ static void test_mt_common(void *arg)
  done:;
 }
 
+static void
+mt_cclient_process_received_msg_mock(origin_circuit_t *circ, crypt_path_t *cpath,
+    mt_ntype_t pcommand, byte *msg, size_t msg_len) {
+  (void) circ;
+  (void) cpath;
+  (void) pcommand;
+  (void) msg;
+  (void) msg_len;
+  return;
+}
+
+static void test_mt_process_msg(void *args) {
+  (void) args;
+  origin_circuit_t *circ = origin_circuit_new();
+  relay_header_t *rh = tor_malloc_zero(sizeof(relay_header_t));
+  relay_pheader_t *rph = tor_malloc_zero(sizeof(relay_pheader_t));
+  cell_t cell;
+  memset(&cell, 0, sizeof(cell_t));
+
+  if (!circ->ppath) {
+    circ->ppath = circuit_init_ppath(NULL);
+    circ->ppath->next = circuit_init_ppath(circ->ppath);
+    circ->ppath->next->next = circuit_init_ppath(circ->ppath->next);
+  }
+  if (!circ->cpath) {
+    circ->cpath = tor_malloc_zero(sizeof(crypt_path_t));
+    circ->cpath->next = tor_malloc_zero(sizeof(crypt_path_t));
+  }
+  MOCK(mt_cclient_process_received_msg, mt_cclient_process_received_msg_mock);
+  byte *msg1 = tor_malloc_zero(1000*sizeof(byte));
+  size_t msg_len1 = mt_token_get_size_of(MT_NTYPE_NAN_CLI_SETUP1);
+  byte *msg2 = tor_malloc_zero(RELAY_PPAYLOAD_SIZE*sizeof(byte));
+  size_t msg_len2 = RELAY_PPAYLOAD_SIZE;
+  byte *msg3 = tor_malloc_zero(20*sizeof(byte));
+  size_t msg_len3 = 20;
+  
+  rh->command = RELAY_COMMAND_MT;
+  rh->length = RELAY_PPAYLOAD_SIZE + RELAY_PHEADER_SIZE;
+  rph->pcommand = MT_NTYPE_NAN_CLI_SETUP1; // get_token_sz should return 1000;
+  rph->length = RELAY_PPAYLOAD_SIZE;
+
+  TO_CIRCUIT(circ)->purpose = CIRCUIT_PURPOSE_C_GENERAL;
+  int i = 0;
+  int bytes_remains = msg_len1;
+  do {
+    mt_process_received_relaycell(TO_CIRCUIT(circ), rh, rph,
+        circ->cpath->next, cell.payload+RELAY_HEADER_SIZE+RELAY_PHEADER_SIZE);
+    bytes_remains -= RELAY_PPAYLOAD_SIZE;
+    if (bytes_remains < RELAY_PPAYLOAD_SIZE) {
+      rph->length = bytes_remains;
+    }
+    i++;
+  } while (buf_datalen(circ->ppath->next->buf) != 0 && i < 10);
+  
+  tt_int_op(i, OP_EQ, msg_len1/RELAY_PPAYLOAD_SIZE + 1);
+  tt_int_op(buf_datalen(circ->ppath->next->buf), OP_EQ, 0);
+
+ done:
+  UNMOCK(mt_cclient_process_received_msg);
+  tor_free(circ->cpath->next);
+  tor_free(circ->cpath);
+  /*circuit_ppath_free(circ->ppath);*/
+  tor_free(msg1);
+  tor_free(msg2);
+  tor_free(msg3);
+}
+
 struct testcase_t mt_common_tests[] = {
   /* This test is named 'strdup'. It's implemented by the test_strdup
    * function, it has no flags, and no setup/teardown code. */
-  { "mt_common", test_mt_common, 0, NULL, NULL },
+{ "mt_common", test_mt_common, 0, NULL, NULL },
+{ "process_msg", test_mt_process_msg, 0, NULL, NULL },
   END_OF_TESTCASES
 };

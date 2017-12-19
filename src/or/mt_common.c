@@ -200,8 +200,9 @@ void direct_pheader_pack(uint8_t *dest, relay_pheader_t *rph) {
  *  layer_hint allows us to know which relay sent us this cell
  */
 
-void mt_process_received_relaycell(circuit_t *circ, relay_header_t* rh,
-    relay_pheader_t* rph, crypt_path_t *layer_hint, uint8_t* payload) {
+MOCK_IMPL(void,
+    mt_process_received_relaycell, (circuit_t *circ, relay_header_t* rh,
+    relay_pheader_t* rph, crypt_path_t *layer_hint, uint8_t* payload)) {
   (void) rh; //need to refactor
   size_t msg_len = mt_token_get_size_of(rph->pcommand);
   if (authdir_mode(get_options())) {
@@ -232,6 +233,7 @@ void mt_process_received_relaycell(circuit_t *circ, relay_header_t* rh,
             buf_get_bytes(ppath->buf, (char*) msg, msg_len);
             buf_clear(ppath->buf);
             mt_cclient_process_received_msg(ocirc, layer_hint, rph->pcommand, msg, msg_len);
+            tor_free(msg);
           }
           else {
             log_info(LD_MT, "Buffering one received payment cell of type %hhx"

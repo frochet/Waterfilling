@@ -6076,7 +6076,7 @@ typedef struct {
 typedef struct {
   chn_end_revoke_t cli_revoke;
   chn_end_revoke_t rel_revoke;
-} mic_rev_pay6_t;
+} mic_rel_pay6_t;
 
 typedef struct {
   mt_code_t success;
