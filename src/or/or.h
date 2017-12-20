@@ -2261,6 +2261,8 @@ typedef struct {
                                       * a hidden service directory. */
   unsigned int wants_to_be_intermediary:1; /** < True iff this router claims
 					       to be an intermediary. */
+  unsigned int wants_to_be_ledger:1;
+
   unsigned int policy_is_reject_star:1; /**< True iff the exit policy for this
                                          * router rejects everything. */
   /** True if, after we have added this router, we should re-launch
