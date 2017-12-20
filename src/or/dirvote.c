@@ -1777,6 +1777,7 @@ networkstatus_compute_consensus(smartlist_t *votes,
       int exitsummary_disagreement = 0;
       int is_named = 0, is_unnamed = 0, is_running = 0, is_valid = 0;
       int is_guard = 0, is_exit = 0, is_bad_exit = 0, is_intermediary = 0;
+      int is_ledger = 0;
       int naming_conflict = 0;
       int n_listing = 0;
       char microdesc_digest[DIGEST256_LEN];
@@ -1937,6 +1938,8 @@ networkstatus_compute_consensus(smartlist_t *votes,
               is_valid = 1;
             else if (!strcmp(fl, "Inter"))
               is_intermediary = 1;
+            else if (!strcmp(fl, "Ledger"))
+              is_ledger = 1;
           }
         }
       } SMARTLIST_FOREACH_END(fl);
@@ -2001,9 +2004,9 @@ networkstatus_compute_consensus(smartlist_t *votes,
       is_exit = is_exit && !is_bad_exit;
       
       /* an intermediary cannot be an exit */
-
+      /* curently both useless lines .. */
       is_intermediary = !is_exit && is_intermediary;
-
+      is_ledger = !is_exit && !is_guard && !is_intermediary && is_ledger;
       /* Update total bandwidth weights with the bandwidths of this router. */
       {
         update_total_bandwidth_weights(&rs_out,

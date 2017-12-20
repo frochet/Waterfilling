@@ -1445,6 +1445,15 @@ dirserv_thinks_router_is_intermediary(const routerinfo_t *router,
           node->is_fast && router_is_active(router, node, now));
 }
 
+/** Return true iff <b>router</b> should be assigned the "Ledger" flag.
+ *
+ */
+static int
+dirserv_thinks_router_is_ledger(const routerinfo_t *router)
+{
+  return (router->wants_to_be_ledger && 
+      router_digest_is_trusted_dir(router->cache_info.identity_digest));
+}
 /** Don't consider routers with less bandwidth than this when computing
  * thresholds. */
 #define ABSOLUTE_MIN_BW_VALUE_TO_CONSIDER_KB 4
@@ -1970,7 +1979,7 @@ routerstatus_format_entry(const routerstatus_t *rs, const char *version,
     goto done;
 
   smartlist_add_asprintf(chunks,
-                   "s%s%s%s%s%s%s%s%s%s%s%s\n",
+                   "%s%s%s%s%s%s%s%s%s%s%s%s\n",
                   /* These must stay in alphabetical order. */
                    rs->is_authority?" Authority":"",
                    rs->is_bad_exit?" BadExit":"",
@@ -1979,11 +1988,11 @@ routerstatus_format_entry(const routerstatus_t *rs, const char *version,
                    rs->is_possible_guard?" Guard":"",
                    rs->is_hs_dir?" HSDir":"",
                    rs->is_intermediary?" Inter":"",
+                   rs->is_ledger?" Ledger":"",
                    rs->is_flagged_running?" Running":"",
                    rs->is_stable?" Stable":"",
                    rs->is_v2_dir?" V2Dir":"",
-                   rs->is_valid?" Valid":"",
-                   rs->is_ledger?" Ledger":"",);
+                   rs->is_valid?" Valid":"");
 
   /* length of "opt v \n" */
 #define V_LINE_OVERHEAD 7
@@ -2248,7 +2257,8 @@ set_routerstatus_from_routerinfo(routerstatus_t *rs,
 
   rs->is_authority =
     router_digest_is_trusted_dir(ri->cache_info.identity_digest);
-
+  rs->is_ledger = 
+    dirserv_thinks_router_is_ledger(ri);
   /* Already set by compute_performance_thresholds. */
   rs->is_exit = node->is_exit;
   rs->is_stable = node->is_stable =
