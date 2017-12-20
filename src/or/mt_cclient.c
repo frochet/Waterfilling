@@ -496,6 +496,18 @@ mt_cclient_send_message(mt_desc_t* desc, uint8_t command, mt_ntype_t type,
   mt_desc2digest(desc, &id);
   origin_circuit_t* circ = digestmap_get(desc2circ, (char*) id);
   tor_assert(circ);
+  if (TO_CIRCUIT(circ)->marked_for_close || 
+      TO_CIRCUIT(circ)->state != CIRCUIT_STATE_OPEN) {
+    /*If send_message is called by an event added by a worker
+      thread, it is possible that our circuit has just been
+      marked for close for whatever reason - It is unlikely, though
+      we return -1*/
+    /** The proper way to handle this would be to try again to send
+     * the message once a new circ is up (in the case of a ledger
+     * circuit or an intermediary circuit)*/
+    /** If this is a general circuit, we should just cashout */
+    return -1;
+  }
   if (command == RELAY_COMMAND_MT) {
     /*defensive prog from payment module*/
     /*tor_assert(size <= RELAY_PPAYLOAD_SIZE);*/
