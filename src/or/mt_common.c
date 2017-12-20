@@ -250,6 +250,7 @@ MOCK_IMPL(void,
             buf_get_bytes(intermediary->buf, (char*) msg, msg_len);
             buf_clear(intermediary->buf);
             mt_cclient_process_received_msg(ocirc, layer_hint, rph->pcommand, msg, msg_len);
+            tor_free(msg);
           }
           else {
             log_info(LD_MT, "Buffering one received payment cell of type %hhx"

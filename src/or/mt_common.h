@@ -11,6 +11,7 @@
 #include "or.h"
 #include "mt_crypto.h"
 #include "mt_tokens.h"
+#include "buffers.h"
 
 #define INTERMEDIARY_REACHABLE_NO 0
 #define INTERMEDIARY_REACHABLE_YES 1
@@ -38,7 +39,7 @@ typedef struct intermediary_t {
 
   /*buffer payment cells received by this intermediary
    *if we get multiple cells for one mt_ntype_t */
-  struct buf_t *buf;
+  buf_t *buf;
   
 } intermediary_t;
 

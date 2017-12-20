@@ -1,5 +1,6 @@
 #define TOR_CHANNEL_INTERNAL_
 #define CIRCUITBUILD_PRIVATE
+#define MT_CCLIENT_PRIVATE
 
 #include <string.h>
 #include <stdio.h>
@@ -134,7 +135,33 @@ static void test_mt_process_msg(void *args) {
   
   tt_int_op(i, OP_EQ, msg_len1/RELAY_PPAYLOAD_SIZE + 1);
   tt_int_op(buf_datalen(circ->ppath->next->buf), OP_EQ, 0);
-
+  
+  mt_cclient_init();
+  node_t node;
+  memset(&node, 0, sizeof(node_t));
+  extend_info_t ei;
+  memset(&ei, 0, sizeof(extend_info_t));
+  intermediary_t *inter = intermediary_new(&node, &ei, 0);
+  add_intermediary(inter);
+  /* testing the other code path */
+  circ->inter_ident = tor_malloc_zero(sizeof(intermediary_identity_t));
+  memcpy(circ->inter_ident->identity, inter->identity->identity, DIGEST_LEN);
+  TO_CIRCUIT(circ)->purpose = CIRCUIT_PURPOSE_C_INTERMEDIARY;
+  rph->length = RELAY_PPAYLOAD_SIZE;
+  bytes_remains = msg_len1;
+  i = 0;
+  do {
+    mt_process_received_relaycell(TO_CIRCUIT(circ), rh, rph,
+        circ->cpath->next, cell.payload+RELAY_HEADER_SIZE+RELAY_PHEADER_SIZE);
+    bytes_remains -= RELAY_PPAYLOAD_SIZE;
+    if (bytes_remains < RELAY_PPAYLOAD_SIZE) {
+      rph->length = bytes_remains;
+    }
+    i++;
+  } while (buf_datalen(inter->buf) != 0 && i < 10);
+  tt_int_op(i, OP_EQ, msg_len1/RELAY_PPAYLOAD_SIZE+1);
+  tt_int_op(buf_datalen(inter->buf), OP_EQ, 0);
+ 
  done:
   UNMOCK(mt_cclient_process_received_msg);
   tor_free(circ->cpath->next);

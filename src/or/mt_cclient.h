@@ -20,9 +20,9 @@ void mt_cclient_intermediary_circ_has_opened(origin_circuit_t *circ);
 // XXX MoneTor - do we need backup intermediaries?
 #define MAX_INTERMEDIARY_CHOSEN 2
 
-
-
-
+#ifdef MT_CCLIENT_PRIVATE
+STATIC intermediary_t* intermediary_new(const node_t *node, extend_info_t *ei, time_t now);
+#endif
 /** Gets called every second, job:
  */
 void run_cclient_scheduled_events(time_t now);
@@ -35,6 +35,9 @@ void run_cclient_scheduled_events(time_t now);
 smartlist_t* get_node_t_smartlist_intermerdiaries(void);
 
 smartlist_t* get_intermediaries(int for_circuit);
+
+/** Used by unit tests: add inter to the smartlist */
+void add_intermediary(intermediary_t *inter);
 
 /* Get one intermediary usable for position */
 intermediary_t* get_intermediary_by_role(position_t position);

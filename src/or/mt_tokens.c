@@ -636,8 +636,6 @@ size_t mt_token_get_size_of(mt_ntype_t type) {
       return sizeof(chn_int_estab2_t)+strlen;
     case MT_NTYPE_CHN_INT_ESTAB4:
       return sizeof(chn_int_estab4_t)+strlen;
-    case MT_NTYPE_CHN_END_SETUP:
-      return sizeof(chn_end_setup_t)+strlen;
     case MT_NTYPE_MIC_CLI_PAY1:
       return sizeof(mic_cli_pay1_t)+strlen;
     case MT_NTYPE_MIC_REL_PAY2:
@@ -675,7 +673,7 @@ size_t mt_token_get_size_of(mt_ntype_t type) {
     case MT_NTYPE_NAN_INT_DPAY2:
       return sizeof(nan_int_dpay2_t)+strlen;
     case MT_NTYPE_NAN_CLI_ESTAB1:
-      return sizeo(nan_cli_estab1_t)+strlen;
+      return sizeof(nan_cli_estab1_t)+strlen;
     case MT_NTYPE_NAN_REL_ESTAB2:
       return sizeof(nan_rel_estab2_t)+strlen;
     case MT_NTYPE_NAN_INT_ESTAB3:

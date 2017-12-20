@@ -2,6 +2,7 @@
 #include "or.h"
 #include "config.h"
 #include "buffers.h"
+#define MT_CCLIENT_PRIVATE
 #include "mt_cclient.h"
 #include "mt_common.h"
 #include "mt_cpay.h"
@@ -23,7 +24,6 @@
 
 /* Some forward static declaration for ease of implem */
 
-static intermediary_t* intermediary_new(const node_t *node, extend_info_t *ei, time_t now);
 
 STATIC void run_cclient_housekeeping_event(time_t now);
 
@@ -45,6 +45,38 @@ static digestmap_t* desc2circ = NULL; // mt_desc2digest => origin_circuit_t
 /*static counter of descriptors - also used as id*/
 
 static uint32_t desc_id = 0;
+
+/**
+ * Allocate on the heap a new intermediary and returns the pointer
+ */
+
+STATIC intermediary_t *
+intermediary_new(const node_t *node, extend_info_t *ei, time_t now) {
+  tor_assert(node);
+  tor_assert(ei);
+  intermediary_t *intermediary = tor_malloc_zero(sizeof(intermediary_t));
+  intermediary->identity = tor_malloc_zero(sizeof(intermediary_t));
+  memcpy(intermediary->identity->identity, node->identity, DIGEST_LEN);
+  //XXX MoneTor change nickname to something else, or remove nickname
+  //intermediary->nickname = tor_strdup(node->ri->nickname);
+  intermediary->is_reachable = INTERMEDIARY_REACHABLE_MAYBE;
+  intermediary->desc.id = desc_id++;
+  intermediary->desc.party = MT_PARTY_INT;
+  intermediary->chosen_at = now;
+  intermediary->ei = ei;
+  intermediary->buf = buf_new_with_capacity(RELAY_PPAYLOAD_SIZE);
+  return intermediary;
+}
+
+static void
+intermediary_free(intermediary_t *intermediary) {
+  if (!intermediary)
+    return;
+  if (intermediary->ei)
+    extend_info_free(intermediary->ei);
+  buf_free(intermediary->buf);
+  tor_free(intermediary);
+}
 
 /*
  * Builds and returns a smartlist_t containing node_t objects
@@ -73,6 +105,11 @@ intermediary_t* get_intermediary_by_role(position_t position) {
 smartlist_t* get_intermediaries(int for_circuit) {
   (void)for_circuit;
   return NULL;
+}
+
+void add_intermediary(intermediary_t *inter) {
+  /**Used by unit tests*/
+  smartlist_add(intermediaries, inter);
 }
 
 void
@@ -603,34 +640,3 @@ mt_cclient_intermediary_circuit_free(origin_circuit_t* circ) {
   tor_free(circ->inter_ident);
 }
 
-/**
- * Allocate on the heap a new intermediary and returns the pointer
- */
-
-static intermediary_t *
-intermediary_new(const node_t *node, extend_info_t *ei, time_t now) {
-  tor_assert(node);
-  tor_assert(ei);
-  intermediary_t *intermediary = tor_malloc_zero(sizeof(intermediary_t));
-  intermediary->identity = tor_malloc_zero(sizeof(intermediary_t));
-  memcpy(intermediary->identity->identity, node->identity, DIGEST_LEN);
-  //XXX MoneTor change nickname to something else, or remove nickname
-  //intermediary->nickname = tor_strdup(node->ri->nickname);
-  intermediary->is_reachable = INTERMEDIARY_REACHABLE_MAYBE;
-  intermediary->desc.id = desc_id++;
-  intermediary->desc.party = MT_PARTY_INT;
-  intermediary->chosen_at = now;
-  intermediary->ei = ei;
-  intermediary->buf = buf_new_with_capacity(RELAY_PPAYLOAD_SIZE);
-  return intermediary;
-}
-
-static void
-intermediary_free(intermediary_t *intermediary) {
-  if (!intermediary)
-    return;
-  if (intermediary->ei)
-    extend_info_free(intermediary->ei);
-  buf_free(intermediary->buf);
-  tor_free(intermediary);
-}
