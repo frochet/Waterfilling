@@ -899,6 +899,7 @@ static int init_nan_cli_pay1(mt_channel_t* chn, byte (*pid)[DIGEST_LEN]){
 
   // make token
   nan_cli_pay1_t token;
+  memcpy(&token.nan_public, &chn->data.nan_public, sizeof(nan_any_public_t));
 
   // TODO finish making setup;
 
@@ -1023,6 +1024,7 @@ static int init_nan_cli_reqclose1(mt_channel_t* chn, byte (*pid)[DIGEST_LEN]){
 
   // intiate token
   nan_cli_reqclose1_t token;
+  memcpy(&token.nan_public, &chn->data.nan_public, sizeof(nan_any_public_t));
 
   // TODO finish making token;
 

@@ -6146,6 +6146,7 @@ typedef struct {
 } nan_rel_estab6_t;
 
 typedef struct {
+  nan_any_public_t nan_public;
   byte preimage[MT_SZ_HASH];
 } nan_cli_pay1_t;
 
@@ -6154,6 +6155,7 @@ typedef struct {
 } nan_rel_pay2_t;
 
 typedef struct {
+  nan_any_public_t nan_public;
   mt_code_t reqclose;
 } nan_cli_reqclose1_t;
 
