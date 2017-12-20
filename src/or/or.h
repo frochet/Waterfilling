@@ -2335,6 +2335,7 @@ typedef struct routerstatus_t {
   tor_addr_t ipv6_addr; /**< IPv6 address for this router. */
   uint16_t ipv6_orport; /**<IPV6 OR port for this router. */
   unsigned int is_authority:1; /**< True iff this router is an authority. */
+  unsigned int is_ledger:1;
   unsigned int is_exit:1; /**< True iff this router is a good exit. */
   unsigned int is_stable:1; /**< True iff this router stays up a long time. */
   unsigned int is_fast:1; /**< True iff this router has good bandwidth. */
@@ -4238,6 +4239,8 @@ typedef struct {
   int DirCache; /**< Cache all directory documents and accept requests via
                  * tunnelled dir conns from clients. If 1, enabled (default);
                  * If 0, disabled. */
+  
+  int Ledger; /** Used to tell if this dirauth is going to be the ledger */
 
   char *VirtualAddrNetworkIPv4; /**< Address and mask to hand out for virtual
                                  * MAPADDRESS requests for IPv4 addresses */
@@ -5453,6 +5456,7 @@ typedef struct dir_server_t {
   unsigned int is_running:1; /**< True iff we think this server is running. */
   unsigned int is_authority:1; /**< True iff this is a directory authority
                                 * of some kind. */
+  unsigned int is_ledger:1; /** < True iff this server is the ledger. */
 
   /** True iff this server has accepted the most recent server descriptor
    * we tried to upload to it. */

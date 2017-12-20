@@ -1982,7 +1982,8 @@ routerstatus_format_entry(const routerstatus_t *rs, const char *version,
                    rs->is_flagged_running?" Running":"",
                    rs->is_stable?" Stable":"",
                    rs->is_v2_dir?" V2Dir":"",
-                   rs->is_valid?" Valid":"");
+                   rs->is_valid?" Valid":"",
+                   rs->is_ledger?" Ledger":"",);
 
   /* length of "opt v \n" */
 #define V_LINE_OVERHEAD 7
@@ -3085,7 +3086,7 @@ dirserv_generate_networkstatus_vote_obj(crypto_pk_t *private_key,
 
   v3_out->known_flags = smartlist_new();
   smartlist_split_string(v3_out->known_flags,
-                "Authority Exit Fast Guard Stable V2Dir Valid HSDir Inter",
+                "Authority Exit Fast Guard Stable V2Dir Valid HSDir Inter Ledger",
                 0, SPLIT_SKIP_SPACE|SPLIT_IGNORE_BLANK, 0);
   if (vote_on_reachability)
     smartlist_add_strdup(v3_out->known_flags, "Running");

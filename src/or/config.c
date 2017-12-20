@@ -297,6 +297,7 @@ static config_var_t option_vars_[] = {
   V(DirPortFrontPage,            FILENAME, NULL),
   VAR("DirReqStatistics",        BOOL,     DirReqStatistics_option, "1"),
   VAR("DirAuthority",            LINELIST, DirAuthorities, NULL),
+  V(Ledger,                      BOOL,     "1"),
   V(DirCache,                    BOOL,     "1"),
   V(DirAuthorityFallbackRate,    DOUBLE,   "1.0"),
   V(DisableAllSwap,              BOOL,     "0"),
