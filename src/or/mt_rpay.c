@@ -103,7 +103,7 @@ typedef struct {
   // channel states are encoded by which of these containers they are held
   digestmap_t* chns_setup;       // digest(idesc) -> smartlist of channels
   digestmap_t* chns_estab;       // digest(idesc) -> smartlist of channels
-  digestmap_t* nans_estab;       // digest(cdesc) -> channel
+  digestmap_t* nans_estab;       // digest(nan_pub) -> channel
   smartlist_t* chns_spent;
 
   // special container to hold channels in the middle of a protocol
@@ -630,7 +630,7 @@ static int handle_nan_int_estab5(mt_desc_t* desc, nan_int_estab5_t* token, byte 
   // check validity of incoming message;
 
   byte digest[DIGEST_LEN];
-  mt_desc2digest(&chn->cdesc, &digest);
+  mt_nanpub2digest(&chn->data.nan_public, &digest);
   digestmap_remove(relay.chns_transition, (char*)*pid);
   digestmap_set(relay.nans_estab, (char*)digest, chn);
 
@@ -648,7 +648,6 @@ static int handle_nan_int_estab5(mt_desc_t* desc, nan_int_estab5_t* token, byte 
 /******************************* Nano Pay *******************************/
 
 static int handle_nan_cli_pay1(mt_desc_t* desc, nan_cli_pay1_t* token, byte (*pid)[DIGEST_LEN]){
-  (void)token;
   (void)desc;
 
   // check validity of incoming message;
@@ -658,7 +657,7 @@ static int handle_nan_cli_pay1(mt_desc_t* desc, nan_cli_pay1_t* token, byte (*pi
   // fill reply with correct values;
 
   byte digest[DIGEST_LEN];
-  mt_desc2digest(desc, &digest);
+  mt_nanpub2digest(&token->nan_public, &digest);
   mt_channel_t* chn = digestmap_get(relay.nans_estab, (char*)digest);
   if(!chn){
     log_debug(LD_MT, "client descriptor not recognized");
@@ -682,14 +681,13 @@ static int handle_nan_cli_pay1(mt_desc_t* desc, nan_cli_pay1_t* token, byte (*pi
 /*************************** Nano Req Close *****************************/
 
 static int handle_nan_cli_reqclose1(mt_desc_t* desc, nan_cli_reqclose1_t* token, byte (*pid)[DIGEST_LEN]){
-  (void)token;
   (void)desc;
 
   // check validity of incoming message;
 
   mt_channel_t* chn;
   byte digest[DIGEST_LEN];
-  mt_desc2digest(desc, &digest);
+  mt_nanpub2digest(&token->nan_public, &digest);
 
   if((chn = digestmap_remove(relay.nans_estab, (char*)digest))){
     digestmap_set(relay.chns_transition, (char*)pid, chn);

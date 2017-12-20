@@ -2263,6 +2263,8 @@ typedef struct {
                                       * a hidden service directory. */
   unsigned int wants_to_be_intermediary:1; /** < True iff this router claims
 					       to be an intermediary. */
+  unsigned int wants_to_be_ledger:1;
+
   unsigned int policy_is_reject_star:1; /**< True iff the exit policy for this
                                          * router rejects everything. */
   /** True if, after we have added this router, we should re-launch
@@ -6152,6 +6154,7 @@ typedef struct {
 } nan_rel_estab6_t;
 
 typedef struct {
+  nan_any_public_t nan_public;
   byte preimage[MT_SZ_HASH];
 } nan_cli_pay1_t;
 
@@ -6160,6 +6163,7 @@ typedef struct {
 } nan_rel_pay2_t;
 
 typedef struct {
+  nan_any_public_t nan_public;
   mt_code_t reqclose;
 } nan_cli_reqclose1_t;
 
