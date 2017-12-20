@@ -166,7 +166,7 @@ static void test_mt_process_msg(void *args) {
   UNMOCK(mt_cclient_process_received_msg);
   tor_free(circ->cpath->next);
   tor_free(circ->cpath);
-  /*circuit_ppath_free(circ->ppath);*/
+  circuit_free(TO_CIRCUIT(circ));
   tor_free(msg1);
   tor_free(msg2);
   tor_free(msg3);
