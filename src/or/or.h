@@ -5458,7 +5458,7 @@ typedef struct dir_server_t {
   unsigned int is_running:1; /**< True iff we think this server is running. */
   unsigned int is_authority:1; /**< True iff this is a directory authority
                                 * of some kind. */
-  unsigned int is_ledger:1; /** < True iff this server is the ledger. */
+  //unsigned int is_ledger:1; [>* < True iff this server is the ledger. <]
 
   /** True iff this server has accepted the most recent server descriptor
    * we tried to upload to it. */
