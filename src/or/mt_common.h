@@ -43,6 +43,8 @@ typedef struct intermediary_t {
 
 } intermediary_t;
 
+void mt_desc_free(mt_desc_t *desc);
+
 /**
  * Convert a mt public key into an mt address
  */

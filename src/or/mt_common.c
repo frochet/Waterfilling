@@ -16,10 +16,12 @@
 #include "buffers.h"
 #include "config.h"
 #include "compat.h"
+#include "circuituse.h"
 #include "mt_crypto.h" // only needed for the defined byte array sizes
 #include "mt_common.h"
 #include "mt_cclient.h"
 #include "mt_crelay.h"
+#include "mt_cintermediary.h"
 #include "mt_tokens.h"
 #include "router.h"
 
@@ -181,6 +183,13 @@ const char* mt_desc_describe(mt_desc_t* desc) {
   return "";
 }
 
+/** Free mt_desc */
+void mt_desc_free(mt_desc_t *desc) {
+  if (!desc)
+    return;
+  // XXX todo
+}
+
 /**
  * Pack the relay header containing classical relay_header_t
  * and our payment header
@@ -224,6 +233,69 @@ MOCK_IMPL(void,
   if (authdir_mode(get_options())) {
   }
   else if (intermediary_mode(get_options())) {
+    if (CIRCUIT_IS_ORCIRC(circ)) {
+      // should be circuit built towards us by a client or
+      // a relay
+      or_circuit_t *orcirc = TO_OR_CIRCUIT(circ);
+      /** It is a payment cell over a or-circuit - should be
+       * sent a client or a relay - change purpose */
+      if (circ->purpose == CIRCUIT_PURPOSE_OR) {
+        // Should be done at the first received payment cell
+        // over this circuit
+        circuit_change_purpose(circ, CIRCUIT_PURPOSE_INTERMEDIARY);
+        TO_OR_CIRCUIT(circ)->buf = buf_new_with_capacity(RELAY_PPAYLOAD_SIZE);
+        mt_cintermediary_init_desc_and_add(orcirc);
+      }
+      /*buffer data if necessary*/
+      if (msg_len > RELAY_PPAYLOAD_SIZE) {
+        buf_add(orcirc->buf, (char*) payload, rph->length);
+        if (buf_datalen(orcirc->buf) == msg_len) {
+          /** We now have the full message */
+          byte *msg = tor_malloc(msg_len);
+          buf_get_bytes(orcirc->buf, (char*) msg, msg_len);
+          buf_clear(orcirc->buf);
+          mt_cintermediary_process_received_msg(circ, rph->pcommand, msg, msg_len);
+          tor_free(msg);
+        }
+        else {
+          log_info(LD_MT, "Buffering one received payment cell of type %hhx"
+              " current buf datlen %lu", rph->pcommand, buf_datalen(orcirc->buf));
+          return;
+        }
+      }
+      else {
+        /** No need to buffer */
+        tor_assert(rph->length == msg_len);
+        mt_cintermediary_process_received_msg(circ, rph->pcommand, payload,
+            rph->length);
+      }
+    } 
+    else if (CIRCUIT_IS_ORIGIN(circ)) {
+      // should be a ledger circuit
+      if (msg_len > RELAY_PPAYLOAD_SIZE) {
+        ledger_t *ledger = mt_cintermediary_get_ledger();
+        tor_assert(ledger);
+        buf_add(ledger->buf, (char*) payload, rph->length);
+        if (buf_datalen(ledger->buf) == msg_len) {
+          byte *msg = tor_malloc(msg_len);
+          buf_get_bytes(ledger->buf, (char*) msg, msg_len);
+          buf_clear(ledger->buf);
+          mt_cintermediary_process_received_msg(circ, rph->pcommand, msg, msg_len);
+          tor_free(msg);
+        }
+        else {
+          log_info(LD_MT, "Buffering one received payment cell of type %hhx"
+              " current buf datlen %lu", rph->pcommand, buf_datalen(ledger->buf));
+          return;
+        }
+      }
+      else {
+        /** No need to buffer */
+        tor_assert(rph->length == msg_len);
+        mt_cintermediary_process_received_msg(circ, rph->pcommand, payload,
+            rph->length);
+      }
+    }
   }
   else if (server_mode(get_options())) {
 

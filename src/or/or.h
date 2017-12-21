@@ -554,7 +554,11 @@ typedef enum {
 
 #define CIRCUIT_PURPOSE_R_INTERMEDIARY 23
 
-#define CIRCUIT_PURPOSE_MAX_ 23
+#define CIRCUIT_PURPOSE_I_LEDGER 24
+/** OR-side circuit on a intermerdiary */
+#define CIRCUIT_PURPOSE_INTERMEDIARY 25
+
+#define CIRCUIT_PURPOSE_MAX_ 25
 /** A catch-all for unrecognized purposes. Currently we don't expect
  * to make or see any circuits with this purpose. */
 #define CIRCUIT_PURPOSE_UNKNOWN 255
@@ -2261,6 +2265,8 @@ typedef struct {
                                       * a hidden service directory. */
   unsigned int wants_to_be_intermediary:1; /** < True iff this router claims
 					       to be an intermediary. */
+  unsigned int wants_to_be_ledger:1;
+
   unsigned int policy_is_reject_star:1; /**< True iff the exit policy for this
                                          * router rejects everything. */
   /** True if, after we have added this router, we should re-launch
@@ -2333,6 +2339,7 @@ typedef struct routerstatus_t {
   tor_addr_t ipv6_addr; /**< IPv6 address for this router. */
   uint16_t ipv6_orport; /**<IPV6 OR port for this router. */
   unsigned int is_authority:1; /**< True iff this router is an authority. */
+  unsigned int is_ledger:1;
   unsigned int is_exit:1; /**< True iff this router is a good exit. */
   unsigned int is_stable:1; /**< True iff this router stays up a long time. */
   unsigned int is_fast:1; /**< True iff this router has good bandwidth. */
@@ -2537,6 +2544,7 @@ typedef struct node_t {
                             *  (For Authdir: Have we validated this OR?) */
   unsigned int is_fast:1; /** Do we think this is a fast OR? */
   unsigned int is_intermediary:1; /** Do we think this is an intermediary? */
+  unsigned int is_ledger:1;
   unsigned int is_stable:1; /** Do we think this is a stable OR? */
   unsigned int is_possible_guard:1; /**< Do we think this is an OK guard? */
   unsigned int is_exit:1; /**< Do we think this is an OK exit? */
@@ -3599,6 +3607,16 @@ typedef struct or_circuit_t {
    * to zero, it is initialized to the default value.
    */
   uint32_t max_middle_cells;
+  /**
+   * Contains the mt_desc_t to give to the payment module when
+   * we receive a payment cell over an intermerdiary or over a relay.
+   * This cell is has been sent by a Tor client
+   */
+  mt_desc_t desc;
+  /*
+   * Contains buffering that received on that circuit
+   * if this is a CIRCUIT_PURPOSE_INTERMEDIARY */
+  struct buf_t *buf;
 } or_circuit_t;
 
 #if REND_COOKIE_LEN != DIGEST_LEN
@@ -4236,6 +4254,8 @@ typedef struct {
   int DirCache; /**< Cache all directory documents and accept requests via
                  * tunnelled dir conns from clients. If 1, enabled (default);
                  * If 0, disabled. */
+  
+  int Ledger; /** Used to tell if this dirauth is going to be the ledger */
 
   char *VirtualAddrNetworkIPv4; /**< Address and mask to hand out for virtual
                                  * MAPADDRESS requests for IPv4 addresses */
@@ -5462,6 +5482,7 @@ typedef struct dir_server_t {
   unsigned int is_running:1; /**< True iff we think this server is running. */
   unsigned int is_authority:1; /**< True iff this is a directory authority
                                 * of some kind. */
+  //unsigned int is_ledger:1; [>* < True iff this server is the ledger. <]
 
   /** True iff this server has accepted the most recent server descriptor
    * we tried to upload to it. */
