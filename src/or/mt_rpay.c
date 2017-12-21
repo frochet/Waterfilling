@@ -36,12 +36,10 @@
 
 #pragma GCC diagnostic ignored "-Wswitch-enum"
 
-//TODO figure out callback business for handlers
-//    probably should make callbacks more general with dynamic arg list
-
 #include<pthread.h>
 
 #include "or.h"
+#include "config.h"
 #include "cpuworker.h"
 #include "workqueue.h"
 #include "mt_common.h"
@@ -159,33 +157,33 @@ int mt_rpay_init(void){
   int rel_bal;
 
   /********************************************************************/
-  //TODO replace with torrc
+  // load values from torrc
 
-  FILE* fp;
+  const or_options_t* options = get_options();
 
-  fp = fopen("mt_config_temp/pp", "rb");
-  tor_assert(fread(pp, 1, MT_SZ_PP, fp) == MT_SZ_PP);
-  fclose(fp);
+  byte* temp_pp;
+  byte* temp_pk;
+  byte* temp_sk;
+  byte* temp_led;
 
-  fp = fopen("mt_config_temp/rel_pk", "rb");
-  tor_assert(fread(pk, 1, MT_SZ_PK, fp) == MT_SZ_PK);
-  fclose(fp);
+  fee = options->moneTorFee;
+  rel_bal = options->moneTorBalance;
+  ledger.party = MT_PARTY_LED;
 
-  fp = fopen("mt_config_temp/rel_sk", "rb");
-  tor_assert(fread(sk, 1, MT_SZ_SK, fp) == MT_SZ_SK);
-  fclose(fp);
+  tor_assert(mt_hex2bytes(options->moneTorLedgerDesc, &temp_led) == sizeof(ledger.id));
+  tor_assert(mt_hex2bytes(options->moneTorPP, &temp_pp) == MT_SZ_PP);
+  tor_assert(mt_hex2bytes(options->moneTorPK, &temp_pk) == MT_SZ_PK);
+  tor_assert(mt_hex2bytes(options->moneTorSK, &temp_sk) == MT_SZ_SK);
 
-  fp = fopen("mt_config_temp/led_desc", "rb");
-  tor_assert(fread(&ledger, 1, sizeof(mt_desc_t), fp) == sizeof(mt_desc_t));
-  fclose(fp);
+  memcpy(pp, temp_pp, MT_SZ_PP);
+  memcpy(pk, temp_pk, MT_SZ_PK);
+  memcpy(sk, temp_sk, MT_SZ_SK);
+  memcpy(&ledger.id, temp_led, sizeof(ledger.id));
 
-  fp = fopen("mt_config_temp/fee", "rb");
-  tor_assert(fread(&fee, 1, sizeof(fee), fp) == sizeof(fee));
-  fclose(fp);
-
-  fp = fopen("mt_config_temp/rel_bal", "rb");
-  tor_assert(fread(&rel_bal, 1, sizeof(rel_bal), fp) == sizeof(rel_bal));
-  fclose(fp);
+  free(temp_pp);
+  free(temp_pk);
+  free(temp_sk);
+  free(temp_led);
 
   /********************************************************************/
 
@@ -354,6 +352,7 @@ int mt_rpay_chn_number(void){
 int mt_rpay_clear(void){
   // Need to implement
   tor_assert(0);
+  return MT_ERROR;
 }
 
 /**

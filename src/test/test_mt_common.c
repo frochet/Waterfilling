@@ -49,13 +49,19 @@ static void test_mt_common(void *arg)
 
     //----------------------------- Test Address to Hex --------------------------//
 
-    byte addr_str[MT_SZ_ADDR] = "20 bytes ++)(*_*)///";
-    char expected_hex[MT_SZ_ADDR * 2 + 3] = "0x3230206279746573202B2B29282A5F2A292F2F2F\0";
-    char hex_out[MT_SZ_ADDR * 2 + 3];
+    byte* addr_str = (byte*)"20 bytes ++)(*_*)///";
+    const char* expected_hex = "0x3230206279746573202B2B29282A5F2A292F2F2F\0";
+    char* hex;
 
-    mt_addr2hex(&addr_str, &hex_out);
+    tt_assert(mt_bytes2hex(addr_str, 20, &hex) == MT_SUCCESS);
+    tt_assert(memcmp(expected_hex, hex, 43) == 0);
 
-    tt_assert(memcmp(expected_hex, hex_out, strlen(hex_out)) == 0);
+    byte* bytes;
+    tt_assert(mt_hex2bytes(hex, &bytes) == 20);
+    tt_assert(memcmp(bytes, addr_str, 20) == 0);
+
+    free(hex);
+    free(bytes);
 
     //----------------------------- Test Hash Chains -----------------------------//
 
@@ -114,7 +120,7 @@ static void test_mt_process_msg(void *args) {
   size_t msg_len2 = RELAY_PPAYLOAD_SIZE;
   byte *msg3 = tor_malloc_zero(20*sizeof(byte));
   size_t msg_len3 = 20;
-  
+
   rh->command = RELAY_COMMAND_MT;
   rh->length = RELAY_PPAYLOAD_SIZE + RELAY_PHEADER_SIZE;
   rph->pcommand = MT_NTYPE_NAN_CLI_SETUP1; // get_token_sz should return 1000;
@@ -132,10 +138,10 @@ static void test_mt_process_msg(void *args) {
     }
     i++;
   } while (buf_datalen(circ->ppath->next->buf) != 0 && i < 10);
-  
+
   tt_int_op(i, OP_EQ, msg_len1/RELAY_PPAYLOAD_SIZE + 1);
   tt_int_op(buf_datalen(circ->ppath->next->buf), OP_EQ, 0);
-  
+
   mt_cclient_init();
   node_t node;
   memset(&node, 0, sizeof(node_t));
@@ -161,7 +167,7 @@ static void test_mt_process_msg(void *args) {
   } while (buf_datalen(inter->buf) != 0 && i < 10);
   tt_int_op(i, OP_EQ, msg_len1/RELAY_PPAYLOAD_SIZE+1);
   tt_int_op(buf_datalen(inter->buf), OP_EQ, 0);
- 
+
  done:
   UNMOCK(mt_cclient_process_received_msg);
   tor_free(circ->cpath->next);

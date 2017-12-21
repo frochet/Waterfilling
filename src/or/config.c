@@ -410,8 +410,16 @@ static config_var_t option_vars_[] = {
   VAR("MaxMemInQueues",          MEMUNIT,   MaxMemInQueues_raw, "0"),
   OBSOLETE("MaxOnionsPending"),
   V(MaxOnionQueueDelay,          MSEC_INTERVAL, "1750 msec"),
-  V(MaxUnparseableDescSizeToLog, MEMUNIT, "10 MB"),
+  V(MaxUnparseableDescSizeToLog, MEMUNIT,  "10 MB"),
   V(MinMeasuredBWsForAuthToIgnoreAdvertised, INT, "500"),
+  V(moneTorAuthorityPK,          STRING,   NULL),
+  V(moneTorBalance,              INT,      "0"),
+  V(moneTorFee,                  INT,      "0"),
+  V(moneTorLedgerDesc,           UINT,     "0"),
+  V(moneTorPK,                   STRING,   NULL),
+  V(moneTorPP,                   STRING,   NULL),
+  V(moneTorSK,                   STRING,   NULL),
+  V(moneTorTax,                  INT,      "0"),
   VAR("MyFamily",                LINELIST, MyFamily_lines,       NULL),
   V(NewCircuitPeriod,            INTERVAL, "30 seconds"),
   OBSOLETE("NamingAuthoritativeDirectory"),
@@ -8278,4 +8286,3 @@ init_cookie_authentication(const char *fname, const char *header,
   tor_free(cookie_file_str);
   return retval;
 }
-

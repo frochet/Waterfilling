@@ -6,6 +6,7 @@
 #include <stdlib.h>
 
 #include "or.h"
+#include "config.h"
 #include "mt_crypto.h"
 #include "mt_tokens.h"
 #include "mt_common.h"
@@ -96,26 +97,47 @@ static void test_mt_lpay(void *arg)
   byte aut_0_sk[MT_SZ_SK];
   mt_desc_t aut_0_desc;
 
+  // seutp ledger
+  byte led_0_pk[MT_SZ_PK];
+  byte led_0_sk[MT_SZ_SK];
+
   /********************************************************************/
   //TODO replace with torrc
 
-  FILE* fp;
+  mt_crypt_setup(&pp);
+  mt_crypt_keygen(&pp, &aut_0_pk, &aut_0_sk);
+  mt_crypt_keygen(&pp, &led_0_pk, &led_0_sk);
 
-  fp = fopen("mt_config_temp/pp", "rb");
-  tor_assert(fread(pp, 1, MT_SZ_PP, fp) == MT_SZ_PP);
-  fclose(fp);
+  aut_0_desc.id = 1;
+  aut_0_desc.party = MT_PARTY_AUT;
 
-  fp = fopen("mt_config_temp/aut_pk", "rb");
-  tor_assert(fread(aut_0_pk, 1, MT_SZ_PK, fp) == MT_SZ_PK);
-  fclose(fp);
+  or_options_t* options = get_options();
 
-  fp = fopen("mt_config_temp/aut_sk", "rb");
-  tor_assert(fread(aut_0_sk, 1, MT_SZ_SK, fp) == MT_SZ_SK);
-  fclose(fp);
+  mt_bytes2hex(pp, MT_SZ_PP, &options->moneTorPP);
+  mt_bytes2hex(led_0_pk, MT_SZ_PK, &options->moneTorPK);
+  mt_bytes2hex(led_0_sk, MT_SZ_SK, &options->moneTorSK);
+  mt_bytes2hex(aut_0_pk, MT_SZ_PK, &options->moneTorAuthorityPK);
 
-  fp = fopen("mt_config_temp/aut_desc", "rb");
-  tor_assert(fread(&aut_0_desc, 1, sizeof(mt_desc_t), fp) == sizeof(mt_desc_t));
-  fclose(fp);
+  options->moneTorFee = MT_FEE;
+  options->moneTorTax = MT_TAX;
+
+  /* FILE* fp; */
+
+  /* fp = fopen("mt_config_temp/pp", "rb"); */
+  /* tor_assert(fread(pp, 1, MT_SZ_PP, fp) == MT_SZ_PP); */
+  /* fclose(fp); */
+
+  /* fp = fopen("mt_config_temp/aut_pk", "rb"); */
+  /* tor_assert(fread(aut_0_pk, 1, MT_SZ_PK, fp) == MT_SZ_PK); */
+  /* fclose(fp); */
+
+  /* fp = fopen("mt_config_temp/aut_sk", "rb"); */
+  /* tor_assert(fread(aut_0_sk, 1, MT_SZ_SK, fp) == MT_SZ_SK); */
+  /* fclose(fp); */
+
+  /* fp = fopen("mt_config_temp/aut_desc", "rb"); */
+  /* tor_assert(fread(&aut_0_desc, 1, sizeof(mt_desc_t), fp) == sizeof(mt_desc_t)); */
+  /* fclose(fp); */
 
   /********************************************************************/
 
@@ -154,18 +176,6 @@ static void test_mt_lpay(void *arg)
 
   byte aut_0_addr[MT_SZ_ADDR];
   mt_pk2addr(&aut_0_pk, &aut_0_addr);
-
-  char aut_0_hex[MT_SZ_ADDR * 2 + 3] ;
-  char end_1_hex[MT_SZ_ADDR * 2 + 3] ;
-  char int_1_hex[MT_SZ_ADDR * 2 + 3] ;
-
-  mt_addr2hex(&aut_0_addr, &aut_0_hex);
-  mt_addr2hex(&end_1_addr, &end_1_hex);
-  mt_addr2hex(&int_1_addr, &int_1_hex);
-
-  //printf("aut addr %s\n", aut_0_hex);
-  //printf("end addr %s\n", end_1_hex);
-  //printf("int addr %s\n", int_1_hex);
 
   //expected
   int exp_aut_0_bal = 0;
