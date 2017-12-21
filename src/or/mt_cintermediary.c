@@ -1,6 +1,7 @@
 #include "or.h"
 #include "mt_cintermediary.h"
 #include "mt_common.h"
+#include "mt_ipay.h"
 #include "container.h"
 #include "circuitbuild.h"
 #include "circuituse.h"
@@ -14,11 +15,13 @@
 
 STATIC void run_cintermediary_housekeeping_event(time_t now);
 STATIC void run_cintermediary_build_circuit_event(time_t now);
+static void ledger_free(void);
+static void ledger_init(const node_t *node, extend_info_t *ei, time_t now);
 
 static digestmap_t *desc2circ = NULL;
 
 static smartlist_t *ledgercircs = NULL;
-static smartlist_t *ledgers = NULL;
+static ledger_t* ledger = NULL;
 static int count = 1;
 
 /********************** Once per second events ***********************/
@@ -26,8 +29,12 @@ static int count = 1;
 STATIC void
 run_cintermediary_housekeeping_event(time_t now) {
   (void) now;
-  /** Create ledger_t */
 }
+
+/**
+ * Once we have enough consensus information we try to build circuit
+ * towards the ledger and maintain them open
+ */
 
 STATIC void
 run_cintermediary_build_circuit_event(time_t now) {
@@ -36,13 +43,27 @@ run_cintermediary_build_circuit_event(time_t now) {
       !have_completed_a_circuit())
     return;
   /* We get our ledger circuit and we built one if it is NULL */
-  
+  extend_info_t *ei = NULL;
+  if (!ledger) {
+    const node_t* node;
+    node = node_find_ledger();
+    if (!node) {
+      log_info(LD_MT, "Hey, we do not have a ledger in our consensus?");
+      return;  /** For whatever reason our consensus does not have a ledger */
+    }
+    ei = extend_info_from_node(node, 0);
+    if (!ei) {
+      log_info(LD_MT, "extend_info_from_node failed?");
+      goto err;
+    }
+    ledger_init(node, ei, now);
+  }
+
+
   /* How many of them do we build? - should be linked to 
    * our consensus weight */
   origin_circuit_t *circ = NULL;
   
-  ledger_t *ledger = mt_cintermediary_get_ledger();
-
   while (smartlist_len(ledgercircs) < NBR_LEDGER_CIRCUITS &&
          ledger->circuit_retries < NBR_LEDGER_CIRCUITS*LEDGER_MAX_RETRIES) {
     /* this is just about load balancing */
@@ -59,12 +80,40 @@ run_cintermediary_build_circuit_event(time_t now) {
       smartlist_add(ledgercircs, circ);
     }
   }
+  return;
+ err:
+  extend_info_free(ei);
+  ledger_free();
+  return;
+}
+
+/********************** circ event ***********************************/
+
+void mt_cintermediary_ledgercirc_has_opened(circuit_t *circ) {
+  (void) circ;
+}
+
+void mt_cintermediary_ledgercirc_has_closed(circuit_t *circ) {
+  (void) circ;
+}
+
+void mt_cintermediary_orcirc_has_closed(or_circuit_t *circ) {
+  buf_free(circ->buf);
+  mt_desc_free(&circ->desc);
+  // TODO remove this circuit from our structures
+}
+
+/** We've received the first payment cell over that circuit 
+ * init structure as well as add this circ in our structures*/
+
+void mt_cintermediary_init_desc_and_add(or_circuit_t *circ) {
+  (void) circ;
 }
 
 /********************** Utility stuff ********************************/
 
 ledger_t *mt_cintermediary_get_ledger(void) {
-  return NULL;
+  return ledger;
 }
 
 /********************** Payment related functions ********************/
@@ -76,16 +125,46 @@ mt_cintermediary_send_message(mt_desc_t *desc, mt_ntype_t pcommand,
   (void) pcommand;
   (void) msg;
   (void) size;
-  return 0;
+  byte id[DIGEST_LEN];
+  mt_desc2digest(desc, &id);
+  circuit_t *circ = digestmap_get(desc2circ, (char*) id);
+  /** Might happen if the circuit has been closed */
+  // We can go a bit further and re-send the command for 
+  // ledger circuits when it is up again.
+  // XXX TODO
+  if (!circ || circ->marked_for_close || circ->state !=
+      CIRCUIT_STATE_OPEN) {
+    return -1;
+  }
+  return relay_send_pcommand_from_edge(circ, RELAY_COMMAND_MT,
+      pcommand, (const char*) msg, size);
 }
 
 void
 mt_cintermediary_process_received_msg(circuit_t *circ, mt_ntype_t pcommand,
     byte *msg, size_t msg_len) {
-  (void) circ;
-  (void) pcommand;
-  (void) msg;
-  (void) msg_len;
+  mt_desc_t *desc;
+  or_circuit_t *orcirc;
+  if (circ->purpose == CIRCUIT_PURPOSE_I_LEDGER) {
+    tor_assert(ledger);
+    desc = &ledger->desc;
+    if (mt_ipay_recv(desc, pcommand, msg, msg_len) < 0) {
+      log_info(LD_MT, "Payment module returned -1 for mt_ntype_t %hhx", pcommand);
+      // XXX decides what to do
+    }
+  }
+  else if (circ->purpose == CIRCUIT_PURPOSE_INTERMEDIARY) {
+    orcirc = TO_OR_CIRCUIT(circ);
+    desc = &orcirc->desc;
+    if (mt_ipay_recv(desc, pcommand, msg, msg_len) < 0) {
+      log_info(LD_MT, "Payment module returned -1 for mt_ntype_t %hhx", pcommand);
+      //decides what to do
+    }
+  }
+  else {
+    log_info(LD_MT, "Processing circuit with unsupported purpose %hhx",
+        circ->purpose);
+  }
 }
 
 
@@ -94,5 +173,31 @@ mt_cintermediary_process_received_msg(circuit_t *circ, mt_ntype_t pcommand,
 void mt_cintermediary_init(void) {
   desc2circ = digestmap_new();
   ledgercircs = smartlist_new();
-  ledgers = smartlist_new();
+}
+
+/*
+ * Initialize our static ledger
+ */
+
+static void
+ledger_init(const node_t *node, extend_info_t *ei, time_t now) {
+  tor_assert(node);
+  tor_assert(ei);
+  ledger = tor_malloc_zero(sizeof(ledger_t));
+  memcpy(ledger->identity.identity, node->identity, DIGEST_LEN);
+  ledger->is_reachable = LEDGER_REACHABLE_MAYBE;
+  ledger->desc.id = count++; // XXX change this counter to 128-bit digest
+  ledger->desc.party = MT_PARTY_LED;
+  ledger->ei = ei;
+  ledger->buf = buf_new_with_capacity(RELAY_PPAYLOAD_SIZE);
+  log_info(LD_MT, "Ledger created at %lld", (long long) now);
+}
+
+static void ledger_free(void) {
+  if (!ledger)
+    return;
+  if (ledger->ei)
+    extend_info_free(ledger->ei);
+  buf_free(ledger->buf);
+  tor_free(ledger);
 }

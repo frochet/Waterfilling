@@ -540,6 +540,7 @@ nodelist_set_consensus(networkstatus_t *ns)
       node->is_running = rs->is_flagged_running;
       node->is_fast = rs->is_fast;
       node->is_intermediary = rs->is_intermediary;
+      node->is_ledger = rs->is_ledger;
       node->is_stable = rs->is_stable;
       node->is_possible_guard = rs->is_possible_guard;
       node->is_exit = rs->is_exit;
@@ -1831,6 +1832,18 @@ router_find_exact_exit_enclave(const char *address, uint16_t port)
         compare_tor_addr_to_node_policy(&a, port, node) ==
           ADDR_POLICY_ACCEPTED &&
         !routerset_contains_node(options->ExcludeExitNodesUnion_, node))
+      return node;
+  });
+  return NULL;
+}
+
+/** Find the ledger among our router list */
+
+const node_t *
+node_find_ledger(void)
+{
+  SMARTLIST_FOREACH(nodelist_get_list(), const node_t *, node, {
+    if (node->is_ledger)
       return node;
   });
   return NULL;

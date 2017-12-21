@@ -555,8 +555,10 @@ typedef enum {
 #define CIRCUIT_PURPOSE_R_INTERMEDIARY 23
 
 #define CIRCUIT_PURPOSE_I_LEDGER 24
+/** OR-side circuit on a intermerdiary */
+#define CIRCUIT_PURPOSE_INTERMEDIARY 25
 
-#define CIRCUIT_PURPOSE_MAX_ 24
+#define CIRCUIT_PURPOSE_MAX_ 25
 /** A catch-all for unrecognized purposes. Currently we don't expect
  * to make or see any circuits with this purpose. */
 #define CIRCUIT_PURPOSE_UNKNOWN 255
@@ -2542,6 +2544,7 @@ typedef struct node_t {
                             *  (For Authdir: Have we validated this OR?) */
   unsigned int is_fast:1; /** Do we think this is a fast OR? */
   unsigned int is_intermediary:1; /** Do we think this is an intermediary? */
+  unsigned int is_ledger:1;
   unsigned int is_stable:1; /** Do we think this is a stable OR? */
   unsigned int is_possible_guard:1; /**< Do we think this is an OK guard? */
   unsigned int is_exit:1; /**< Do we think this is an OK exit? */
@@ -3604,6 +3607,16 @@ typedef struct or_circuit_t {
    * to zero, it is initialized to the default value.
    */
   uint32_t max_middle_cells;
+  /**
+   * Contains the mt_desc_t to give to the payment module when
+   * we receive a payment cell over an intermerdiary or over a relay.
+   * This cell is has been sent by a Tor client
+   */
+  mt_desc_t desc;
+  /*
+   * Contains buffering that received on that circuit
+   * if this is a CIRCUIT_PURPOSE_INTERMEDIARY */
+  struct buf_t *buf;
 } or_circuit_t;
 
 #if REND_COOKIE_LEN != DIGEST_LEN

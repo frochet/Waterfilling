@@ -60,11 +60,13 @@ intermediary_new(const node_t *node, extend_info_t *ei, time_t now) {
   //XXX MoneTor change nickname to something else, or remove nickname
   //intermediary->nickname = tor_strdup(node->ri->nickname);
   intermediary->is_reachable = INTERMEDIARY_REACHABLE_MAYBE;
-  intermediary->desc.id = desc_id++;
+  /** XXX change this counter to a 128-bit digest */
+  intermediary->desc.id = desc_id++; 
   intermediary->desc.party = MT_PARTY_INT;
   intermediary->chosen_at = now;
   intermediary->ei = ei;
   intermediary->buf = buf_new_with_capacity(RELAY_PPAYLOAD_SIZE);
+  log_info(LD_MT, "Intermediary created at %lld", (long long) now);
   return intermediary;
 }
 
@@ -495,8 +497,7 @@ mt_cclient_send_message(mt_desc_t* desc, uint8_t command, mt_ntype_t type,
   byte id[DIGEST_LEN];
   mt_desc2digest(desc, &id);
   origin_circuit_t* circ = digestmap_get(desc2circ, (char*) id);
-  tor_assert(circ);
-  if (TO_CIRCUIT(circ)->marked_for_close || 
+  if (!circ || TO_CIRCUIT(circ)->marked_for_close || 
       TO_CIRCUIT(circ)->state != CIRCUIT_STATE_OPEN) {
     /*If send_message is called by an event added by a worker
       thread, it is possible that our circuit has just been
@@ -572,7 +573,7 @@ mt_cclient_process_received_msg, (origin_circuit_t *circ, crypt_path_t *layer_hi
         extend_info_describe(intermediary->ei));
     // XXX Buffering cells? - We should do this in mt_common
     if (mt_cpay_recv(desc, pcommand, msg, msg_len) < 0) {
-      log_info(LD_MT, "Payment module returned -1 for mt_ntype_t %d", pcommand);
+      log_info(LD_MT, "Payment module returned -1 for mt_ntype_t %hhx", pcommand);
       // XXX Do we mark this circuit for close and complain about
       // intermediary?
       // XXX Do we notify all general circuit that the payment will not complete?

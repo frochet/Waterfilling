@@ -32,6 +32,21 @@ typedef struct ledger_t {
   uint32_t circuit_retries;
 } ledger_t;
 
+/********************* Circ event ********************************/
+
+void mt_cintermediary_ledgercirc_has_opened(circuit_t *circ);
+
+void mt_cintermediary_ledgercirc_has_closed(circuit_t *circ);
+
+/** When a CIRCUIT_PURPOSE_INTERMEDIARY closes, this function
+ * should be called */
+
+void mt_cintermediary_orcirc_has_closed(or_circuit_t *circ);
+
+/** We've received the fist cell over what is now a CIRCUIT_PURPOSE_INTERMEDIARY
+ * we initiate the new mt_desc_t and we add this circuit into our 
+ * structures */
+void  mt_cintermediary_init_desc_and_add(or_circuit_t *circ);
 
 /********************* Utility stuffs ****************************/
 
