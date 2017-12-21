@@ -87,6 +87,15 @@ run_cintermediary_build_circuit_event(time_t now) {
   return;
 }
 
+void
+run_cintermediary_scheduled_events(time_t now) {
+  if (!intermediary_mode(get_options()))
+    return;
+  run_cintermediary_housekeeping_event(now);
+
+  run_cintermediary_build_circuit_event(now);
+}
+
 /********************** circ event ***********************************/
 
 void mt_cintermediary_ledgercirc_has_opened(circuit_t *circ) {

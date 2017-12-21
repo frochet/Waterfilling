@@ -164,11 +164,20 @@ int mt_check_enough_fund(void) {
  */
 void monetor_run_scheduled_events(time_t now) {
 
-  /*run scheduled cclient event - avoid to do this on authority*/
-  run_cclient_scheduled_events(now);
-
   /*XXX MoneTor - Todo: adding scheduled events for intermediaries, relays, etc */
-
+  if (authdir_mode(get_options()) || authdir_mode_v3(get_options())) {
+    /*run_cauthdir_scheduled_events(now);*/
+  }
+  if (intermediary_mode(get_option())) {
+    run_cintermediary_scheduled_events(now);
+  }
+  else if (server_mode(get_options())) {
+    /*run_crelay_scheduled_events(now);*/
+  }
+  else {
+    /*2run scheduled cclient event - avoid to do this on authority*/
+    run_cclient_scheduled_events(now);
+  }
 }
 
 /**

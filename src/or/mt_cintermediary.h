@@ -32,6 +32,9 @@ typedef struct ledger_t {
   uint32_t circuit_retries;
 } ledger_t;
 
+void run_cintermediary_scheduled_events(time_t now);
+
+
 /********************* Circ event ********************************/
 
 void mt_cintermediary_ledgercirc_has_opened(circuit_t *circ);
