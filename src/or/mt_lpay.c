@@ -30,6 +30,8 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "or.h"
+#include "config.h"
 #include "mt_crypto.h"
 #include "mt_tokens.h"
 #include "mt_common.h"
@@ -107,25 +109,29 @@ int mt_lpay_init(void){
   byte aut_pk[MT_SZ_PK];
 
   /********************************************************************/
-  //TODO replace with torrc
+  // load values from torrc
 
-  FILE* fp;
+  or_options_t* options = get_options();
 
-  fp = fopen("mt_config_temp/pp", "rb");
-  tor_assert(fread(pp, 1, MT_SZ_PP, fp) == MT_SZ_PP);
-  fclose(fp);
+  byte* temp_pp;
+  byte* temp_pk;
+  byte* temp_sk;
+  byte* temp_aut_pk;
 
-  fp = fopen("mt_config_temp/led_pk", "rb");
-  tor_assert(fread(pk, 1, MT_SZ_PK, fp) == MT_SZ_PK);
-  fclose(fp);
+  tor_assert(mt_hex2bytes(options->moneTorPP, &temp_pp) == MT_SZ_PP);
+  tor_assert(mt_hex2bytes(options->moneTorPK, &temp_pk) == MT_SZ_PK);
+  tor_assert(mt_hex2bytes(options->moneTorSK, &temp_sk) == MT_SZ_SK);
+  tor_assert(mt_hex2bytes(options->moneTorAuthorityPK, &temp_aut_pk) == MT_SZ_PK);
 
-  fp = fopen("mt_config_temp/led_sk", "rb");
-  tor_assert(fread(sk, 1, MT_SZ_SK, fp) == MT_SZ_SK);
-  fclose(fp);
+  memcpy(pp, temp_pp, MT_SZ_PP);
+  memcpy(pk, temp_pk, MT_SZ_PK);
+  memcpy(sk, temp_sk, MT_SZ_SK);
+  memcpy(aut_pk, temp_aut_pk, MT_SZ_PK);
 
-  fp = fopen("mt_config_temp/aut_pk", "rb");
-  tor_assert(fread(aut_pk, 1, MT_SZ_PK, fp) == MT_SZ_PK);
-  fclose(fp);
+  free(temp_pp);
+  free(temp_pk);
+  free(temp_sk);
+  free(temp_aut_pk);
 
   /********************************************************************/
 

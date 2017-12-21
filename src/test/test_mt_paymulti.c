@@ -14,6 +14,7 @@
 #include <stdlib.h>
 
 #include "or.h"
+#include "config.h"
 #include "container.h"
 #include "workqueue.h"
 #include "cpuworker.h"
@@ -77,7 +78,6 @@ static int max_time = 1000;
 static mt_desc_t cur_desc;
 static mt_desc_t aut_desc;
 static mt_desc_t led_desc;
-static mt_payment_public_t public;
 
 static digestmap_t* cli_ctx;           // digest(cli_desc) -> context_t*
 static digestmap_t* rel_ctx;           // digest(rel_desc) -> context_t*
@@ -202,16 +202,6 @@ static int mock_close_success(mt_desc_t* rdesc, mt_desc_t* idesc, int success){
   (void)idesc;
   (void)success;
   return MT_SUCCESS;
-}
-
-/**
- * Write a file to the disk. File will be in the active directory (tor/)
- */
-static void write_file(const char* name, void* buf, int size){
-  FILE *fp;
-  fp = fopen(name, "wb");
-  fwrite(buf, sizeof(byte), size, fp);
-  fclose(fp);
 }
 
 /**
@@ -520,7 +510,7 @@ static int do_main_loop_once(void){
 
   byte int_digest[DIGEST_LEN];
   mt_desc2digest(&event->desc2, &int_digest);
-  int MT_NAN_TAX = MT_NAN_VAL * public.tax / 100;
+  int MT_NAN_TAX = MT_NAN_VAL * MT_TAX / 100;
 
   // update expected balances for pay
   if(event->type == CALL_PAY && memcmp(dst_digest, int_digest, DIGEST_LEN) != 0){
@@ -695,15 +685,17 @@ static void test_mt_paymulti(void *arg){
   aut_desc.id = ids++;
   led_desc.id = ids++;
 
-  write_file("mt_config_temp/pp", pp, MT_SZ_PP);
+  or_options_t* options = (or_options_t*)get_options();
 
-  write_file("mt_config_temp/aut_pk", aut_pk, MT_SZ_PK);
-  write_file("mt_config_temp/aut_sk", aut_sk, MT_SZ_SK);
-  write_file("mt_config_temp/aut_desc", &aut_desc, sizeof(mt_desc_t));
+  mt_bytes2hex((byte*)&led_desc.id, sizeof(led_desc.id), &options->moneTorLedgerDesc);
+  mt_bytes2hex(aut_pk, MT_SZ_PK, &options->moneTorAuthorityPK);
 
-  write_file("mt_config_temp/led_pk", led_pk, MT_SZ_PK);
-  write_file("mt_config_temp/led_sk", led_sk, MT_SZ_SK);
-  write_file("mt_config_temp/led_desc", &led_desc, sizeof(mt_desc_t));
+  mt_bytes2hex(pp, MT_SZ_PP, &options->moneTorPP);
+  mt_bytes2hex(led_pk, MT_SZ_PK, &options->moneTorPK);
+  mt_bytes2hex(led_sk, MT_SZ_SK, &options->moneTorSK);
+
+  options->moneTorFee = MT_FEE;
+  options->moneTorTax = MT_TAX;
 
   byte aut_addr[MT_SZ_ADDR];
   byte led_addr[MT_SZ_ADDR];
@@ -712,9 +704,6 @@ static void test_mt_paymulti(void *arg){
 
   // initialize ledger and save relevant "public" values
   tt_assert(mt_lpay_init() == MT_SUCCESS);
-  public = mt_lpay_get_payment_public();
-  write_file("mt_config_temp/fee", &public.fee, sizeof(public.fee));
-  write_file("mt_config_temp/tax", &public.tax, sizeof(public.tax));
 
   // authority mints money
 
@@ -742,11 +731,9 @@ static void test_mt_paymulti(void *arg){
     mt_crypt_keygen(&pp, &cli_pk, &cli_sk);
     cli_desc.id = ids++;
 
-    write_file("mt_config_temp/cli_pk", cli_pk, MT_SZ_PK);
-    write_file("mt_config_temp/cli_sk", cli_sk, MT_SZ_SK);
-    write_file("mt_config_temp/cli_desc", &cli_desc, sizeof(mt_desc_t));
-    write_file("mt_config_temp/cli_bal", &cli_trans_val, sizeof(int));
-
+    mt_bytes2hex(cli_pk, MT_SZ_PK, &options->moneTorPK);
+    mt_bytes2hex(cli_sk, MT_SZ_SK, &options->moneTorSK);
+    options->moneTorBalance = cli_trans_val;
     tt_assert(mt_cpay_init() == MT_SUCCESS);
 
     byte digest[DIGEST_LEN];
@@ -763,7 +750,7 @@ static void test_mt_paymulti(void *arg){
     byte cli_addr[MT_SZ_ADDR];
     mt_pk2addr(&cli_pk, &cli_addr);
 
-    mac_any_trans_t cli_trans = {.val_to = cli_trans_val, .val_from = cli_trans_val + public.fee};
+    mac_any_trans_t cli_trans = {.val_to = cli_trans_val, .val_from = cli_trans_val + MT_FEE};
     memcpy(cli_trans.from, aut_addr, MT_SZ_ADDR);
     memcpy(cli_trans.to, cli_addr, MT_SZ_ADDR);
     byte cli_trans_id[DIGEST_LEN];
@@ -794,11 +781,9 @@ static void test_mt_paymulti(void *arg){
     mt_crypt_keygen(&pp, &rel_pk, &rel_sk);
     rel_desc.id = ids++;
 
-    write_file("mt_config_temp/rel_pk", rel_pk, MT_SZ_PK);
-    write_file("mt_config_temp/rel_sk", rel_sk, MT_SZ_SK);
-    write_file("mt_config_temp/rel_desc", &rel_desc, sizeof(mt_desc_t));
-    write_file("mt_config_temp/rel_bal", &rel_trans_val, sizeof(int));
-
+    mt_bytes2hex(rel_pk, MT_SZ_PK, &options->moneTorPK);
+    mt_bytes2hex(rel_sk, MT_SZ_SK, &options->moneTorSK);
+    options->moneTorBalance = rel_trans_val;
     tt_assert(mt_rpay_init() == MT_SUCCESS);
 
     byte digest[DIGEST_LEN];
@@ -815,7 +800,7 @@ static void test_mt_paymulti(void *arg){
     byte rel_addr[MT_SZ_ADDR];
     mt_pk2addr(&rel_pk, &rel_addr);
 
-    mac_any_trans_t rel_trans = {.val_to = rel_trans_val, .val_from = rel_trans_val + public.fee};
+    mac_any_trans_t rel_trans = {.val_to = rel_trans_val, .val_from = rel_trans_val + MT_FEE};
     memcpy(rel_trans.from, aut_addr, MT_SZ_ADDR);
     memcpy(rel_trans.to, rel_addr, MT_SZ_ADDR);
     byte rel_trans_id[DIGEST_LEN];
@@ -846,11 +831,9 @@ static void test_mt_paymulti(void *arg){
     mt_crypt_keygen(&pp, &int_pk, &int_sk);
     int_desc.id = ids++;
 
-    write_file("mt_config_temp/int_pk", int_pk, MT_SZ_PK);
-    write_file("mt_config_temp/int_sk", int_sk, MT_SZ_SK);
-    write_file("mt_config_temp/int_desc", &int_desc, sizeof(mt_desc_t));
-    write_file("mt_config_temp/int_bal", &int_trans_val, sizeof(int));
-
+    mt_bytes2hex(int_pk, MT_SZ_PK, &options->moneTorPK);
+    mt_bytes2hex(int_sk, MT_SZ_SK, &options->moneTorSK);
+    options->moneTorBalance = int_trans_val;
     tt_assert(mt_ipay_init() == MT_SUCCESS);
 
     byte digest[DIGEST_LEN];
@@ -867,7 +850,7 @@ static void test_mt_paymulti(void *arg){
     byte int_addr[MT_SZ_ADDR];
     mt_pk2addr(&int_pk, &int_addr);
 
-    mac_any_trans_t int_trans = {.val_to = int_trans_val, .val_from = int_trans_val + public.fee};
+    mac_any_trans_t int_trans = {.val_to = int_trans_val, .val_from = int_trans_val + MT_FEE};
     memcpy(int_trans.from, aut_addr, MT_SZ_ADDR);
     memcpy(int_trans.to, int_addr, MT_SZ_ADDR);
     byte int_trans_id[DIGEST_LEN];
@@ -912,21 +895,21 @@ static void test_mt_paymulti(void *arg){
   MAP_FOREACH(digestmap_, cli_ctx, const char*, digest, context_t*, ctx){
     mt_cpay_import(ctx->state);
     int bal = mt_cpay_mac_balance() + mt_cpay_chn_balance();
-    int exp = *(int*)digestmap_get(exp_balance, digest) - public.fee * mt_cpay_chn_number();
+    int exp = *(int*)digestmap_get(exp_balance, digest) - MT_FEE * mt_cpay_chn_number();
     tor_assert(bal == exp);
   } MAP_FOREACH_END;
 
   MAP_FOREACH(digestmap_, rel_ctx, const char*, digest, context_t*, ctx){
     mt_rpay_import(ctx->state);
     int bal = mt_rpay_mac_balance() + mt_rpay_chn_balance();
-    int exp = *(int*)digestmap_get(exp_balance, digest) - public.fee * mt_rpay_chn_number();
+    int exp = *(int*)digestmap_get(exp_balance, digest) - MT_FEE * mt_rpay_chn_number();
     tor_assert(bal == exp);
   } MAP_FOREACH_END;
 
   MAP_FOREACH(digestmap_, int_ctx, const char*, digest, context_t*, ctx){
     mt_ipay_import(ctx->state);
     int bal =  mt_ipay_mac_balance() + mt_ipay_chn_balance();
-    int exp = *(int*)digestmap_get(exp_balance, digest) - public.fee * mt_ipay_chn_number();
+    int exp = *(int*)digestmap_get(exp_balance, digest) - MT_FEE * mt_ipay_chn_number();
     tor_assert(bal == exp);
   } MAP_FOREACH_END;
 

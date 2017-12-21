@@ -40,7 +40,7 @@ typedef struct intermediary_t {
   /*buffer payment cells received by this intermediary
    *if we get multiple cells for one mt_ntype_t */
   buf_t *buf;
-  
+
 } intermediary_t;
 
 /**
@@ -61,7 +61,12 @@ void mt_nanpub2digest(nan_any_public_t* token, byte (*digest_out)[DIGEST_LEN]);
 /**
  * Convert an mt address into a printable hexidecimal c-string
  */
-int mt_addr2hex(byte (*addr)[MT_SZ_ADDR], char (*hex_out)[MT_SZ_ADDR * 2 + 3]);
+int mt_bytes2hex(byte* bytes, int size, char** hex_out);
+
+/**
+ * Converts a hex digest (c-string) into a malloc'd byte string
+ */
+int mt_hex2bytes(char* hex, byte** bytes_out);
 
 /**
  * Create malloc'd hash chain of the given size using the given head

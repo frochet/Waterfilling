@@ -14,6 +14,7 @@
 #include <unistd.h>
 
 #include "or.h"
+#include "config.h"
 #include "workqueue.h"
 #include "cpuworker.h"
 #include "mt_crypto.h"
@@ -318,16 +319,6 @@ static workqueue_entry_t* mock_cpuworker_queue_work(workqueue_priority_t priorit
 }
 
 /**
- * Write a file to the disk. File will be in the active directory (tor/)
- */
-static void write_file(const char* name, void* buf, int size){
-  FILE *fp;
-  fp = fopen(name, "wb");
-  fwrite(buf, sizeof(byte), size, fp);
-  fclose(fp);
-}
-
-/**
  * Execute paysimple test
  */
 static void test_mt_paysimple(void *arg){
@@ -398,32 +389,35 @@ static void test_mt_paysimple(void *arg){
   // write values to disk as separate files in the tor/ directory
   // TODO: this should go through torcc instead
 
-  write_file("mt_config_temp/pp", pp, MT_SZ_PP);
+  or_options_t* options = (or_options_t*)get_options();
 
-  write_file("mt_config_temp/aut_pk", aut_pk, MT_SZ_PK);
-  write_file("mt_config_temp/aut_sk", aut_sk, MT_SZ_SK);
-  write_file("mt_config_temp/aut_desc", &aut_desc, sizeof(mt_desc_t));
+  mt_bytes2hex((byte*)&led_desc.id, sizeof(led_desc.id), &options->moneTorLedgerDesc);
+  mt_bytes2hex(aut_pk, MT_SZ_PK, &options->moneTorAuthorityPK);
+  mt_bytes2hex(pp, MT_SZ_PP, &options->moneTorPP);
+  options->moneTorFee = MT_FEE;
+  options->moneTorTax = MT_TAX;
 
-  write_file("mt_config_temp/led_pk", led_pk, MT_SZ_PK);
-  write_file("mt_config_temp/led_sk", led_sk, MT_SZ_SK);
-  write_file("mt_config_temp/led_desc", &led_desc, sizeof(mt_desc_t));
+  // initiate ledger
+  mt_bytes2hex(led_pk, MT_SZ_PK, &options->moneTorPK);
+  mt_bytes2hex(led_sk, MT_SZ_SK, &options->moneTorSK);
+  tt_assert(mt_lpay_init() == MT_SUCCESS);
 
-  write_file("mt_config_temp/cli_pk", cli_pk, MT_SZ_PK);
-  write_file("mt_config_temp/cli_sk", cli_sk, MT_SZ_SK);
-  write_file("mt_config_temp/cli_desc", &cli_desc, sizeof(mt_desc_t));
-  write_file("mt_config_temp/cli_bal", &cli_trans_val, sizeof(int));
+  mt_bytes2hex(cli_pk, MT_SZ_PK, &options->moneTorPK);
+  mt_bytes2hex(cli_sk, MT_SZ_SK, &options->moneTorSK);
+  options->moneTorBalance = cli_trans_val;
+  tt_assert(mt_cpay_init() == MT_SUCCESS);
 
-  write_file("mt_config_temp/rel_pk", rel_pk, MT_SZ_PK);
-  write_file("mt_config_temp/rel_sk", rel_sk, MT_SZ_SK);
-  write_file("mt_config_temp/rel_desc", &rel_desc, sizeof(mt_desc_t));
-  write_file("mt_config_temp/rel_bal", &rel_trans_val, sizeof(int));
+  mt_bytes2hex(rel_pk, MT_SZ_PK, &options->moneTorPK);
+  mt_bytes2hex(rel_sk, MT_SZ_SK, &options->moneTorSK);
+  options->moneTorBalance = rel_trans_val;
+  tt_assert(mt_rpay_init() == MT_SUCCESS);
 
-  write_file("mt_config_temp/int_pk", int_pk, MT_SZ_PK);
-  write_file("mt_config_temp/int_sk", int_sk, MT_SZ_SK);
-  write_file("mt_config_temp/int_desc", &int_desc, sizeof(mt_desc_t));
-  write_file("mt_config_temp/int_bal", &int_trans_val, sizeof(int));
+  mt_bytes2hex(int_pk, MT_SZ_PK, &options->moneTorPK);
+  mt_bytes2hex(int_sk, MT_SZ_SK, &options->moneTorSK);
+  options->moneTorBalance = int_trans_val;
+  tt_assert(mt_ipay_init() == MT_SUCCESS);
 
-  // declare and define addresses for ledger interaction
+  // decalre and define addresses for ledger interaction
   byte aut_addr[MT_SZ_ADDR];
   byte led_addr[MT_SZ_ADDR];
   byte cli_addr[MT_SZ_ADDR];
@@ -435,17 +429,6 @@ static void test_mt_paysimple(void *arg){
   mt_pk2addr(&cli_pk, &cli_addr);
   mt_pk2addr(&rel_pk, &rel_addr);
   mt_pk2addr(&int_pk, &int_addr);
-
-  // initialize ledger and save relevant "public" values
-  tt_assert(mt_lpay_init() == MT_SUCCESS);
-  mt_payment_public_t public = mt_lpay_get_payment_public();
-  write_file("mt_config_temp/fee", &public.fee, sizeof(public.fee));
-  write_file("mt_config_temp/tax", &public.tax, sizeof(public.tax));
-
-  // initialize remaining payment modules
-  tt_assert(mt_cpay_init() == MT_SUCCESS);
-  tt_assert(mt_ipay_init() == MT_SUCCESS);
-  tt_assert(mt_rpay_init() == MT_SUCCESS);
 
   int result; // generic variable to track function call success/failure
 
@@ -467,7 +450,7 @@ static void test_mt_paysimple(void *arg){
 
   // send money from authority to client
 
-  mac_any_trans_t cli_trans = {.val_to = cli_trans_val, .val_from = cli_trans_val + public.fee};
+  mac_any_trans_t cli_trans = {.val_to = cli_trans_val, .val_from = cli_trans_val + MT_FEE};
   memcpy(cli_trans.from, aut_addr, MT_SZ_ADDR);
   memcpy(cli_trans.to, cli_addr, MT_SZ_ADDR);
   byte cli_trans_id[DIGEST_LEN];
@@ -484,7 +467,7 @@ static void test_mt_paysimple(void *arg){
 
   // send money from authority to relay
 
-  mac_any_trans_t rel_trans = {.val_to = rel_trans_val, .val_from = rel_trans_val + public.fee};
+  mac_any_trans_t rel_trans = {.val_to = rel_trans_val, .val_from = rel_trans_val + MT_FEE};
   memcpy(rel_trans.from, aut_addr, MT_SZ_ADDR);
   memcpy(rel_trans.to, rel_addr, MT_SZ_ADDR);
   byte rel_trans_id[DIGEST_LEN];
@@ -501,7 +484,7 @@ static void test_mt_paysimple(void *arg){
 
   // send money from authority to intermediary
 
-  mac_any_trans_t int_trans = {.val_to = int_trans_val, .val_from = int_trans_val + public.fee};
+  mac_any_trans_t int_trans = {.val_to = int_trans_val, .val_from = int_trans_val + MT_FEE};
   memcpy(int_trans.from, aut_addr, MT_SZ_ADDR);
   memcpy(int_trans.to, int_addr, MT_SZ_ADDR);
   byte int_trans_id[DIGEST_LEN];
@@ -517,7 +500,6 @@ static void test_mt_paysimple(void *arg){
   tt_assert(result == MT_SUCCESS);
 
   // make sure balances are what we expect them to be
-
   tt_assert(mt_lpay_query_mac_balance(&cli_addr) == cli_trans_val);
   tt_assert(mt_lpay_query_mac_balance(&rel_addr) == rel_trans_val);
   tt_assert(mt_lpay_query_mac_balance(&int_addr) == int_trans_val);
@@ -561,7 +543,7 @@ static void test_mt_paysimple(void *arg){
   int rel_bal = mt_rpay_mac_balance() + mt_rpay_chn_balance();
   int int_bal = mt_ipay_mac_balance() + mt_ipay_chn_balance();
 
-  int MT_NAN_TAX = MT_NAN_VAL * public.tax / 100;
+  int MT_NAN_TAX = MT_NAN_VAL * MT_TAX / 100;
   int cli_exp = cli_trans_val - (num_pay + num_dpay) * (MT_NAN_VAL + MT_NAN_TAX);
   int rel_exp = rel_trans_val + num_pay * MT_NAN_VAL;
   int int_exp = int_trans_val + num_pay * MT_NAN_TAX + num_dpay * (MT_NAN_VAL + MT_NAN_TAX);

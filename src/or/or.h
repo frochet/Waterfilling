@@ -4744,6 +4744,17 @@ typedef struct {
   smartlist_t *Schedulers;
   /* An ordered list of scheduler_types mapped from Schedulers. */
   smartlist_t *SchedulerTypes_;
+
+  /* moneTor configurations for the payment module */
+  char* moneTorLedgerDesc;
+  char* moneTorAuthorityPK;
+  int moneTorFee;
+  int moneTorTax;
+
+  char* moneTorPP;
+  char* moneTorPK;
+  char* moneTorSK;
+  int moneTorBalance;
 } or_options_t;
 
 #define LOG_PROTOCOL_WARN (get_protocol_warning_severity_level())
@@ -6146,6 +6157,7 @@ typedef struct {
 } nan_rel_estab6_t;
 
 typedef struct {
+  nan_any_public_t nan_public;
   byte preimage[MT_SZ_HASH];
 } nan_cli_pay1_t;
 
@@ -6154,6 +6166,7 @@ typedef struct {
 } nan_rel_pay2_t;
 
 typedef struct {
+  nan_any_public_t nan_public;
   mt_code_t reqclose;
 } nan_cli_reqclose1_t;
 

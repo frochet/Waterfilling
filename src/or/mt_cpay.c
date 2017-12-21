@@ -44,6 +44,7 @@
 #include <unistd.h>
 
 #include "or.h"
+#include "config.h"
 #include "workqueue.h"
 #include "cpuworker.h"
 #include "mt_common.h"
@@ -184,37 +185,34 @@ int mt_cpay_init(void){
   int cli_bal;
 
   /********************************************************************/
-  //TODO replace with torrc
+  // load values from torrc
 
-  FILE* fp;
+  const or_options_t* options = get_options();
 
-  fp = fopen("mt_config_temp/pp", "rb");
-  tor_assert(fread(pp, 1, MT_SZ_PP, fp) == MT_SZ_PP);
-  fclose(fp);
+  byte* temp_pp;
+  byte* temp_pk;
+  byte* temp_sk;
+  byte* temp_led;
 
-  fp = fopen("mt_config_temp/cli_pk", "rb");
-  tor_assert(fread(pk, 1, MT_SZ_PK, fp) == MT_SZ_PK);
-  fclose(fp);
+  fee = options->moneTorFee;
+  tax = options->moneTorTax;
+  cli_bal = options->moneTorBalance;
+  ledger.party = MT_PARTY_LED;
 
-  fp = fopen("mt_config_temp/cli_sk", "rb");
-  tor_assert(fread(sk, 1, MT_SZ_SK, fp) == MT_SZ_SK);
-  fclose(fp);
+  tor_assert(mt_hex2bytes(options->moneTorLedgerDesc, &temp_led) == sizeof(ledger.id));
+  tor_assert(mt_hex2bytes(options->moneTorPP, &temp_pp) == MT_SZ_PP);
+  tor_assert(mt_hex2bytes(options->moneTorPK, &temp_pk) == MT_SZ_PK);
+  tor_assert(mt_hex2bytes(options->moneTorSK, &temp_sk) == MT_SZ_SK);
 
-  fp = fopen("mt_config_temp/led_desc", "rb");
-  tor_assert(fread(&ledger, 1, sizeof(mt_desc_t), fp) == sizeof(mt_desc_t));
-  fclose(fp);
+  memcpy(pp, temp_pp, MT_SZ_PP);
+  memcpy(pk, temp_pk, MT_SZ_PK);
+  memcpy(sk, temp_sk, MT_SZ_SK);
+  memcpy(&ledger.id, temp_led, sizeof(ledger.id));
 
-  fp = fopen("mt_config_temp/fee", "rb");
-  tor_assert(fread(&fee, 1, sizeof(fee), fp) == sizeof(fee));
-  fclose(fp);
-
-  fp = fopen("mt_config_temp/tax", "rb");
-  tor_assert(fread(&tax, 1, sizeof(tax), fp) == sizeof(tax));
-  fclose(fp);
-
-  fp = fopen("mt_config_temp/cli_bal", "rb");
-  tor_assert(fread(&cli_bal, 1, sizeof(cli_bal), fp) == sizeof(cli_bal));
-  fclose(fp);
+  free(temp_pp);
+  free(temp_pk);
+  free(temp_sk);
+  free(temp_led);
 
   /********************************************************************/
 
@@ -586,7 +584,8 @@ int mt_cpay_chn_number(void){
  */
 int mt_cpay_clear(void){
   // Need to implement
-  return 0;
+  tor_assert(0);
+  return MT_ERROR;
 }
 
 /**
@@ -899,6 +898,7 @@ static int init_nan_cli_pay1(mt_channel_t* chn, byte (*pid)[DIGEST_LEN]){
 
   // make token
   nan_cli_pay1_t token;
+  memcpy(&token.nan_public, &chn->data.nan_public, sizeof(nan_any_public_t));
 
   // TODO finish making setup;
 
@@ -1023,6 +1023,7 @@ static int init_nan_cli_reqclose1(mt_channel_t* chn, byte (*pid)[DIGEST_LEN]){
 
   // intiate token
   nan_cli_reqclose1_t token;
+  memcpy(&token.nan_public, &chn->data.nan_public, sizeof(nan_any_public_t));
 
   // TODO finish making token;
 

@@ -63,19 +63,35 @@ void mt_nanpub2digest(nan_any_public_t* token, byte (*digest_out)[DIGEST_LEN]){
 
 
 /**
- * Converts an address in byte-string form to a more human-readable hexadecimal
- * string. The format is in the style of Ethereum as it leads with the '0x'
+ * Converts byte string to a malloc'd hex output (c-string)
  */
-int mt_addr2hex(byte (*addr)[MT_SZ_ADDR], char (*hex_out)[MT_SZ_ADDR * 2 + 3]){
+int mt_bytes2hex(byte* bytes, int size, char** hex_out){
+
+  *hex_out = malloc(size * 2 + 3);
 
   (*hex_out)[0] = '0';
   (*hex_out)[1] = 'x';
 
-  for(int i = 0; i < MT_SZ_ADDR; i++)
-    sprintf(&((*hex_out)[i*2 + 2]), "%02X", (*addr)[i]);
+  for(int i = 0; i < size; i++)
+    sprintf(*hex_out + i * 2 + 2, "%02X", bytes[i]);
 
-  (*hex_out)[MT_SZ_ADDR * 2 + 2] = '\0';
+  (*hex_out)[size * 2 + 2] = '\0';
   return MT_SUCCESS;
+}
+
+/**
+ * Converts a hex digest (c-string) into a malloc'd byte string; return size
+ */
+int mt_hex2bytes(char* hex, byte** bytes_out){
+
+  tor_assert(strlen(hex) >= 2);
+  int size = (strlen(hex) - 2) / 2;
+  *bytes_out = malloc(size);
+
+  for(int i = 0; i < size; i++)
+    sscanf(hex + i * 2 + 2, "%2hhx", &(*bytes_out)[i]);
+
+  return size;
 }
 
 /**
@@ -191,7 +207,7 @@ void relay_pheader_unpack(relay_pheader_t *dest, const uint8_t *src) {
 void direct_pheader_pack(uint8_t *dest, relay_pheader_t *rph) {
   set_uint8(dest, rph->pcommand);
   set_uint16(dest+1, htons(rph->length));
-}  
+}
 
 /** Called when we get a MoneTor cell on circuit circ.
  *  gets the right mt_desc_t and dispatch to the right
@@ -280,11 +296,11 @@ MOCK_IMPL(void,
 
 /*
  * Called when we got a peer-level MoneTor cell on this circ. No onion-decryption
- * had to be performed.  cell must contain the plaintext 
+ * had to be performed.  cell must contain the plaintext
  */
 
 int mt_process_received_directpaymentcell(circuit_t *circ, cell_t *cell) {
-  
+
   relay_pheader_t rph;
   relay_pheader_unpack(&rph, cell->payload);
 
