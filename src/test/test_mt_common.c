@@ -1,7 +1,4 @@
-#define TOR_CHANNEL_INTERNAL_
-#define CIRCUITBUILD_PRIVATE
 #define MT_CCLIENT_PRIVATE
-#define CIRCUITLIST_PRIVATE
 
 #include <string.h>
 #include <stdio.h>

@@ -1979,7 +1979,7 @@ routerstatus_format_entry(const routerstatus_t *rs, const char *version,
     goto done;
 
   smartlist_add_asprintf(chunks,
-                   "%s%s%s%s%s%s%s%s%s%s%s%s\n",
+                   "s%s%s%s%s%s%s%s%s%s%s%s%s\n",
                   /* These must stay in alphabetical order. */
                    rs->is_authority?" Authority":"",
                    rs->is_bad_exit?" BadExit":"",
