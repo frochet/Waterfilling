@@ -98,9 +98,10 @@ void mt_cintermediary_ledgercirc_has_closed(circuit_t *circ) {
   /* If the circuit is closed before we successfully extend
    * a general circuit towards the ledger, then we may have
    * a reachability problem.. */
-  if (TO_CIRCUIT(circ)->state != CIRCUIT_STATE_OPEN) {
-    log_info(lD_MT, "MoneTor: Looks like we did not extend a circuit successfully"
+  if (circ->state != CIRCUIT_STATE_OPEN) {
+    log_info(LD_MT, "MoneTor: Looks like we did not extend a circuit successfully"
         " towards the ledger");
+    
   }
 }
 
