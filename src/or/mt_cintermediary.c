@@ -94,7 +94,14 @@ void mt_cintermediary_ledgercirc_has_opened(circuit_t *circ) {
 }
 
 void mt_cintermediary_ledgercirc_has_closed(circuit_t *circ) {
-  (void) circ;
+  time_t now;
+  /* If the circuit is closed before we successfully extend
+   * a general circuit towards the ledger, then we may have
+   * a reachability problem.. */
+  if (TO_CIRCUIT(circ)->state != CIRCUIT_STATE_OPEN) {
+    log_info(lD_MT, "MoneTor: Looks like we did not extend a circuit successfully"
+        " towards the ledger");
+  }
 }
 
 void mt_cintermediary_orcirc_has_closed(or_circuit_t *circ) {
@@ -107,8 +114,12 @@ void mt_cintermediary_orcirc_has_closed(or_circuit_t *circ) {
  * init structure as well as add this circ in our structures*/
 
 void mt_cintermediary_init_desc_and_add(or_circuit_t *circ) {
-  (void) circ;
+  circ->desc.id = count++; // XXX change that later to a 128bit rand 
+  /*Cell received has been sent either by a relay or by a client
+   *Todo => check with Thien-Nam what desc.party we have to configure */
+  circ->desc.party = MT_PARTY_INT; 
 }
+
 
 /********************** Utility stuff ********************************/
 

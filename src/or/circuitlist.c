@@ -71,6 +71,7 @@
 #include "hs_ident.h"
 #include "mt_common.h"
 #include "mt_cclient.h"
+#include "mt_cintemerdiary.h"
 #include "mt_crelay.h"
 #include "networkstatus.h"
 #include "nodelist.h"
@@ -2047,6 +2048,9 @@ circuit_about_to_free(circuit_t *circ)
   }
   if (circ->purpose == CIRCUIT_PURPOSE_R_INTERMEDIARY) {
     mt_crelay_intermediary_circ_has_closed(TO_ORIGIN_CIRCUIT(circ));
+  }
+  if (circ->purpose == CIRCUIT_PURPOSE_I_LEDGER) {
+    mt_cintermediary_ledgercirc_has_closed(TO_ORIGIN_CIRCUIT(circ));
   }
   /* Notify payment controller when a general circuit has closed */
   if (get_options()->EnablePayment && 
