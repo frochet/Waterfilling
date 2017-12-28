@@ -43,9 +43,11 @@ static smartlist_t *intermediaries = NULL;
  *- Is there enough performance?? */
 static digestmap_t* desc2circ = NULL; // mt_desc2digest => origin_circuit_t
 /*static counter of descriptors - also used as id*/
-
 static uint32_t desc_id = 0;
-
+/*static ledger */
+static ledger_t *ledger = NULL;
+/*list of circuits to the ledger */
+static smartlist_t *ledgercircs;
 /**
  * Allocate on the heap a new intermediary and returns the pointer
  */
@@ -120,6 +122,7 @@ mt_cclient_init(void) {
   tor_assert(!intermediaries); //should never be called twice
   intermediaries = smartlist_new();
   desc2circ = digestmap_new();
+  ledgercircs = smartlist_new();
 }
 
 /**
@@ -379,6 +382,51 @@ run_cclient_build_circuit_event(time_t now) {
     //XXX MoneTor - Check circuit healthiness? - check that it is already
     // done by an other Tor intern function
   } SMARTLIST_FOREACH_END(intermediary);
+  
+  /* Ledger stuff now  - We initiate ou ledger if not already done and we 
+   * ensure enough circuit are built to it*/
+
+  extend_info_t *ei = NULL;
+  if (!ledger) {
+    const node_t *node;
+    node = node_find_ledger();
+    if (!node) {
+      log_info(LD_MT, "MoneTor: Hey, we do not have a ledger in our consensus?");
+      return;  /** For whatever reason our consensus does not have a ledger */
+    }
+    ei = extend_info_from_node(node, 0);
+    if (!ei) {
+      log_info(LD_MT, "Monetor: extend_info_from_node failed?");
+      goto err;
+    }
+    ledger_init(&ledger, node, ei, now);
+  }
+  /* How many of them do we build? */
+  while (smartlist_len(ledgercircs) < NBR_LEDGER_CIRCUITS &&
+         ledger->circuit_retries < NBR_LEDGER_CIRCUITS*LEDGER_MAX_RETRIES) {
+    /* this is just about load balancing */
+    log_info(LD_MT, "MoneTor: We do not have enough ledger circuits - launching one more");
+    int purpose = CIRCUIT_PURPOSE_C_LEDGER;
+    int flags = CIRCLAUNCH_IS_INTERNAL;
+    flags |= CIRCLAUNCH_NEED_UPTIME;
+    circ = circuit_launch_by_extend_info(purpose, ledger->ei,
+        flags);
+    if (!circ) {
+      ledger->circuit_retries++;
+    }
+    else {
+      smartlist_add(ledgercircs, circ);
+    }
+  }
+  if (ledger->circuit_retries >= NBR_LEDGER_CIRCUITS*LEDGER_MAX_RETRIES) {
+    log_info(LD_MT, "MoneTor: It looks like we reach maximum cicuit launch"
+        " towards the ledger. What is going on?");
+  }
+  return;
+ err:
+  extend_info_free(ei);
+  ledger_free(&ledger);
+  return;
 }
 
 intermediary_t* mt_cclient_get_intermediary_from_ocirc(origin_circuit_t *ocirc) {
@@ -408,6 +456,11 @@ run_cclient_scheduled_events(time_t now) {
   run_cclient_housekeeping_event(now);
   /*Make sure our intermediaries are up*/
   run_cclient_build_circuit_event(now);
+}
+
+
+void mt_cclient_ledger_circ_has_closed(origin_circuit_t *circ) {
+  (void) circ;
 }
 
 /**
@@ -457,7 +510,7 @@ void mt_cclient_intermediary_circ_has_closed(origin_circuit_t *circ) {
     byte id[DIGEST_LEN];
     mt_desc2digest(&intermediary->desc, &id);
     digestmap_remove(desc2circ, (char*) id);
-    /* Circuit has been closed - notify the payment module */
+    /* XXX Todo Circuit has been closed - notify the payment module */
   }
 
  cleanup:
@@ -466,6 +519,11 @@ void mt_cclient_intermediary_circ_has_closed(origin_circuit_t *circ) {
     now = approx_time();
     intermediary_need_cleanup(intermediary, now);
   }
+}
+
+void 
+mt_cclient_ledger_circ_has_opened(origin_circuit_t *circ) {
+  (void) circ;
 }
 
 /**

@@ -16,12 +16,11 @@
 
 STATIC void run_cintermediary_housekeeping_event(time_t now);
 STATIC void run_cintermediary_build_circuit_event(time_t now);
-static void ledger_free(void);
 
 static digestmap_t *desc2circ = NULL;
 
 static smartlist_t *ledgercircs = NULL;
-static ledger_t* ledger = NULL;
+static ledger_t *ledger = NULL;
 static int count = 1;
 
 /********************** Once per second events ***********************/
@@ -45,15 +44,15 @@ run_cintermediary_build_circuit_event(time_t now) {
   /* We get our ledger circuit and we built one if it is NULL */
   extend_info_t *ei = NULL;
   if (!ledger) {
-    const node_t* node;
+    const node_t *node;
     node = node_find_ledger();
     if (!node) {
-      log_info(LD_MT, "Hey, we do not have a ledger in our consensus?");
+      log_info(LD_MT, "MoneTor: Hey, we do not have a ledger in our consensus?");
       return;  /** For whatever reason our consensus does not have a ledger */
     }
     ei = extend_info_from_node(node, 0);
     if (!ei) {
-      log_info(LD_MT, "extend_info_from_node failed?");
+      log_info(LD_MT, "MoneTor: extend_info_from_node failed?");
       goto err;
     }
     ledger_init(&ledger, node, ei, now);
@@ -87,7 +86,7 @@ run_cintermediary_build_circuit_event(time_t now) {
   return;
  err:
   extend_info_free(ei);
-  ledger_free();
+  ledger_free(&ledger);
   return;
 }
 
@@ -102,14 +101,14 @@ run_cintermediary_scheduled_events(time_t now) {
 
 /********************** circ event ***********************************/
 
-void mt_cintermediary_ledgercirc_has_opened(circuit_t *circ) {
+void mt_cintermediary_ledger_circ_has_opened(circuit_t *circ) {
   (void) circ;
   ledger->circuit_retries = 0;
   ledger->is_reachable = LEDGER_REACHABLE_YES;
   /* Generate new desc and add this circ into desc2circ */
 }
 
-void mt_cintermediary_ledgercirc_has_closed(circuit_t *circ) {
+void mt_cintermediary_ledger_circ_has_closed(circuit_t *circ) {
   time_t now;
   /* If the circuit is closed before we successfully extend
    * a general circuit towards the ledger, then we may have
@@ -127,7 +126,7 @@ void mt_cintermediary_ledgercirc_has_closed(circuit_t *circ) {
 void mt_cintermediary_orcirc_has_closed(or_circuit_t *circ) {
   buf_free(circ->buf);
   // XXX TODO remove this circuit from our structures
-  
+  /* XXX TODO alert payment module to cashout */
   /*mt_desc_free(&circ->desc);*/
 }
 
@@ -153,10 +152,6 @@ ledger_t *mt_cintermediary_get_ledger(void) {
 int
 mt_cintermediary_send_message(mt_desc_t *desc, mt_ntype_t pcommand,
     byte *msg, int size) {
-  (void) desc;
-  (void) pcommand;
-  (void) msg;
-  (void) size;
   byte id[DIGEST_LEN];
   mt_desc2digest(desc, &id);
   circuit_t *circ = digestmap_get(desc2circ, (char*) id);
@@ -207,11 +202,3 @@ void mt_cintermediary_init(void) {
   ledgercircs = smartlist_new();
 }
 
-static void ledger_free(void) {
-  if (!ledger)
-    return;
-  if (ledger->ei)
-    extend_info_free(ledger->ei);
-  buf_free(ledger->buf);
-  tor_free(ledger);
-}

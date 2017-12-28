@@ -17,6 +17,7 @@
 #include "config.h"
 #include "compat.h"
 #include "circuituse.h"
+#include "circuitbuild.h"
 #include "mt_crypto.h" // only needed for the defined byte array sizes
 #include "mt_common.h"
 #include "mt_cclient.h"
@@ -169,6 +170,15 @@ ledger_init(ledger_t **ledger, const node_t *node, extend_info_t *ei,
   log_info(LD_MT, "Ledger created at %lld", (long long) now);
 }
 
+void ledger_free(ledger_t **ledger) {
+  if (!ledger || !*ledger)
+    return;
+  if ((*ledger)->ei)
+    extend_info_free((*ledger)->ei);
+  buf_free((*ledger)->buf);
+  tor_free(*ledger);
+}
+
 /**
  * Verifies enough money remains in the wallet - NOT URGENT
  */
@@ -187,7 +197,7 @@ void monetor_run_scheduled_events(time_t now) {
   if (authdir_mode(get_options()) || authdir_mode_v3(get_options())) {
     /*run_cauthdir_scheduled_events(now);*/
   }
-  if (intermediary_mode(get_option())) {
+  if (intermediary_mode(get_options())) {
     run_cintermediary_scheduled_events(now);
   }
   else if (server_mode(get_options())) {

@@ -127,7 +127,7 @@ void mt_init(void);
 
 void ledger_init(ledger_t **ledger, const node_t *node, extend_info_t *ei,
     time_t now);
-
+void ledger_free(ledger_t **ledger);
 /**
  * Has enough funds to pay for prioritization? returns 1 or 0
  */

@@ -11,9 +11,9 @@ void run_cintermediary_scheduled_events(time_t now);
 
 /********************* Circ event ********************************/
 
-void mt_cintermediary_ledgercirc_has_opened(circuit_t *circ);
+void mt_cintermediary_ledger_circ_has_opened(circuit_t *circ);
 
-void mt_cintermediary_ledgercirc_has_closed(circuit_t *circ);
+void mt_cintermediary_ledger_circ_has_closed(circuit_t *circ);
 
 /** When a CIRCUIT_PURPOSE_INTERMEDIARY closes, this function
  * should be called */

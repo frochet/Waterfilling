@@ -2050,12 +2050,14 @@ circuit_about_to_free(circuit_t *circ)
     mt_crelay_intermediary_circ_has_closed(TO_ORIGIN_CIRCUIT(circ));
   }
   if (circ->purpose == CIRCUIT_PURPOSE_I_LEDGER) {
-    mt_cintermediary_ledgercirc_has_closed(circ);
+    mt_cintermediary_ledger_circ_has_closed(circ);
   }
   /* Notify payment controller when a general circuit has closed */
-  if (get_options()->EnablePayment && 
-      circ->purpose == CIRCUIT_PURPOSE_C_GENERAL) {
+  if (circ->purpose == CIRCUIT_PURPOSE_C_GENERAL) {
     mt_cclient_general_circ_has_closed(TO_ORIGIN_CIRCUIT(circ));
+  }
+  if (circ->purpose == CIRCUIT_PURPOSE_C_LEDGER) {
+    mt_cclient_ledger_circ_has_closed(TO_ORIGIN_CIRCUIT(circ));
   }
 
   /* Notify the HS subsystem for any intro point circuit closing so it can be

@@ -48,6 +48,7 @@
 #include "nodelist.h"
 #include "mt_common.h"
 #include "mt_cclient.h"
+#include "mt_cintermediary.h"
 #include "mt_crelay.h"
 #include "networkstatus.h"
 #include "policies.h"
@@ -1699,6 +1700,12 @@ circuit_has_opened(origin_circuit_t *circ)
       break;
     case CIRCUIT_PURPOSE_C_INTERMEDIARY:
       mt_cclient_intermediary_circ_has_opened(circ);
+      break;
+    case CIRCUIT_PURPOSE_C_LEDGER:
+      mt_cclient_ledger_circ_has_opened(circ);
+      break;
+    case CIRCUIT_PURPOSE_I_LEDGER:
+      mt_cintermediary_ledger_circ_has_opened(circ);
       break;
     case CIRCUIT_PURPOSE_R_INTERMEDIARY:
       mt_crelay_intermediary_circ_has_opened(circ);
