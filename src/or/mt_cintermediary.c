@@ -6,6 +6,7 @@
 #include "circuitbuild.h"
 #include "circuituse.h"
 #include "circuitlist.h"
+#include "config.h"
 #include "router.h"
 #include "relay.h"
 #include "torlog.h"
