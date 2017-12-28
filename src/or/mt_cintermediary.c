@@ -16,7 +16,6 @@
 STATIC void run_cintermediary_housekeeping_event(time_t now);
 STATIC void run_cintermediary_build_circuit_event(time_t now);
 static void ledger_free(void);
-static void ledger_init(const node_t *node, extend_info_t *ei, time_t now);
 
 static digestmap_t *desc2circ = NULL;
 
@@ -56,7 +55,7 @@ run_cintermediary_build_circuit_event(time_t now) {
       log_info(LD_MT, "extend_info_from_node failed?");
       goto err;
     }
-    ledger_init(node, ei, now);
+    ledger_init(&ledger, node, ei, now);
   }
 
 
@@ -67,7 +66,7 @@ run_cintermediary_build_circuit_event(time_t now) {
   while (smartlist_len(ledgercircs) < NBR_LEDGER_CIRCUITS &&
          ledger->circuit_retries < NBR_LEDGER_CIRCUITS*LEDGER_MAX_RETRIES) {
     /* this is just about load balancing */
-    log_info(LD_MT, "We do not have enough ledger circuits - launching one more");
+    log_info(LD_MT, "MoneTor: We do not have enough ledger circuits - launching one more");
     int purpose = CIRCUIT_PURPOSE_I_LEDGER;
     int flags = CIRCLAUNCH_IS_INTERNAL;
     flags |= CIRCLAUNCH_NEED_UPTIME;
@@ -80,6 +79,10 @@ run_cintermediary_build_circuit_event(time_t now) {
       smartlist_add(ledgercircs, circ);
     }
   }
+  if (ledger->circuit_retries >= NBR_LEDGER_CIRCUITS*LEDGER_MAX_RETRIES) {
+    log_info(LD_MT, "MoneTor: It looks like we reach maximum cicuit launch"
+        " towards the ledger. What is going on?");
+  }
   return;
  err:
   extend_info_free(ei);
@@ -91,6 +94,9 @@ run_cintermediary_build_circuit_event(time_t now) {
 
 void mt_cintermediary_ledgercirc_has_opened(circuit_t *circ) {
   (void) circ;
+  ledger->circuit_retries = 0;
+  ledger->is_reachable = LEDGER_REACHABLE_YES;
+  /* Generate new desc and add this circ into desc2circ */
 }
 
 void mt_cintermediary_ledgercirc_has_closed(circuit_t *circ) {
@@ -101,14 +107,18 @@ void mt_cintermediary_ledgercirc_has_closed(circuit_t *circ) {
   if (circ->state != CIRCUIT_STATE_OPEN) {
     log_info(LD_MT, "MoneTor: Looks like we did not extend a circuit successfully"
         " towards the ledger");
-    
+    ledger->circuit_retries++;
   }
+  smartlist_remove(ledgercircs, circ);
+  /* XXX Todo should also remove from desc2circ */
+
 }
 
 void mt_cintermediary_orcirc_has_closed(or_circuit_t *circ) {
   buf_free(circ->buf);
-  mt_desc_free(&circ->desc);
-  // TODO remove this circuit from our structures
+  // XXX TODO remove this circuit from our structures
+  
+  /*mt_desc_free(&circ->desc);*/
 }
 
 /** We've received the first payment cell over that circuit 
@@ -185,24 +195,6 @@ mt_cintermediary_process_received_msg(circuit_t *circ, mt_ntype_t pcommand,
 void mt_cintermediary_init(void) {
   desc2circ = digestmap_new();
   ledgercircs = smartlist_new();
-}
-
-/*
- * Initialize our static ledger
- */
-
-static void
-ledger_init(const node_t *node, extend_info_t *ei, time_t now) {
-  tor_assert(node);
-  tor_assert(ei);
-  ledger = tor_malloc_zero(sizeof(ledger_t));
-  memcpy(ledger->identity.identity, node->identity, DIGEST_LEN);
-  ledger->is_reachable = LEDGER_REACHABLE_MAYBE;
-  ledger->desc.id = count++; // XXX change this counter to 128-bit digest
-  ledger->desc.party = MT_PARTY_LED;
-  ledger->ei = ei;
-  ledger->buf = buf_new_with_capacity(RELAY_PPAYLOAD_SIZE);
-  log_info(LD_MT, "Ledger created at %lld", (long long) now);
 }
 
 static void ledger_free(void) {

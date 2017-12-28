@@ -147,7 +147,23 @@ void mt_init(void){
   log_info(LD_MT, "MoneTor: Initializing the payment system");
   mt_cclient_init();
   /* Todo call intermediary, relay and ledger init? */
-
+}
+/**
+ * Initialize ledger info
+ */
+void
+ledger_init(ledger_t **ledger, const node_t *node, extend_info_t *ei,
+    time_t now) {
+  tor_assert(node);
+  tor_assert(ei);
+  *ledger = tor_malloc_zero(sizeof(ledger_t));
+  memcpy(ledger->identity.identity, node->identity, DIGEST_LEN);
+  *ledger->is_reachable = LEDGER_REACHABLE_MAYBE;
+  *ledger->desc.id = count++; // XXX change this counter to 128-bit digest
+  *ledger->desc.party = MT_PARTY_LED;
+  *ledger->ei = ei;
+  *ledger->buf = buf_new_with_capacity(RELAY_PPAYLOAD_SIZE);
+  log_info(LD_MT, "Ledger created at %lld", (long long) now);
 }
 
 /**

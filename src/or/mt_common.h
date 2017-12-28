@@ -97,6 +97,9 @@ void mt_circuit_intermediary_has_opened(origin_circuit_t* circuit);
 
 void mt_init(void);
 
+void ledger_init(ledger_t **ledger, const node_t *node, extend_info_t *ei,
+    time_t now);
+
 /**
  * Has enough funds to pay for prioritization? returns 1 or 0
  */
