@@ -101,11 +101,15 @@ run_cintermediary_scheduled_events(time_t now) {
 
 /********************** circ event ***********************************/
 
-void mt_cintermediary_ledger_circ_has_opened(circuit_t *circ) {
-  (void) circ;
+void mt_cintermediary_ledger_circ_has_opened(origin_circuit_t *circ) {
   ledger->circuit_retries = 0;
   ledger->is_reachable = LEDGER_REACHABLE_YES;
   /* Generate new desc and add this circ into desc2circ */
+  circ->desc.id = count++; // To change later 
+  circ->desc.party = MT_PARTY_LED;
+  byte id[DIGEST_LEN];
+  mt_desc2digest(&circ->desc, &id);
+  digestmap_set(desc2circ, (char*) id, circ);
 }
 
 void mt_cintermediary_ledger_circ_has_closed(circuit_t *circ) {
@@ -114,12 +118,16 @@ void mt_cintermediary_ledger_circ_has_closed(circuit_t *circ) {
    * a general circuit towards the ledger, then we may have
    * a reachability problem.. */
   if (circ->state != CIRCUIT_STATE_OPEN) {
+    now = time(NULL);
     log_info(LD_MT, "MoneTor: Looks like we did not extend a circuit successfully"
-        " towards the ledger");
+        " towards the ledger %lld", (long long) now);
     ledger->circuit_retries++;
   }
   smartlist_remove(ledgercircs, circ);
   /* XXX Todo should also remove from desc2circ */
+  byte id[DIGEST_LEN];
+  mt_desc2digest(&TO_ORIGIN_CIRCUIT(circ)->desc, &id);
+  digestmap_remove(desc2circ, (char*) id);
 
 }
 
@@ -137,7 +145,10 @@ void mt_cintermediary_init_desc_and_add(or_circuit_t *circ) {
   circ->desc.id = count++; // XXX change that later to a 128bit rand 
   /*Cell received has been sent either by a relay or by a client
    *Todo => check with Thien-Nam what desc.party we have to configure */
-  circ->desc.party = MT_PARTY_INT; 
+  circ->desc.party = MT_PARTY_INT;
+  byte id[DIGEST_LEN];
+  mt_desc2digest(&circ->desc, &id);
+  digestmap_set(desc2circ, (char*) id, circ);
 }
 
 
@@ -184,12 +195,12 @@ mt_cintermediary_process_received_msg(circuit_t *circ, mt_ntype_t pcommand,
     orcirc = TO_OR_CIRCUIT(circ);
     desc = &orcirc->desc;
     if (mt_ipay_recv(desc, pcommand, msg, msg_len) < 0) {
-      log_info(LD_MT, "Payment module returned -1 for mt_ntype_t %hhx", pcommand);
+      log_info(LD_MT, "MoneTor: Payment module returned -1 for mt_ntype_t %hhx", pcommand);
       //decides what to do
     }
   }
   else {
-    log_info(LD_MT, "Processing circuit with unsupported purpose %hhx",
+    log_info(LD_MT, "MoneTor: Processing circuit with unsupported purpose %hhx",
         circ->purpose);
   }
 }

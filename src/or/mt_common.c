@@ -270,19 +270,26 @@ MOCK_IMPL(void,
   size_t msg_len = mt_token_get_size_of(rph->pcommand);
   if (authdir_mode(get_options())) {
   }
-  else if (intermediary_mode(get_options())) {
+  else if (intermediary_mode(get_options()) || 
+      server_mode(get_options())) {
     if (CIRCUIT_IS_ORCIRC(circ)) {
       // should be circuit built towards us by a client or
       // a relay
       or_circuit_t *orcirc = TO_OR_CIRCUIT(circ);
       /** It is a payment cell over a or-circuit - should be
        * sent a client or a relay - change purpose */
-      if (circ->purpose == CIRCUIT_PURPOSE_OR) {
+      if (!orcirc->circuit_received_first_payment_cell) {
         // Should be done at the first received payment cell
         // over this circuit
-        circuit_change_purpose(circ, CIRCUIT_PURPOSE_INTERMEDIARY);
-        TO_OR_CIRCUIT(circ)->buf = buf_new_with_capacity(RELAY_PPAYLOAD_SIZE);
-        mt_cintermediary_init_desc_and_add(orcirc);
+        if (intermediary_mode(get_options())) {
+          circuit_change_purpose(circ, CIRCUIT_PURPOSE_INTERMEDIARY);
+          mt_cintermediary_init_desc_and_add(orcirc);
+        }
+        else {
+          mt_crelay_init_desc_and_add(orcirc);
+        }
+        orcirc->buf = buf_new_with_capacity(RELAY_PPAYLOAD_SIZE);
+        orcirc->circuit_received_first_payment_cell = 1;
       }
       /*buffer data if necessary*/
       if (msg_len > RELAY_PPAYLOAD_SIZE) {
@@ -292,7 +299,12 @@ MOCK_IMPL(void,
           byte *msg = tor_malloc(msg_len);
           buf_get_bytes(orcirc->buf, (char*) msg, msg_len);
           buf_clear(orcirc->buf);
-          mt_cintermediary_process_received_msg(circ, rph->pcommand, msg, msg_len);
+          if (intermediary_mode(get_options())) {
+            mt_cintermediary_process_received_msg(circ, rph->pcommand, msg, msg_len);
+          }
+          else {
+            mt_crelay_process_received_msg(circ, rph->pcommand, msg, msg_len);
+          }
           tor_free(msg);
         }
         else {
@@ -311,14 +323,25 @@ MOCK_IMPL(void,
     else if (CIRCUIT_IS_ORIGIN(circ)) {
       // should be a ledger circuit
       if (msg_len > RELAY_PPAYLOAD_SIZE) {
-        ledger_t *ledger = mt_cintermediary_get_ledger();
+        ledger_t *ledger;
+        if (intermediary_mode(get_options())) {
+          ledger = mt_cintermediary_get_ledger();
+        }
+        else {
+          ledger = mt_crelay_get_ledger();
+        }
         tor_assert(ledger);
         buf_add(ledger->buf, (char*) payload, rph->length);
         if (buf_datalen(ledger->buf) == msg_len) {
           byte *msg = tor_malloc(msg_len);
           buf_get_bytes(ledger->buf, (char*) msg, msg_len);
           buf_clear(ledger->buf);
-          mt_cintermediary_process_received_msg(circ, rph->pcommand, msg, msg_len);
+          if (intermediary_mode(get_options())) {
+            mt_cintermediary_process_received_msg(circ, rph->pcommand, msg, msg_len);
+          }
+          else {
+            mt_crelay_process_received_msg(circ, rph->pcommand, msg, msg_len);
+          }
           tor_free(msg);
         }
         else {
@@ -330,13 +353,16 @@ MOCK_IMPL(void,
       else {
         /** No need to buffer */
         tor_assert(rph->length == msg_len);
-        mt_cintermediary_process_received_msg(circ, rph->pcommand, payload,
-            rph->length);
+        if (intermediary_mode(get_options())) {
+          mt_cintermediary_process_received_msg(circ, rph->pcommand, payload,
+              rph->length);
+        }
+        else {
+          mt_crelay_process_received_msg(circ, rph->pcommand, payload,
+              rph->length);
+        }
       }
     }
-  }
-  else if (server_mode(get_options())) {
-
   }
   else {
     /* Client mode with one origin circuit */
@@ -409,6 +435,7 @@ MOCK_IMPL(void,
  * had to be performed.  cell must contain the plaintext
  */
 
+//XXX Todo buffer received cells if msg_len too large
 int mt_process_received_directpaymentcell(circuit_t *circ, cell_t *cell) {
 
   relay_pheader_t rph;
@@ -550,6 +577,10 @@ MOCK_IMPL(int, mt_send_message, (mt_desc_t *desc, mt_ntype_t type,
   return -1;
 }
 
+/**
+ * Called to send a intermediary descriptor to a relay. This is sent by 
+ * a client.
+ */
 MOCK_IMPL(int, mt_send_message_multidesc, (mt_desc_t *desc1, mt_desc_t* desc2, mt_ntype_t type, byte* msg, int size)) {
   (void) desc1;
   (void) desc2;

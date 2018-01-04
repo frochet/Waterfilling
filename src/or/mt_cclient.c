@@ -43,7 +43,7 @@ static smartlist_t *intermediaries = NULL;
  *- Is there enough performance?? */
 static digestmap_t* desc2circ = NULL; // mt_desc2digest => origin_circuit_t
 /*static counter of descriptors - also used as id*/
-static uint32_t desc_id = 0;
+static uint32_t count = 0;
 /*static ledger */
 static ledger_t *ledger = NULL;
 /*list of circuits to the ledger */
@@ -63,7 +63,7 @@ intermediary_new(const node_t *node, extend_info_t *ei, time_t now) {
   //intermediary->nickname = tor_strdup(node->ri->nickname);
   intermediary->is_reachable = INTERMEDIARY_REACHABLE_MAYBE;
   /** XXX change this counter to a 128-bit digest */
-  intermediary->desc.id = desc_id++; 
+  intermediary->desc.id = count++; 
   intermediary->desc.party = MT_PARTY_INT;
   intermediary->chosen_at = now;
   intermediary->ei = ei;
@@ -169,13 +169,13 @@ intermediary_need_cleanup(intermediary_t *intermediary, time_t now) {
 void
 mt_cclient_launch_payment(origin_circuit_t* circ) {
   log_info(LD_MT, "MoneTor - Initiating payment - calling payment module");
-  circ->ppath->desc.id = desc_id++;
+  circ->ppath->desc.id = count++;
   circ->ppath->desc.party = MT_PARTY_REL;
   /* Choosing right intermediary */
   tor_assert(circ->ppath->next);
   pay_path_t* middle = circ->ppath->next;
   intermediary_t* intermediary_g = get_intermediary_by_role(MIDDLE);
-  middle->desc.id = desc_id++;
+  middle->desc.id = count++;
   middle->desc.party = MT_PARTY_REL;
   /* Log if intermediary is NULL? Should not happen*/
   tor_assert_nonfatal(intermediary_g);
@@ -187,7 +187,7 @@ mt_cclient_launch_payment(origin_circuit_t* circ) {
   tor_assert(middle->next);
   pay_path_t* exit = middle->next;
   intermediary_t* intermediary_e = get_intermediary_by_role(EXIT);
-  exit->desc.id = desc_id++;
+  exit->desc.id = count++;
   exit->desc.party = MT_PARTY_REL;
   tor_assert_nonfatal(intermediary_e);
   
@@ -523,7 +523,15 @@ void mt_cclient_intermediary_circ_has_closed(origin_circuit_t *circ) {
 
 void 
 mt_cclient_ledger_circ_has_opened(origin_circuit_t *circ) {
-  (void) circ;
+  ledger->circuit_retries = 0;
+  ledger->is_reachable = LEDGER_REACHABLE_YES;
+  /*Circ is already in the smartlist*/
+  /*Need  a new desc and add this circ in desc2circ */
+  circ->desc.id = count++; // To change later 
+  circ->desc.party = MT_PARTY_LED;
+  byte id[DIGEST_LEN];
+  mt_desc2digest(&circ->desc, &id);
+  digestmap_set(desc2circ, (char*) id, circ);
 }
 
 /**

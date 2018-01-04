@@ -3358,6 +3358,9 @@ typedef struct origin_circuit_t {
    */
   pay_path_t *ppath;
 
+  /** Used for ledger circuits */
+  mt_desc_t desc;
+
 
   /** Holds the data that the entry guard system uses to track the
    * status of the guard this circuit is using, and thereby to determine
@@ -3613,6 +3616,16 @@ typedef struct or_circuit_t {
    * This cell is has been sent by a Tor client
    */
   mt_desc_t desc;
+
+  /**
+   * Set to 1 when we receive the first payment cell */
+
+  unsigned int circuit_received_first_payment_cell : 1;
+  
+  /**
+   * Set to 1 when we prioritize this circuit
+   */
+  unsigned int mt_priority : 1;
   /*
    * Contains buffering that received on that circuit
    * if this is a CIRCUIT_PURPOSE_INTERMEDIARY */
