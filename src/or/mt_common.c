@@ -581,13 +581,20 @@ MOCK_IMPL(int, mt_send_message, (mt_desc_t *desc, mt_ntype_t type,
  * Called to send a intermediary descriptor to a relay. This is sent by 
  * a client.
  */
-MOCK_IMPL(int, mt_send_message_multidesc, (mt_desc_t *desc1, mt_desc_t* desc2, mt_ntype_t type, byte* msg, int size)) {
+MOCK_IMPL(int, mt_send_message_multidesc, (mt_desc_t *desc1, mt_desc_t* desc2,
+      mt_ntype_t type, byte* msg, int size)) {
   (void) desc1;
   (void) desc2;
   (void) type;
   (void) msg;
   (void) size;
-  return 0;
+
+  if (authdir_mode(get_options()) || intermediary_mode(get_options()) ||
+      server_mode(get_options())) {
+    log_info(LD_BUG, "MoneTor: this function should only be called on a client");
+    return -1;
+  }
+  return mt_cclient_send_message_multidesc(desc1, desc2, type, msg, size);
 }
 
 MOCK_IMPL(int, mt_alert_payment, (mt_desc_t *desc)) {

@@ -109,7 +109,7 @@ void mt_cintermediary_ledger_circ_has_opened(origin_circuit_t *circ) {
   circ->desc.party = MT_PARTY_LED;
   byte id[DIGEST_LEN];
   mt_desc2digest(&circ->desc, &id);
-  digestmap_set(desc2circ, (char*) id, circ);
+  digestmap_set(desc2circ, (char*) id, TO_CIRCUIT(circ));
 }
 
 void mt_cintermediary_ledger_circ_has_closed(circuit_t *circ) {
@@ -148,7 +148,7 @@ void mt_cintermediary_init_desc_and_add(or_circuit_t *circ) {
   circ->desc.party = MT_PARTY_INT;
   byte id[DIGEST_LEN];
   mt_desc2digest(&circ->desc, &id);
-  digestmap_set(desc2circ, (char*) id, circ);
+  digestmap_set(desc2circ, (char*) id, TO_CIRCUIT(circ));
 }
 
 
@@ -166,6 +166,7 @@ mt_cintermediary_send_message(mt_desc_t *desc, mt_ntype_t pcommand,
   byte id[DIGEST_LEN];
   mt_desc2digest(desc, &id);
   circuit_t *circ = digestmap_get(desc2circ, (char*) id);
+  crypt_path_t *layer_start = NULL;
   /** Might happen if the circuit has been closed */
   // We can go a bit further and re-send the command for 
   // ledger circuits when it is up again.
@@ -174,8 +175,11 @@ mt_cintermediary_send_message(mt_desc_t *desc, mt_ntype_t pcommand,
       CIRCUIT_STATE_OPEN) {
     return -1;
   }
+  if (circ->purpose == CIRCUIT_PURPOSE_I_LEDGER) {
+    layer_start = TO_ORIGIN_CIRCUIT(circ)->cpath->prev;
+  }
   return relay_send_pcommand_from_edge(circ, RELAY_COMMAND_MT,
-      pcommand, (const char*) msg, size);
+      pcommand, layer_start, (const char*) msg, size);
 }
 
 void

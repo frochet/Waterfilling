@@ -491,7 +491,8 @@ relay_crypt(circuit_t *circ, cell_t *cell, cell_direction_t cell_direction,
 static int
 circuit_package_relay_cell(cell_t *cell, circuit_t *circ,
                            cell_direction_t cell_direction,
-                           crypt_path_t *layer_hint, streamid_t on_stream,
+                           crypt_path_t *layer_hint, crypt_path_t *layer_stop
+                           streamid_t on_stream,
                            const char *filename, int lineno)
 {
   channel_t *chan; /* where to send the cell */
@@ -535,7 +536,7 @@ circuit_package_relay_cell(cell_t *cell, circuit_t *circ,
       relay_crypt_one_payload(thishop->f_crypto, cell->payload);
 
       thishop = thishop->prev;
-    } while (thishop != TO_ORIGIN_CIRCUIT(circ)->cpath->prev);
+    } while (thishop != layer_stop);
 
   } else { /* incoming cell */
     or_circuit_t *or_circ;
@@ -683,7 +684,7 @@ relay_command_to_string(uint8_t command)
 
 MOCK_IMPL(int,
 relay_send_pcommand_from_edge_,(circuit_t* circ, uint8_t relay_command,
-                                uint8_t relay_pcommand,
+                                uint8_t relay_pcommand, crypt_path_t *layer_start,
                                 const char *payload, size_t payload_len,
                                 const char *filename, int lineno))
 {
@@ -699,7 +700,7 @@ relay_send_pcommand_from_edge_,(circuit_t* circ, uint8_t relay_command,
   if (CIRCUIT_IS_ORIGIN(circ)) {
     cell.circ_id = circ->n_circ_id;
     cell_direction = CELL_DIRECTION_OUT;
-    cpath_layer = TO_ORIGIN_CIRCUIT(circ)->cpath;
+    cpath_layer = TO_ORIGIN_CIRCUIT(circ)->cpath->prev; //layer stop
   }
   else {
     cell.circ_id = TO_OR_CIRCUIT(circ)->p_circ_id;
@@ -723,7 +724,7 @@ relay_send_pcommand_from_edge_,(circuit_t* circ, uint8_t relay_command,
     log_debug(LD_MT, "MoneTor - Packaging cell type %d", relay_pcommand);
 
     return circuit_package_relay_cell(&cell, circ, cell_direction,
-        cpath_layer, 0, filename, lineno);
+        layer_start, cpath_layer, 0, filename, lineno);
   }
   else {
     int nbr_cells;
@@ -747,7 +748,7 @@ relay_send_pcommand_from_edge_,(circuit_t* circ, uint8_t relay_command,
       memcpy(cell.payload+RELAY_HEADER_SIZE+RELAY_PHEADER_SIZE,
           payload+i*RELAY_PPAYLOAD_SIZE, rph.length);
       if (circuit_package_relay_cell(&cell, circ, cell_direction,
-            cpath_layer, 0, filename, lineno) < 0) {
+            layer_start, cpath_layer, 0, filename, lineno) < 0) {
         log_info(LD_MT, "We are packaging several cells at once"
             " and one packaging failed ...");
         return -1;
@@ -858,6 +859,7 @@ relay_send_command_from_edge_,(streamid_t stream_id, circuit_t *circ,
   }
 
   if (circuit_package_relay_cell(&cell, circ, cell_direction, cpath_layer,
+                                 TO_ORIGIN_CIRCUIT(circ)->cpath->prev),
                                  stream_id, filename, lineno) < 0) {
     log_warn(LD_BUG,"circuit_package_relay_cell failed. Closing.");
     circuit_mark_for_close(circ, END_CIRC_REASON_INTERNAL);

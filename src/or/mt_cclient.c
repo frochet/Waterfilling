@@ -200,15 +200,15 @@ mt_cclient_launch_payment(origin_circuit_t* circ) {
   /* Adding new elements to digestmap */
   byte id[DIGEST_LEN];
   mt_desc2digest(&circ->ppath->desc, &id);
-  digestmap_set(desc2circ, (char*) id, circ);
+  digestmap_set(desc2circ, (char*) id, TO_CIRCUIT(circ));
   log_info(LD_MT, "MoneTor - Adding circ's descs %s to digestmap",
       mt_desc_describe(&middle->desc));
   mt_desc2digest(&middle->desc, &id);
-  digestmap_set(desc2circ, (char*) id, circ);
+  digestmap_set(desc2circ, (char*) id, TO_CIRCUIT(circ));
   log_info(LD_MT, "MoneTor - Adding circ's descs %s to digestmap",
       mt_desc_describe(&exit->desc));
   mt_desc2digest(&exit->desc, &id);
-  digestmap_set(desc2circ, (char*) id, circ);
+  digestmap_set(desc2circ, (char*) id, TO_CIRCUIT(circ));
   // XXX MoneTor - what to do with retVal
   /*Now, notify payment module that we have to start a payment*/
   int retVal;
@@ -531,7 +531,7 @@ mt_cclient_ledger_circ_has_opened(origin_circuit_t *circ) {
   circ->desc.party = MT_PARTY_LED;
   byte id[DIGEST_LEN];
   mt_desc2digest(&circ->desc, &id);
-  digestmap_set(desc2circ, (char*) id, circ);
+  digestmap_set(desc2circ, (char*) id, TO_CIRCUIT(circ));
 }
 
 /**
@@ -547,7 +547,7 @@ mt_cclient_intermediary_circ_has_opened(origin_circuit_t *circ) {
   intermediary_t* intermediary = mt_cclient_get_intermediary_from_ocirc(circ);
   byte id[DIGEST_LEN];
   mt_desc2digest(&intermediary->desc, &id);
-  digestmap_set(desc2circ, (char*) id, circ);
+  digestmap_set(desc2circ, (char*) id, TO_CIRCUIT(circ));
 
   /*XXX MoneTor - What do we do? notify payment, wait to full establishement of all circuits?*/
 }
@@ -562,9 +562,9 @@ mt_cclient_send_message(mt_desc_t* desc, uint8_t command, mt_ntype_t type,
   /* init and stuff */
   byte id[DIGEST_LEN];
   mt_desc2digest(desc, &id);
-  origin_circuit_t* circ = digestmap_get(desc2circ, (char*) id);
-  if (!circ || TO_CIRCUIT(circ)->marked_for_close || 
-      TO_CIRCUIT(circ)->state != CIRCUIT_STATE_OPEN) {
+  circuit_t *circ = digestmap_get(desc2circ, (char*) id);
+  if (!circ || circ->marked_for_close || 
+      circ->state != CIRCUIT_STATE_OPEN) {
     /*If send_message is called by an event added by a worker
       thread, it is possible that our circuit has just been
       marked for close for whatever reason - It is unlikely, though
@@ -576,11 +576,29 @@ mt_cclient_send_message(mt_desc_t* desc, uint8_t command, mt_ntype_t type,
     return -1;
   }
   if (command == RELAY_COMMAND_MT) {
-    /*defensive prog from payment module*/
-    /*tor_assert(size <= RELAY_PPAYLOAD_SIZE);*/
+    crypt_path_t *layer_start; //layer of destination hop
+    tor_assert(circ->cpath);
+    if (circ->purpose == CIRCUIT_PURPOSE_C_INTERMEDIARY ||
+        circ->purpose == CIRCUIT_PURPOSE_C_LEDGER) {
+      /* We will have 4 relay_crypt */
+      layer_start = TO_ORIGIN_CIRCUIT(circ)->cpath->prev;
+    }
+    else {
+      /** Then its a message for one of the relay within the circuit, find it*/
+      layer_start = TO_ORIGIN_CIRCUIT(circ)->cpath;
+      int fount = 0;
+      do {
+        if (desc == &layer_start->desc) {
+          found = 1;
+          break;
+        }
+        layer_start = layer_start->next;
+      } while(layer_start != TO_ORIGIN_CIRCUIT(circ)->cpath)
+      tor_assert(found==1);
+    }
     // XXX Sending many cells depending of size
-    return relay_send_pcommand_from_edge(TO_CIRCUIT(circ), command, (uint8_t) type,
-        (const char*) msg, size);
+    return relay_send_pcommand_from_edge(circ, command, (uint8_t) type,
+        layer_start, (const char*) msg, size);
   }
   else if (command == CELL_PAYMENT) {
     //XXX fix following code. msg can be >
@@ -621,6 +639,19 @@ mt_cclient_send_message(mt_desc_t* desc, uint8_t command, mt_ntype_t type,
     log_warn(LD_MT, "Unrecognized command %d", command);
   }
   return -1;
+}
+
+/**
+ * Send message intermediary's information to the right relay in the path
+ */
+
+mt_cclient_send_message_multidesc(mt_desc_t *desc1, mt_desc_t *desc2, 
+    mt_ntype_t type, byte* msg, int size) {
+  (void) desc1;
+  (void) desc2;
+  (void) type;
+  (void) msg;
+  (void) size;
 }
 
 /** Process received msg from either relay, intermediary
