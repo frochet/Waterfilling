@@ -577,7 +577,7 @@ mt_cclient_send_message(mt_desc_t* desc, uint8_t command, mt_ntype_t type,
   }
   if (command == RELAY_COMMAND_MT) {
     crypt_path_t *layer_start; //layer of destination hop
-    tor_assert(circ->cpath);
+    tor_assert(TO_ORIGIN_CIRCUIT(circ)->cpath);
     if (circ->purpose == CIRCUIT_PURPOSE_C_INTERMEDIARY ||
         circ->purpose == CIRCUIT_PURPOSE_C_LEDGER) {
       /* We will have 4 relay_crypt */
@@ -586,15 +586,18 @@ mt_cclient_send_message(mt_desc_t* desc, uint8_t command, mt_ntype_t type,
     else {
       /** Then its a message for one of the relay within the circuit, find it*/
       layer_start = TO_ORIGIN_CIRCUIT(circ)->cpath;
-      int fount = 0;
+      pay_path_t *ppath_tmp = TO_ORIGIN_CIRCUIT(circ)->ppath;
+      int found = 0;
       do {
-        if (desc == &layer_start->desc) {
+        if (desc == &ppath_tmp->desc) {
           found = 1;
           break;
         }
         layer_start = layer_start->next;
-      } while(layer_start != TO_ORIGIN_CIRCUIT(circ)->cpath)
-      tor_assert(found==1);
+        ppath_tmp = ppath_tmp->next;
+      } while(layer_start != TO_ORIGIN_CIRCUIT(circ)->cpath);
+      if (BUG(!found))
+        return -1;
     }
     // XXX Sending many cells depending of size
     return relay_send_pcommand_from_edge(circ, command, (uint8_t) type,
@@ -607,7 +610,7 @@ mt_cclient_send_message(mt_desc_t* desc, uint8_t command, mt_ntype_t type,
     relay_pheader_t rph;
     memset(&cell, 0, sizeof(cell_t));
     memset(&rph, 0, sizeof(relay_pheader_t));
-    cell.circ_id = TO_CIRCUIT(circ)->n_circ_id;
+    cell.circ_id = circ->n_circ_id;
     cell.command = command;
     rph.pcommand = type;
     int nbr_cells;
@@ -627,12 +630,12 @@ mt_cclient_send_message(mt_desc_t* desc, uint8_t command, mt_ntype_t type,
       memcpy(cell.payload+RELAY_PHEADER_SIZE, msg+i*CELL_PPAYLOAD_SIZE, rph.length);
       remaining_payload -= rph.length;
       log_info(LD_MT, "Adding cell payment %hhx to queue", rph.pcommand);
-      cell_queue_append_packed_copy(NULL, &TO_CIRCUIT(circ)->n_chan_cells, 0, &cell,
-          TO_CIRCUIT(circ)->n_chan->wide_circ_ids, 0);
+      cell_queue_append_packed_copy(NULL, &circ->n_chan_cells, 0, &cell,
+          circ->n_chan->wide_circ_ids, 0);
     }
     tor_assert(remaining_payload == 0);
-    update_circuit_on_cmux(TO_CIRCUIT(circ), CELL_DIRECTION_OUT);
-    scheduler_channel_has_waiting_cells(TO_CIRCUIT(circ)->n_chan);
+    update_circuit_on_cmux(circ, CELL_DIRECTION_OUT);
+    scheduler_channel_has_waiting_cells(circ->n_chan);
     return 0;
   }
   else {
@@ -644,7 +647,7 @@ mt_cclient_send_message(mt_desc_t* desc, uint8_t command, mt_ntype_t type,
 /**
  * Send message intermediary's information to the right relay in the path
  */
-
+int
 mt_cclient_send_message_multidesc(mt_desc_t *desc1, mt_desc_t *desc2, 
     mt_ntype_t type, byte* msg, int size) {
   (void) desc1;
@@ -652,6 +655,7 @@ mt_cclient_send_message_multidesc(mt_desc_t *desc1, mt_desc_t *desc2,
   (void) type;
   (void) msg;
   (void) size;
+  return 0;
 }
 
 /** Process received msg from either relay, intermediary

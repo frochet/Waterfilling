@@ -491,7 +491,7 @@ relay_crypt(circuit_t *circ, cell_t *cell, cell_direction_t cell_direction,
 static int
 circuit_package_relay_cell(cell_t *cell, circuit_t *circ,
                            cell_direction_t cell_direction,
-                           crypt_path_t *layer_hint, crypt_path_t *layer_stop
+                           crypt_path_t *layer_hint, crypt_path_t *layer_stop,
                            streamid_t on_stream,
                            const char *filename, int lineno)
 {
@@ -859,7 +859,7 @@ relay_send_command_from_edge_,(streamid_t stream_id, circuit_t *circ,
   }
 
   if (circuit_package_relay_cell(&cell, circ, cell_direction, cpath_layer,
-                                 TO_ORIGIN_CIRCUIT(circ)->cpath->prev),
+                                 TO_ORIGIN_CIRCUIT(circ)->cpath->prev,
                                  stream_id, filename, lineno) < 0) {
     log_warn(LD_BUG,"circuit_package_relay_cell failed. Closing.");
     circuit_mark_for_close(circ, END_CIRC_REASON_INTERNAL);
