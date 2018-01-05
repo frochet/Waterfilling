@@ -108,6 +108,19 @@ intermediary_t* get_intermediary_by_role(position_t position) {
   return NULL;
 }
 
+/** Get intermediary matching inter_ident
+ */
+
+intermediary_t *get_intermediary_by_identity(intermediary_identity_t *ident) {
+  SMARTLIST_FOREACH_BEGIN(intermediaries, intermediary_t*, intermediary) {
+    if (tor_memeq(intermediary->identity->identity, 
+          ident->identity, DIGEST_LEN)){
+      return intermediary;
+    }
+  } SMARTLIST_FOREACH_END(intermediary);
+  return NULL;
+}
+
 smartlist_t* get_intermediaries(int for_circuit) {
   (void)for_circuit;
   return NULL;
@@ -439,6 +452,9 @@ run_cclient_build_circuit_event(time_t now) {
   return;
 }
 
+/** Get the intermediary connected at the other end of this origin_circuit_t
+ */
+
 intermediary_t* mt_cclient_get_intermediary_from_ocirc(origin_circuit_t *ocirc) {
   intermediary_identity_t *inter_ident = ocirc->inter_ident;
   intermediary_t *intermediary = NULL;
@@ -585,6 +601,8 @@ mt_cclient_send_message(mt_desc_t* desc, uint8_t command, mt_ntype_t type,
      * the message once a new circ is up (in the case of a ledger
      * circuit or an intermediary circuit)*/
     /** If this is a general circuit, we should just cashout */
+    log_info(LD_MT, "MoneTor: digestmap_get failed to return a circ for descriptor"
+        " %s", mt_desc_describe(desc));
     return -1;
   }
   if (command == RELAY_COMMAND_MT) {
@@ -667,6 +685,41 @@ mt_cclient_send_message_multidesc(mt_desc_t *desc1, mt_desc_t *desc2,
   (void) type;
   (void) msg;
   (void) size;
+  
+  byte id[DIGEST_LEN];
+  mt_desc2digest(desc1, &id);
+  crypt_path_t *layer_start;
+  pay_path_t *ppath_tmp;
+  circuit_t *circ = digestmap_get(desc2circ, (char *) id);
+  if (!circ) {
+    log_info(LD_MT, "MoneTor: digestmap_get failed to return a circ for descriptor"
+        " %s", mt_desc_describe(desc1));
+    return -1;
+  }
+  /* Get the appropriate ppath+layer_start and identify related intermediary */
+  layer_start = TO_ORIGIN_CIRCUIT(circ)->cpath;
+  ppath_tmp = TO_ORIGIN_CIRCUIT(circ)->ppath;
+  int found = 0;
+  do {
+    if (desc1 == &ppath_tmp->desc) {
+      found = 1;
+      break;
+    }
+    layer_start = layer_start->next;
+    ppath_tmp = ppath_tmp->next;
+  } while(layer_start != TO_ORIGIN_CIRCUIT(circ)->cpath);
+  if (!found) {
+    log_info(LD_MT, "MoneTor: didn't find right ppath");
+    return -1;
+  }
+  intermediary_t *intermediary = get_intermediary_by_identity(ppath_tmp->inter_ident);
+  if (!intermediary) {
+    log_info(LD_MT, "MoneTor: get_intermediary_by_identity failed for identity %s",
+        ppath_tmp->inter_ident->identity);
+    return -1;
+  }
+  /* Sends intermediary's fingerprint, as well as desc2 and msg */
+
   return 0;
 }
 

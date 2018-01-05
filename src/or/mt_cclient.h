@@ -40,6 +40,12 @@ smartlist_t* get_node_t_smartlist_intermerdiaries(void);
 
 smartlist_t* get_intermediaries(int for_circuit);
 
+/**
+ * Get intermediary by identity
+ */
+
+intermediary_t *get_intermediary_by_identity(intermediary_identity_t *ident);
+
 /** Used by unit tests: add inter to the smartlist */
 void add_intermediary(intermediary_t *inter);
 
