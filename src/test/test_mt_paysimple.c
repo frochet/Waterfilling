@@ -239,27 +239,27 @@ static int mock_send_message(mt_desc_t *desc, mt_ntype_t type, byte* msg, int si
   }
 
   // invoke the corresponding recv call and log
-  if(dst_desc.id == aut_desc.id && dst_desc.party == MT_PARTY_AUT){
+  if(dst_desc.id[0] == aut_desc.id[0] && dst_desc.party == MT_PARTY_AUT){
     printf("%s -> aut : %s\n", party_str, type_str);
     return MT_SUCCESS;
   }
 
-  if(dst_desc.id == led_desc.id && dst_desc.party == MT_PARTY_LED){
+  if(dst_desc.id[0] == led_desc.id[0] && dst_desc.party == MT_PARTY_LED){
     printf("%s -> led : %s\n", party_str, type_str);
     return mt_lpay_recv(&src_desc, type, msg, size);
   }
 
-  if(dst_desc.id == cli_desc.id && dst_desc.party == MT_PARTY_CLI){
+  if(dst_desc.id[0] == cli_desc.id[0] && dst_desc.party == MT_PARTY_CLI){
     printf("%s -> cli : %s\n", party_str, type_str);
     return mt_cpay_recv(&src_desc, type, msg, size);
   }
 
-  if(dst_desc.id == rel_desc.id && dst_desc.party == MT_PARTY_REL){
+  if(dst_desc.id[0] == rel_desc.id[0] && dst_desc.party == MT_PARTY_REL){
     printf("%s -> rel : %s\n", party_str, type_str);
     return mt_rpay_recv(&src_desc, type, msg, size);
   }
 
-  if(dst_desc.id == int_desc.id && dst_desc.party == MT_PARTY_INT){
+  if(dst_desc.id[0] == int_desc.id[0] && dst_desc.party == MT_PARTY_INT){
     printf("%s -> int : %s\n", party_str, type_str);
     return mt_ipay_recv(&src_desc, type, msg, size);
   }
@@ -277,7 +277,7 @@ static int mock_send_message_multidesc(mt_desc_t *desc1, mt_desc_t* desc2, mt_nt
   memcpy(&src_desc, &dst_desc, sizeof(mt_desc_t));
   memcpy(&dst_desc, &temp_desc, sizeof(mt_desc_t));
 
-  if(dst_desc.id == rel_desc.id
+  if(dst_desc.id[0] == rel_desc.id[0]
      && dst_desc.party == MT_PARTY_REL
      && type == MT_NTYPE_NAN_CLI_ESTAB1){
     printf("cli - >rel : nan_cli_estab1\n");
@@ -380,18 +380,18 @@ static void test_mt_paysimple(void *arg){
   mt_crypt_keygen(&pp, &int_pk, &int_sk);
 
   uint32_t ids = 0;
-  aut_desc.id = ids++;
-  led_desc.id = ids++;
-  cli_desc.id = ids++;
-  rel_desc.id = ids++;
-  int_desc.id = ids++;
+  aut_desc.id[0] = ids++;
+  led_desc.id[0] = ids++;
+  cli_desc.id[0] = ids++;
+  rel_desc.id[0] = ids++;
+  int_desc.id[0] = ids++;
 
   // write values to disk as separate files in the tor/ directory
   // TODO: this should go through torcc instead
 
   or_options_t* options = (or_options_t*)get_options();
 
-  mt_bytes2hex((byte*)&led_desc.id, sizeof(led_desc.id), &options->moneTorLedgerDesc);
+  mt_bytes2hex((byte*)&led_desc.id[0], sizeof(led_desc.id[0]), &options->moneTorLedgerDesc);
   mt_bytes2hex(aut_pk, MT_SZ_PK, &options->moneTorAuthorityPK);
   mt_bytes2hex(pp, MT_SZ_PP, &options->moneTorPP);
   options->moneTorFee = MT_FEE;

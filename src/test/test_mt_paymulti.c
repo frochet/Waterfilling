@@ -457,7 +457,7 @@ static void set_up_main_loop(void){
       unique_rel_descs[index] = relay;
 
       for(int j = 0; j < index; j++){
-	if(unique_rel_descs[j].id == relay.id){
+	if(unique_rel_descs[j].id[0] == relay.id[0]){
 	  index--;
 	}
       }
@@ -531,7 +531,7 @@ static int do_main_loop_once(void){
       mt_cpay_import(ctx->state);
       tor_free(ctx->state);
       cur_desc = event->src;
-      printf("cli (%02d) : call pay (%02d)\n", (int)event->src.id, (int)event->desc1.id);
+      printf("cli (%02d) : call pay (%02d)\n", (int)event->src.id[0], (int)event->desc1.id[0]);
       result = mt_cpay_pay(&event->desc1, &event->desc2);
       mt_cpay_export(&ctx->state);
       break;
@@ -541,7 +541,7 @@ static int do_main_loop_once(void){
       mt_cpay_import(ctx->state);
       tor_free(ctx->state);
       cur_desc = event->src;
-      printf("cli (%02d) : call close (%02d)\n", (int)event->src.id, (int)event->desc1.id);
+      printf("cli (%02d) : call close (%02d)\n", (int)event->src.id[0], (int)event->desc1.id[0]);
       result = mt_cpay_close(&event->desc1, &event->desc2);
       mt_cpay_export(&ctx->state);
       break;
@@ -600,7 +600,7 @@ static int do_main_loop_once(void){
 	tor_free(ctx->state);
 	event->fn(NULL, event->arg);
 	cur_desc = event->src;
-	printf("cli (%02d) : make zkp\n", event->src.id);
+	printf("cli (%02d) : make zkp\n", event->src.id[0]);
 	result = event->reply_fn(event->arg);
 	mt_cpay_export(&ctx->state);
       }
@@ -610,7 +610,7 @@ static int do_main_loop_once(void){
 	tor_free(ctx->state);
 	event->fn(NULL, event->arg);
 	cur_desc = event->src;
-	printf("rel (%02d) : make zkp\n", event->src.id);
+	printf("rel (%02d) : make zkp\n", event->src.id[0]);
 	result = event->reply_fn(event->arg);
 	mt_rpay_export(&ctx->state);
       }
@@ -682,12 +682,12 @@ static void test_mt_paymulti(void *arg){
   mt_crypt_keygen(&pp, &led_pk, &led_sk);
 
   uint32_t ids = 0;
-  aut_desc.id = ids++;
-  led_desc.id = ids++;
+  aut_desc.id[0] = ids++;
+  led_desc.id[0] = ids++;
 
   or_options_t* options = (or_options_t*)get_options();
 
-  mt_bytes2hex((byte*)&led_desc.id, sizeof(led_desc.id), &options->moneTorLedgerDesc);
+  mt_bytes2hex((byte*)&led_desc.id[0], sizeof(led_desc.id[0]), &options->moneTorLedgerDesc);
   mt_bytes2hex(aut_pk, MT_SZ_PK, &options->moneTorAuthorityPK);
 
   mt_bytes2hex(pp, MT_SZ_PP, &options->moneTorPP);
@@ -729,7 +729,7 @@ static void test_mt_paymulti(void *arg){
     byte cli_sk[MT_SZ_SK];
     cli_desc.party = MT_PARTY_CLI;
     mt_crypt_keygen(&pp, &cli_pk, &cli_sk);
-    cli_desc.id = ids++;
+    cli_desc.id[0] = ids++;
 
     mt_bytes2hex(cli_pk, MT_SZ_PK, &options->moneTorPK);
     mt_bytes2hex(cli_sk, MT_SZ_SK, &options->moneTorSK);
@@ -779,7 +779,7 @@ static void test_mt_paymulti(void *arg){
     byte rel_sk[MT_SZ_SK];
     rel_desc.party = MT_PARTY_REL;
     mt_crypt_keygen(&pp, &rel_pk, &rel_sk);
-    rel_desc.id = ids++;
+    rel_desc.id[0] = ids++;
 
     mt_bytes2hex(rel_pk, MT_SZ_PK, &options->moneTorPK);
     mt_bytes2hex(rel_sk, MT_SZ_SK, &options->moneTorSK);
@@ -829,7 +829,7 @@ static void test_mt_paymulti(void *arg){
     byte int_sk[MT_SZ_SK];
     int_desc.party = MT_PARTY_INT;
     mt_crypt_keygen(&pp, &int_pk, &int_sk);
-    int_desc.id = ids++;
+    int_desc.id[0] = ids++;
 
     mt_bytes2hex(int_pk, MT_SZ_PK, &options->moneTorPK);
     mt_bytes2hex(int_sk, MT_SZ_SK, &options->moneTorSK);

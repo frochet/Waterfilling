@@ -108,7 +108,7 @@ static void test_mt_lpay(void *arg)
   mt_crypt_keygen(&pp, &aut_0_pk, &aut_0_sk);
   mt_crypt_keygen(&pp, &led_0_pk, &led_0_sk);
 
-  aut_0_desc.id = 1;
+  aut_0_desc.id[0] = 1;
   aut_0_desc.party = MT_PARTY_AUT;
 
   or_options_t* options = get_options();
