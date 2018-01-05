@@ -27,7 +27,7 @@
 #include "router.h"
 
 
-static int count = 100000; /* To remove later */
+static uint64_t count[2] = {0, 0};
 
 /**
  * Converts a public key into an address for use on the ledger. The address is
@@ -141,6 +141,22 @@ int mt_hc_verify(byte (*tail)[MT_SZ_HASH], byte (*preimage)[MT_SZ_HASH], int k){
   return MT_SUCCESS;
 }
 
+void increment(long unsigned *id) {
+  id[0]++;
+  if(id[0]==0) {
+    if(++id[1]==0)
+      id[0]=0;
+  }
+}
+
+uint64_t rand_uint64(void) {
+  uint64_t r = 0;
+  for (int i=0; i<64; i += 30) {
+    r = r*((uint64_t)RAND_MAX + 1) + rand();
+  }
+  return r;
+}
+
 /*
  * Should be called by the tor_init() function - initialize all environment
  * for the payment system
@@ -149,6 +165,8 @@ int mt_hc_verify(byte (*tail)[MT_SZ_HASH], byte (*preimage)[MT_SZ_HASH], int k){
  */
 void mt_init(void){
   log_info(LD_MT, "MoneTor: Initializing the payment system");
+  count[0] = rand_uint64();
+  count[1] = rand_uint64();
   mt_cclient_init();
   /* Todo call intermediary, relay and ledger init? */
 }
@@ -163,7 +181,9 @@ ledger_init(ledger_t **ledger, const node_t *node, extend_info_t *ei,
   *ledger = tor_malloc_zero(sizeof(ledger_t));
   memcpy((*ledger)->identity.identity, node->identity, DIGEST_LEN);
   (*ledger)->is_reachable = LEDGER_REACHABLE_MAYBE;
-  (*ledger)->desc.id = count++; // XXX change this counter to 128-bit digest
+  increment(count);
+  (*ledger)->desc.id[0] = count[0];
+  (*ledger)->desc.id[1] = count[1];
   (*ledger)->desc.party = MT_PARTY_LED;
   (*ledger)->ei = ei;
   (*ledger)->buf = buf_new_with_capacity(RELAY_PPAYLOAD_SIZE);

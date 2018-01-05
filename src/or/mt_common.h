@@ -160,6 +160,13 @@ void direct_pheader_pack(uint8_t *dest, relay_pheader_t *rph);
  */
 const char* mt_desc_describe(mt_desc_t *desc);
 
+/**
+ * Increment the counter described by 2 long unsigned
+ */
+void increment(long unsigned *id);
+
+/** randomize a 64 bit uint by 3 call to rand() */
+uint64_t rand_uint64(void);
 
 /** Interface to the payment module to send a payment cell.
  *  This function dispaches to the right controller.

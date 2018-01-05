@@ -7,7 +7,7 @@
 #include "mt_rpay.h"
 #include "router.h"
 
-static int count = 0; //XXX going to change later
+static uint64_t count[2] = {0, 0}; 
 static digestmap_t  *desc2circ = NULL;
 static ledger_t *ledger = NULL;
 static smartlist_t *ledgercircs = NULL;
@@ -20,10 +20,13 @@ mt_crelay_init(void) {
   log_info(LD_MT, "MoneTor: initialization of controler relay code");
   ledgercircs = smartlist_new();
   desc2circ = digestmap_new();
+  count[0] = rand_uint64();
+  count[1] = rand_uint64();
 }
 
 void mt_crelay_init_desc_and_add(or_circuit_t *circ) {
-  circ->desc.id = count++;
+  circ->desc.id[0] = count[0];
+  circ->desc.id[1] = count[1];
   circ->desc.party = MT_PARTY_CLI; // Which party shoud I put?
   byte id[DIGEST_LEN];
   mt_desc2digest(&circ->desc, &id);

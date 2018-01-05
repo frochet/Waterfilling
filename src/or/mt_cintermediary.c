@@ -21,7 +21,7 @@ static digestmap_t *desc2circ = NULL;
 
 static smartlist_t *ledgercircs = NULL;
 static ledger_t *ledger = NULL;
-static int count = 1;
+static uint64_t count[2] = {0, 0};
 
 /********************** Once per second events ***********************/
 
@@ -105,7 +105,9 @@ void mt_cintermediary_ledger_circ_has_opened(origin_circuit_t *circ) {
   ledger->circuit_retries = 0;
   ledger->is_reachable = LEDGER_REACHABLE_YES;
   /* Generate new desc and add this circ into desc2circ */
-  circ->desc.id = count++; // To change later 
+  increment(count);
+  circ->desc.id[0] = count[0];
+  circ->desc.id[1] = count[1];
   circ->desc.party = MT_PARTY_LED;
   byte id[DIGEST_LEN];
   mt_desc2digest(&circ->desc, &id);
@@ -142,7 +144,9 @@ void mt_cintermediary_orcirc_has_closed(or_circuit_t *circ) {
  * init structure as well as add this circ in our structures*/
 
 void mt_cintermediary_init_desc_and_add(or_circuit_t *circ) {
-  circ->desc.id = count++; // XXX change that later to a 128bit rand 
+  increment(count);
+  circ->desc.id[0] = count[0]; 
+  circ->desc.id[1] = count[1]; 
   /*Cell received has been sent either by a relay or by a client
    *Todo => check with Thien-Nam what desc.party we have to configure */
   circ->desc.party = MT_PARTY_INT;
@@ -215,5 +219,8 @@ mt_cintermediary_process_received_msg(circuit_t *circ, mt_ntype_t pcommand,
 void mt_cintermediary_init(void) {
   desc2circ = digestmap_new();
   ledgercircs = smartlist_new();
+  count[0] = rand_uint64();
+  count[1] = rand_uint64();
+
 }
 

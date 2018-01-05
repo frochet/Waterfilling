@@ -825,7 +825,7 @@ typedef enum {
 } mt_party_t;
 
 typedef struct {
-  uint32_t id;
+  uint64_t id[2]; //simulate a 128 bit counter
   mt_party_t party;
 } mt_desc_t;
 
