@@ -10,6 +10,7 @@
 #include "circuitbuild.h"
 #include "circuituse.h"
 #include "circuitlist.h"
+#include "relay.h"
 
 static uint64_t count[2] = {0, 0}; 
 static digestmap_t  *desc2circ = NULL;

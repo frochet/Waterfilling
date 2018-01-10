@@ -557,8 +557,10 @@ typedef enum {
 #define CIRCUIT_PURPOSE_I_LEDGER 24
 /** OR-side circuit on a intermerdiary */
 #define CIRCUIT_PURPOSE_INTERMEDIARY 25
+/** ledger circuit on a relay */
+#define CIRCUIT_PURPOSE_R_LEDGER 26
 
-#define CIRCUIT_PURPOSE_MAX_ 25
+#define CIRCUIT_PURPOSE_MAX_ 26
 /** A catch-all for unrecognized purposes. Currently we don't expect
  * to make or see any circuits with this purpose. */
 #define CIRCUIT_PURPOSE_UNKNOWN 255
