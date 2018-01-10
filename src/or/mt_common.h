@@ -155,6 +155,13 @@ void relay_pheader_unpack(relay_pheader_t *desc, const uint8_t *src);
 
 void direct_pheader_pack(uint8_t *dest, relay_pheader_t *rph);
 
+
+/** Pack and unpack int_id_t */
+
+int pack_int_id(byte **msg, int_id_t *ind_id);
+
+void unpack_int_id(byte *str, int_id_t* ind_id_out);
+
 /**
  * gives a string description of this mt_desc_t*
  */

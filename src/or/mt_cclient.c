@@ -279,7 +279,7 @@ choose_intermediaries(time_t now, smartlist_t *exclude_list) {
     return;
   log_info(LD_MT, "MoneTor: Choosing intermediaries");
   /*We do not have enough node, let's pick some.*/
-  const node_t *node;
+  const node_t *node = NULL;
   /*Handling extend info here is going to ease my life - great idea of the day*/
   extend_info_t *ei = NULL;
   intermediary_t *intermediary = NULL;
@@ -718,9 +718,21 @@ mt_cclient_send_message_multidesc(mt_desc_t *desc1, mt_desc_t *desc2,
         ppath_tmp->inter_ident->identity);
     return -1;
   }
+  // Now we have layer_start as well as the right intermediary
   /* Sends intermediary's fingerprint, as well as desc2 and msg */
+  int_id_t int_id;
+  memcpy(int_id.identity, intermediary->identity->identity, DIGEST_LEN);
+  byte *msg_int_id;
+  int size_int_id = pack_int_id(&msg_int_id, &int_id);
+  
+  byte *msg_with_desc = tor_malloc_zero(size+size_int_id+sizeof(mt_desc_t));
+  memcpy(msg_with_desc, msg_int_id, size_int_id);
+  memcpy(msg_with_desc+size_int_id, desc2, sizeof(mt_desc_t)); // XXX not safe over network ~ byte ordering
+  memcpy(msg_with_desc+sizeof(mt_desc_t)+size_int_id, msg, size);
 
-  return 0;
+  int ret = mt_cclient_send_message(desc1, RELAY_COMMAND_MT, type, msg_with_desc, size+sizeof(mt_desc_t));
+  tor_free(msg_with_desc);
+  return ret;
 }
 
 /** Process received msg from either relay, intermediary

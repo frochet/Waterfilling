@@ -6,6 +6,9 @@
 #include "mt_crelay.h"
 #include "mt_rpay.h"
 #include "router.h"
+#include "nodelist.h"
+#include "circuitbuild.h"
+#include "circuituse.h"
 
 static uint64_t count[2] = {0, 0}; 
 static digestmap_t  *desc2circ = NULL;
@@ -109,6 +112,59 @@ mt_crelay_process_received_msg(circuit_t *circ, mt_ntype_t pcommand,
   else {
     //circ should a or_circuit_t of a normal circuit with
     //a normal client over one endpoint
+    if (pcommand == MT_NTYPE_NAN_CLI_ESTAB1) {
+      /* We have to open a circuit towards the interemdiary received */
+      int_id_t int_id;
+      unpack_int_id(msg, &int_id);
+      /* Find node with that identity and extend a circuit
+       * to it */
+      const node_t *ninter = node_get_by_id(int_id.identity);
+      if (!ninter) {
+        log_info(LD_MT, "MoneTor: received identity %s but there is no such node"
+            " in my consensus", int_id.identity);
+        //XXX alert payment that something was not ok
+        return;
+      }
+
+      /** Now, try to find a circuit to ninter of launch one */
+      origin_circuit_t *oricirc = NULL;
+      //XXX TODO
+      /** We didn't find a circ connected/connecting to ninter */
+      if (!oricirc) {
+        extend_info_t *ei = NULL;
+        ei = extend_info_from_node(ninter, 0);
+        if (!ei) {
+          log_info(LD_MT, "MoneTor: We did not successfully produced an extend"
+              " info from node %s", node_describe(ninter));
+          //XXX alert payment something went wrong
+          return;
+        }
+        int purpose = CIRCUIT_PURPOSE_C_INTERMEDIARY;
+        int flags = CIRCLAUNCH_IS_INTERNAL;
+        flags |= CIRCLAUNCH_NEED_UPTIME;
+        oricirc = circuit_launch_by_extend_info(purpose, ei, flags);
+        if (!oricirc) {
+          log_info(LD_MT, "MoneTor: Not successfully launch a circuit :/ abording");
+          //XXX alert payment module
+          return;
+        }
+
+        oricirc->desc.id[0] = rand_uint64();
+        oricirc->desc.id[1] = rand_uint64();
+        oricirc->desc.party = MT_PARTY_CLI;
+        byte id[DIGEST_LEN];
+        mt_desc2digest(&oricirc->desc, &id);
+        digestmap_set(desc2circ, (char*) id, TO_CIRCUIT(oricirc));
+      }
+
+      mt_desc_t *desci = tor_malloc_zero(sizeof(mt_desc_t));
+      memcpy(desci, msg+sizeof(int_id_t), sizeof(mt_desc_t));
+
+      mt_rpay_recv_multidesc(&oricirc->desc, desci, pcommand,
+         msg+sizeof(int_id_t)+sizeof(mt_desc_t),
+         msg_len-sizeof(int_id_t)-sizeof(mt_desc_t));
+      return;
+    }
     orcirc = TO_OR_CIRCUIT(circ);
     desc = &orcirc->desc;
     if (mt_rpay_recv(desc, pcommand, msg, msg_len) < 0) {

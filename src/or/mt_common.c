@@ -276,6 +276,16 @@ void direct_pheader_pack(uint8_t *dest, relay_pheader_t *rph) {
   set_uint16(dest+1, htons(rph->length));
 }
 
+int pack_int_id(byte **msg, int_id_t *ind_id) {
+  *msg = tor_malloc_zero(sizeof(int_id_t));
+  memcpy(*msg, ind_id, sizeof(int_id_t));
+  return sizeof(int_id_t);
+}
+
+void unpack_int_id(byte *msg, int_id_t *int_id_out) {
+  memcpy(int_id_out, msg, sizeof(int_id_t));
+}
+
 /** Called when we get a MoneTor cell on circuit circ.
  *  gets the right mt_desc_t and dispatch to the right
  *  payment module
@@ -603,11 +613,6 @@ MOCK_IMPL(int, mt_send_message, (mt_desc_t *desc, mt_ntype_t type,
  */
 MOCK_IMPL(int, mt_send_message_multidesc, (mt_desc_t *desc1, mt_desc_t* desc2,
       mt_ntype_t type, byte* msg, int size)) {
-  (void) desc1;
-  (void) desc2;
-  (void) type;
-  (void) msg;
-  (void) size;
 
   if (authdir_mode(get_options()) || intermediary_mode(get_options()) ||
       server_mode(get_options())) {

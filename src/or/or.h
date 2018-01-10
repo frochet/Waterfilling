@@ -3358,7 +3358,7 @@ typedef struct origin_circuit_t {
    */
   pay_path_t *ppath;
 
-  /** Used for ledger circuits */
+  /** Used for ledger circuits and intermediary circuit at the relay */
   mt_desc_t desc;
 
 
@@ -5840,9 +5840,15 @@ typedef enum {
   MT_NTYPE_CHN_LED_DATA,        // channel ledger data mapped to an address
   MT_NTYPE_MAC_LED_QUERY,       // request to query macropayment data
   MT_NTYPE_CHN_LED_QUERY,       // request to query channel data
+  
 } mt_ntype_t;
 
 //----------------------------- Local Tokens --------------------------------//
+
+
+typedef struct {
+  char identity[DIGEST_LEN];
+} int_id_t;
 
 typedef struct {
   byte rev[MT_SZ_PK];

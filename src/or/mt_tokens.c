@@ -272,6 +272,7 @@ int pack_nan_int_close8(nan_int_close8_t* token, byte(*pid)[DIGEST_LEN], byte** 
     return pack_token(MT_NTYPE_NAN_INT_CLOSE8, token, sizeof(*token), pid, str_out);
 }
 
+
 //--------------------------------- Unpack --------------------------------//
 
 int unpack_mac_aut_mint(byte* str, int size, mac_aut_mint_t* tkn_out, byte(*pid_out)[DIGEST_LEN]){
@@ -673,7 +674,7 @@ size_t mt_token_get_size_of(mt_ntype_t type) {
     case MT_NTYPE_NAN_INT_DPAY2:
       return sizeof(nan_int_dpay2_t)+strlen;
     case MT_NTYPE_NAN_CLI_ESTAB1:
-      return sizeof(nan_cli_estab1_t)+strlen;
+      return sizeof(nan_cli_estab1_t)+strlen+sizeof(int_id_t)+sizeof(mt_desc_t);
     case MT_NTYPE_NAN_REL_ESTAB2:
       return sizeof(nan_rel_estab2_t)+strlen;
     case MT_NTYPE_NAN_INT_ESTAB3:

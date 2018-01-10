@@ -83,7 +83,6 @@ int pack_nan_end_close5(nan_end_close5_t* tkn, byte(*pid)[DIGEST_LEN], byte** st
 int pack_nan_int_close6(nan_int_close6_t* tkn, byte(*pid)[DIGEST_LEN], byte** str_out);
 int pack_nan_end_close7(nan_end_close7_t* tkn, byte(*pid)[DIGEST_LEN], byte** str_out);
 int pack_nan_int_close8(nan_int_close8_t* tkn, byte(*pid)[DIGEST_LEN], byte** str_out);
-
 /**
  * Convert a byte string that was generated using the corresponding
  * "pack" functions into the original token structs. The public key,
