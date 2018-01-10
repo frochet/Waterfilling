@@ -9,6 +9,7 @@
 #include "nodelist.h"
 #include "circuitbuild.h"
 #include "circuituse.h"
+#include "circuitlist.h"
 
 static uint64_t count[2] = {0, 0}; 
 static digestmap_t  *desc2circ = NULL;
@@ -50,12 +51,19 @@ mt_crelay_intermediary_circ_has_closed(origin_circuit_t* ocirc) {
 void 
 mt_crelay_intermediary_circ_has_opened(origin_circuit_t* ocirc) {
   (void) ocirc;
+  /** XXX Did Should notify the payment system when the intermediary is 
+   * ready? */
 }
 
 /************************** Events *****************************/
 
 static void
 run_crelay_housekeeping_event(time_t now) {
+  /** On the todo-list: check for the payment window 
+   * system.
+   * Logic: Every second, we check if every payment windows
+   * are in a correct state => Do we received our payment, etc?
+   */
   (void) now;
 }
 
@@ -129,6 +137,25 @@ mt_crelay_process_received_msg(circuit_t *circ, mt_ntype_t pcommand,
       /** Now, try to find a circuit to ninter of launch one */
       origin_circuit_t *oricirc = NULL;
       //XXX TODO
+      SMARTLIST_FOREACH_BEGIN(circuit_get_global_list(), circuit_t*, circtmp) {
+        if (!circtmp->marked_for_close && CIRCUIT_IS_ORIGIN(circtmp) &&
+            circ->purpose == CIRCUIT_PURPOSE_R_INTERMEDIARY) {
+          if (!TO_ORIGIN_CIRCUIT(circtmp)->cpath)
+            continue;
+          if (!TO_ORIGIN_CIRCUIT(circtmp)->cpath->prev)
+            continue;
+          if (!TO_ORIGIN_CIRCUIT(circtmp)->cpath->prev->extend_info)
+            continue;
+          if (tor_memeq(TO_ORIGIN_CIRCUIT(circtmp)->cpath->prev->extend_info->identity_digest,
+                int_id.identity, DIGEST_LEN)) {
+            oricirc = TO_ORIGIN_CIRCUIT(circtmp);
+            break;
+          }
+        }
+      } SMARTLIST_FOREACH_END(circtmp);
+
+      log_info(LD_MT, "We don't have any current circuit towards %s that intermediary"
+          " .. Building one. ", node_describe(ninter));
       /** We didn't find a circ connected/connecting to ninter */
       if (!oricirc) {
         extend_info_t *ei = NULL;
@@ -139,7 +166,7 @@ mt_crelay_process_received_msg(circuit_t *circ, mt_ntype_t pcommand,
           //XXX alert payment something went wrong
           return;
         }
-        int purpose = CIRCUIT_PURPOSE_C_INTERMEDIARY;
+        int purpose = CIRCUIT_PURPOSE_R_INTERMEDIARY;
         int flags = CIRCLAUNCH_IS_INTERNAL;
         flags |= CIRCLAUNCH_NEED_UPTIME;
         oricirc = circuit_launch_by_extend_info(purpose, ei, flags);
