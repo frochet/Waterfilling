@@ -101,12 +101,23 @@ run_crelay_scheduled_events(time_t now) {
 int
 mt_crelay_send_message(mt_desc_t* desc, uint8_t command, mt_ntype_t type,
     byte* msg, int size) {
-  (void)desc;
-  (void)command;
-  (void)type;
-  (void)msg;
-  (void)size;
-  return 0;
+  byte id[DIGEST_LEN];
+  mt_desc2digest(desc, &id);
+  circuit_t *circ = digestmap_get(desc2circ, (char*) id);
+  crypt_path_t *layer_start = NULL;
+  if (!circ || circ->marked_for_close || circ->state !=
+      CIRCUIT_STATE_OPEN) {
+    //XXX Todo maybe do something smarter if the circ is still not
+    //open
+    return -1;
+  }
+  if (circ->purpose == CIRCUIT_PURPOSE_R_LEDGER || 
+      circ->purpose == CIRCUIT_PURPOSE_R_INTERMEDIARY) {
+    /** Message for the ledger an intermediary */
+    layer_start = TO_ORIGIN_CIRCUIT(circ)->cpath->prev;
+  }
+  return relay_send_pcommand_from_edge(circ, RELAY_COMMAND_MT,
+      type, layer_start, (const char*) msg, size);
 }
 
 void
