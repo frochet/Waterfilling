@@ -6,6 +6,10 @@ void mt_crelay_init(void);
 
 void run_crelay_scheduled_events(time_t now);
 
+void mt_crelay_ledger_circ_has_closed(origin_circuit_t* ocirc);
+
+void mt_crelay_ledger_circ_has_opened(origin_circuit_t* ocirc);
+
 void mt_crelay_intermediary_circ_has_closed(origin_circuit_t* ocirc);
 
 void mt_crelay_intermediary_circ_has_opened(origin_circuit_t* ocirc);

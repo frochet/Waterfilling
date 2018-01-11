@@ -567,7 +567,6 @@ mt_cclient_ledger_circ_has_opened(origin_circuit_t *circ) {
  */
 void 
 mt_cclient_intermediary_circ_has_opened(origin_circuit_t *circ) {
-  (void)circ;
   log_info(LD_MT, "MoneTor: Yay! intermediary circuit opened");
   /* reset circuit_retries counter */
   //Todo

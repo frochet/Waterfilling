@@ -130,7 +130,6 @@ void mt_cintermediary_ledger_circ_has_closed(circuit_t *circ) {
   byte id[DIGEST_LEN];
   mt_desc2digest(&TO_ORIGIN_CIRCUIT(circ)->desc, &id);
   digestmap_remove(desc2circ, (char*) id);
-
 }
 
 void mt_cintermediary_orcirc_has_closed(or_circuit_t *circ) {

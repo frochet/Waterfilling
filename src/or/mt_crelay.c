@@ -11,6 +11,7 @@
 #include "circuituse.h"
 #include "circuitlist.h"
 #include "relay.h"
+#include "main.h"
 
 static uint64_t count[2] = {0, 0}; 
 static digestmap_t  *desc2circ = NULL;
@@ -30,6 +31,7 @@ mt_crelay_init(void) {
 }
 
 void mt_crelay_init_desc_and_add(or_circuit_t *circ) {
+  increment(count);
   circ->desc.id[0] = count[0];
   circ->desc.id[1] = count[1];
   circ->desc.party = MT_PARTY_CLI; // Which party shoud I put?
@@ -44,16 +46,122 @@ mt_crelay_get_ledger(void) {
 }
 
 /************************** Open and close events **************/
+
+/**
+ * XXX check logic about opening/closing circuit with new desc.
+ * Are we going to mess with payment modules?*/
+
+void
+mt_crelay_ledger_circ_has_opened(origin_circuit_t *ocirc) {
+  ledger->circuit_retries = 0;
+  ledger->is_reachable = LEDGER_REACHABLE_YES;
+  /* Generate new desc and add this circ into desc2circ */
+  increment(count);
+  ocirc->desc.id[0] = count[0];
+  ocirc->desc.id[1] = count[1];
+  ocirc->desc.party = MT_PARTY_LED;
+  byte id[DIGEST_LEN];
+  mt_desc2digest(&ocirc->desc, &id);
+  digestmap_set(desc2circ, (char*) id, TO_CIRCUIT(ocirc));
+}
+
+void mt_crelay_ledger_circ_has_closed(origin_circuit_t *circ) {
+  time_t now;
+  /* If the circuit is closed before we successfully extend
+   * a general circuit towards the ledger, then we may have
+   * a reachability problem.. */
+  if (TO_CIRCUIT(circ)->state != CIRCUIT_STATE_OPEN) {
+    now = time(NULL);
+    log_info(LD_MT, "MoneTor: Looks like we did not extend a circuit successfully"
+        " towards the ledger %lld", (long long) now);
+    ledger->circuit_retries++;
+  }
+  smartlist_remove(ledgercircs, circ);
+  /* XXX Todo should also remove from desc2circ */
+  byte id[DIGEST_LEN];
+  mt_desc2digest(&circ->desc, &id);
+  digestmap_remove(desc2circ, (char*) id);
+}
+
 void
 mt_crelay_intermediary_circ_has_closed(origin_circuit_t* ocirc) {
-  (void) ocirc;
+  /** If ocirc is not within our digestmap, it means that the payment
+   * channel has been closed, then it is ok :) 
+   * 
+   * Careful, many payment channels might use the same intermediary circuit
+   *
+   * if circ within our digest map but not open, it means we not successfuly 
+   * connected to the intermediary => close this circuit, launch one another and
+   * log the attempt
+   *
+   * If circ closed but payment channel still open (the circ is still in 
+   * the digestmap ~ or whatever logic which makes us certain that the channel
+   * is open; launch again one circuit toward the intermediary */
+  byte id[DIGEST_LEN];
+  mt_desc2digest(&ocirc->desc, &id);
+  if (TO_CIRCUIT(ocirc)->state != CIRCUIT_STATE_OPEN) {
+    /** Someway to indicate that we retry on an extend_info_t */
+    tor_assert(ocirc->cpath);
+    tor_assert(ocirc->cpath->prev);
+    tor_assert(ocirc->cpath->prev->extend_info);
+    digestmap_remove(desc2circ, (char*) id);
+    if (ocirc->cpath->prev->extend_info->retries < INTERMEDIARY_MAX_RETRIES) {
+      
+      node_t *node = 
+        node_get_mutable_by_id(ocirc->cpath->prev->extend_info->identity_digest);
+      extend_info_t *ei = extend_info_from_node(node, 0);
+      if (!ei) {
+        log_info(LD_MT, "MoneTor: Something went wrong with the extend_info");
+        // XXX TODO alert the payment system to aboard
+
+        return;
+      }
+      ei->retries = ++ocirc->cpath->prev->extend_info->retries;
+      int purpose = CIRCUIT_PURPOSE_R_INTERMEDIARY;
+      int flags = CIRCLAUNCH_IS_INTERNAL;
+      flags |= CIRCLAUNCH_NEED_UPTIME;
+
+      origin_circuit_t *circ = circuit_launch_by_extend_info(purpose, ei, flags);
+      if (!circ) {
+        log_info(LD_MT, "MoneTor: Something went wrong when re-creating a circuit");
+        // XXX Todo alert the payment system to aboard
+        return;
+      }
+      return;
+    }
+    else { /** We reache max retries */
+      log_info(LD_MT, "MoneTor: we reached the maximum allowed retry for intermediary %s"
+          " .. we aboard", extend_info_describe(ocirc->cpath->prev->extend_info));
+      // XXX TODO alert the payement system to aboard
+    }
+  }
+  if (!digestmap_get(desc2circ, (char*) id)) {
+    // then its find
+    log_info(LD_MT, "MoneTor: Our intermerdiary circuit closed but it looks"
+        " it has already been removed from our map => all payment channel should"
+        " have closed");
+    return;
+  }
+  else { //XXX TODO
+    
+    digestmap_remove(desc2circ, (char*) id);
+  /** The circuit was open; so it was intentially closed by our side or someone in the path*/
+
+    // Check if there is some other payment channel that use this circuit, if yes
+    // then rebuild a circuit
+    // XXX TODO => Thien-nam: How do we verify if a payment channel linked to
+    // an intermediary is still open? 
+  }
 }
 
 void 
 mt_crelay_intermediary_circ_has_opened(origin_circuit_t* ocirc) {
-  (void) ocirc;
   /** XXX Did Should notify the payment system when the intermediary is 
    * ready? */
+  log_info(LD_MT, "MoneTor: Yay! An intermediary circuit opened");
+  byte id[DIGEST_LEN];
+  mt_desc2digest(&ocirc->desc, &id);
+  digestmap_set(desc2circ, (char*) id, TO_CIRCUIT(ocirc));
 }
 
 /************************** Events *****************************/
@@ -82,7 +190,55 @@ run_crelay_housekeeping_event(time_t now) {
 
 static void
 run_crelay_build_circuit_event(time_t now) {
-  (void) now;
+
+  if (router_have_consensus_path() == CONSENSUS_PATH_UNKNOWN ||
+      !have_completed_a_circuit())
+    return;
+  /** Note: code duplication with crelay and cclient ~ maybe do something smarter? */
+  extend_info_t *ei = NULL;
+  if (!ledger) {
+    const node_t *node;
+    node = node_find_ledger();
+    if (!node) {
+      log_info(LD_MT, "MoneTor: Hey, we do not have a ledger in our consensus?");
+      return;  /** For whatever reason our consensus does not have a ledger */
+    }
+    ei = extend_info_from_node(node, 0);
+    if (!ei) {
+      log_info(LD_MT, "MoneTor: extend_info_from_node failed?");
+      goto err;
+    }
+    ledger_init(&ledger, node, ei, now);
+  }
+  /* How many of them do we build? - should be linked to 
+   * our consensus weight */
+  origin_circuit_t *circ = NULL;
+  
+  while (smartlist_len(ledgercircs) < NBR_LEDGER_CIRCUITS &&
+         ledger->circuit_retries < NBR_LEDGER_CIRCUITS*LEDGER_MAX_RETRIES) {
+    /* this is just about load balancing */
+    log_info(LD_MT, "MoneTor: We do not have enough ledger circuits - launching one more");
+    int purpose = CIRCUIT_PURPOSE_R_LEDGER;
+    int flags = CIRCLAUNCH_IS_INTERNAL;
+    flags |= CIRCLAUNCH_NEED_UPTIME;
+    circ = circuit_launch_by_extend_info(purpose, ledger->ei,
+        flags);
+    if (!circ) {
+      ledger->circuit_retries++;
+    }
+    else {
+      smartlist_add(ledgercircs, circ);
+    }
+  }
+  if (ledger->circuit_retries >= NBR_LEDGER_CIRCUITS*LEDGER_MAX_RETRIES) {
+    log_info(LD_MT, "MoneTor: It looks like we reach maximum cicuit launch"
+        " towards the ledger. What is going on?");
+  }
+  return;
+ err:
+  extend_info_free(ei);
+  ledger_free(&ledger);
+  return;
 }
 
 void
@@ -117,7 +273,7 @@ mt_crelay_send_message(mt_desc_t* desc, uint8_t command, mt_ntype_t type,
     /** Message for the ledger an intermediary */
     layer_start = TO_ORIGIN_CIRCUIT(circ)->cpath->prev;
   }
-  return relay_send_pcommand_from_edge(circ, RELAY_COMMAND_MT,
+  return relay_send_pcommand_from_edge(circ, command,
       type, layer_start, (const char*) msg, size);
 }
 
@@ -148,7 +304,7 @@ mt_crelay_process_received_msg(circuit_t *circ, mt_ntype_t pcommand,
 
       /** Now, try to find a circuit to ninter of launch one */
       origin_circuit_t *oricirc = NULL;
-      //XXX TODO
+      
       SMARTLIST_FOREACH_BEGIN(circuit_get_global_list(), circuit_t*, circtmp) {
         if (!circtmp->marked_for_close && CIRCUIT_IS_ORIGIN(circtmp) &&
             circ->purpose == CIRCUIT_PURPOSE_R_INTERMEDIARY) {
@@ -187,13 +343,10 @@ mt_crelay_process_received_msg(circuit_t *circ, mt_ntype_t pcommand,
           //XXX alert payment module
           return;
         }
-
-        oricirc->desc.id[0] = rand_uint64();
-        oricirc->desc.id[1] = rand_uint64();
-        oricirc->desc.party = MT_PARTY_CLI;
-        byte id[DIGEST_LEN];
-        mt_desc2digest(&oricirc->desc, &id);
-        digestmap_set(desc2circ, (char*) id, TO_CIRCUIT(oricirc));
+        increment(count);
+        oricirc->desc.id[0] = count[0];
+        oricirc->desc.id[1] = count[1];
+        oricirc->desc.party = MT_PARTY_INT;
       }
 
       mt_desc_t *desci = tor_malloc_zero(sizeof(mt_desc_t));
