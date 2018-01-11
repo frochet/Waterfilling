@@ -2363,6 +2363,14 @@ typedef struct circ_buffer_stats_t {
   double mean_time_cells_in_queue;
   /** Total number of cells sent over this circuit */
   uint32_t processed_cells;
+
+  // XXX moneTor statistics
+
+  /** Destination port of the circuit**/
+  uint16_t port;
+  /** Whether or not the circuit processes user exit data **/
+  uint8_t is_exit_data;
+
 } circ_buffer_stats_t;
 
 /** List of circ_buffer_stats_t. */
@@ -2373,8 +2381,12 @@ static smartlist_t *circuits_for_buffer_stats = NULL;
  * circuit. */
 void
 rep_hist_add_buffer_stats(double mean_num_cells_in_queue,
-    double mean_time_cells_in_queue, uint32_t processed_cells)
+			  double mean_time_cells_in_queue, uint32_t processed_cells,
+			  uint16_t port, uint8_t is_exit_data)
 {
+
+  // XXX moneTor statistics
+
   circ_buffer_stats_t *stats;
   if (!start_of_buffer_stats_interval)
     return; /* Not initialized. */
@@ -2382,6 +2394,8 @@ rep_hist_add_buffer_stats(double mean_num_cells_in_queue,
   stats->mean_num_cells_in_queue = mean_num_cells_in_queue;
   stats->mean_time_cells_in_queue = mean_time_cells_in_queue;
   stats->processed_cells = processed_cells;
+  stats->port = port;
+  stats->is_exit_data = is_exit_data;
   if (!circuits_for_buffer_stats)
     circuits_for_buffer_stats = smartlist_new();
   smartlist_add(circuits_for_buffer_stats, stats);
@@ -2393,11 +2407,16 @@ rep_hist_add_buffer_stats(double mean_num_cells_in_queue,
 void
 rep_hist_buffer_stats_add_circ(circuit_t *circ, time_t end_of_interval)
 {
+
+  // XXX moneTor statistics
+
   time_t start_of_interval;
   int interval_length;
   or_circuit_t *orcirc;
   double mean_num_cells_in_queue, mean_time_cells_in_queue;
   uint32_t processed_cells;
+  uint16_t port;
+  uint8_t is_exit_data;
   if (CIRCUIT_IS_ORIGIN(circ))
     return;
   orcirc = TO_OR_CIRCUIT(circ);
@@ -2419,9 +2438,17 @@ rep_hist_buffer_stats_add_circ(circuit_t *circ, time_t end_of_interval)
       (double) orcirc->processed_cells;
   orcirc->total_cell_waiting_time = 0;
   orcirc->processed_cells = 0;
+
+  port = orcirc->n_streams->base_->port;
+
+  /** TODO: figure out best way to pass this info in **/
+  is_exit_data = 1;
+
   rep_hist_add_buffer_stats(mean_num_cells_in_queue,
                             mean_time_cells_in_queue,
-                            processed_cells);
+                            processed_cells,
+			    port,
+			    is_exit_data);
 }
 
 /** Sorting helper: return -1, 1, or 0 based on comparison of two
@@ -2465,7 +2492,14 @@ rep_hist_reset_buffer_stats(time_t now)
 char *
 rep_hist_format_buffer_stats(time_t now)
 {
-#define SHARES 10
+
+#define SHARES 50
+  // XXX moneTor change bucket granularity
+
+  // XXX moneTor todo:
+  //   - add line for each port
+  //   - filter out data cells only
+
   uint64_t processed_cells[SHARES];
   uint32_t circs_in_share[SHARES];
   int number_of_circuits, i;
@@ -2541,6 +2575,10 @@ rep_hist_format_buffer_stats(time_t now)
   smartlist_free(queued_cells_strings);
   smartlist_free(time_in_queue_strings);
 
+  // XXX moneTor statistics
+
+  log_info(LD_GENERAL, "hiiiiiiiii ");
+
   /* Put everything together. */
   format_iso_time(t, now);
   tor_asprintf(&result, "cell-stats-end %s (%d s)\n"
@@ -2568,6 +2606,9 @@ rep_hist_format_buffer_stats(time_t now)
 time_t
 rep_hist_buffer_stats_write(time_t now)
 {
+
+  // XXX moneTor statistics
+
   char *str = NULL;
 
   if (!start_of_buffer_stats_interval)
@@ -3466,4 +3507,3 @@ rep_hist_free_all(void)
   tor_assert_nonfatal(rephist_total_alloc == 0);
   tor_assert_nonfatal_once(rephist_total_num == 0);
 }
-

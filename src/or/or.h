@@ -5129,7 +5129,10 @@ typedef enum {
   DIRREQ_CHANNEL_BUFFER_FLUSHED = 4
 } dirreq_state_t;
 
-#define WRITE_STATS_INTERVAL (24*60*60)
+//#define WRITE_STATS_INTERVAL (24*60*60)
+
+// XXX moneTor change for chutney testing purposes
+#define WRITE_STATS_INTERVAL 5
 
 /********************************* microdesc.c *************************/
 
@@ -5466,4 +5469,3 @@ typedef struct tor_version_t {
 } tor_version_t;
 
 #endif /* !defined(TOR_OR_H) */
-

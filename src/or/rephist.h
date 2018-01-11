@@ -77,7 +77,9 @@ void rep_hist_buffer_stats_add_circ(circuit_t *circ,
 time_t rep_hist_buffer_stats_write(time_t now);
 void rep_hist_buffer_stats_term(void);
 void rep_hist_add_buffer_stats(double mean_num_cells_in_queue,
-     double mean_time_cells_in_queue, uint32_t processed_cells);
+			       double mean_time_cells_in_queue, uint32_t processed_cells,
+			       uint16_t port, uint8_t is_exit_data);
+
 char *rep_hist_format_buffer_stats(time_t now);
 void rep_hist_reset_buffer_stats(time_t now);
 
@@ -144,4 +146,3 @@ void rep_hist_prep_published_padding_counts(time_t now);
 void rep_hist_padding_count_timers(uint64_t num_timers);
 
 #endif /* !defined(TOR_REPHIST_H) */
-
