@@ -81,6 +81,7 @@ void rep_hist_add_buffer_stats(double mean_num_cells_in_queue,
 			       uint16_t port, uint8_t is_exit_data);
 
 char *rep_hist_format_buffer_stats(time_t now);
+char *rep_hist_format_moneTor_stats(time_t now);
 void rep_hist_reset_buffer_stats(time_t now);
 
 void rep_hist_desc_stats_init(time_t now);
