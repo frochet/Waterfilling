@@ -1015,8 +1015,9 @@ networkstatus_compute_wfbw_weights(smartlist_t *retain,
     }
     tor_free(guardsexits);
   }
-  if (remainder_guards)
-    /*printf("remainder_guards guards=%" PRId64 "\n", remainder_guards);*/
+  if (remainder_guards) {
+    printf("remainder_guards guards=%" PRId64 "\n", remainder_guards);
+  }
   remainder = tor_malloc_zero(sizeof(remainder_wfbw_t));
   remainder->r_guards = remainder_guards;
   remainder->r_exits = remainder_exits;
